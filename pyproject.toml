@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend="setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project]
+name = "cryolike"
+version = "0.0.1"
+description = "Python package for CryoLike"
+authors = [
+    { name = "Wai Shing Tang", email = "wtang@flatironinstitute.org" }
+]
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.23.5",
+    "scipy",
+    "torch>=2.2.0"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest >= 7.4.3",
+    "pytest-cov >= 4.1.8",
+    "mdtraj >= 1.10.0"
+]
+
+[tool.mypy]
+plugins = ["numpy.typing.mypy_plugin"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = ["test/*"]
