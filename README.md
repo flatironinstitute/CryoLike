@@ -1,9 +1,8 @@
-# CryoLike Python library
+# The CryoLike Python library
 
-This repo is dedicated to the development of a Python library for CryoLike, a fast and accurate algorithm for computing the likelihood of images given a cryo-EM map and atomic model. The algorithm is described in the following paper:
-...
+This repo is dedicated to the development of the CryoLike Python library, a fast and accurate algorithm for computing the likelihood of cryo-EM images given a cryo-EM map and atomic model. The algorithm is described in the manuscript soon to be available on bioRxiv.
 
-## Dependencies for Python verion
+## Dependencies for Python 
 
 The Python library requires the following dependencies:
 
@@ -26,8 +25,7 @@ pip3 install torch torchvision torchaudio
 pip install finufft
 pip install cufinufft
 ```
-the torch installation depends on your system, please refer to the official website for the installation guide https://pytorch.org/get-started/locally/.
-
+Note that the torch installation might depend on your system, please refer to the pytorch official website for the installation guide https://pytorch.org/get-started/locally/.
 ## Installation
 
 To install the Python library, clone the repository and run the following command in the root directory of the repository:
@@ -64,10 +62,3 @@ Data used in the examples and test cases are retrieved from the following source
 - EMD: 2788
 - PDB ID: 1UAO
 - PDB ID: 4V1W
-
-## TODO
-
-- [ ] Add documentation for the library
-- [ ] Add more test cases to cover all the functionalities
-- [ ] Add more examples to demonstrate the usage of the library
-- [ ] features to be added...
