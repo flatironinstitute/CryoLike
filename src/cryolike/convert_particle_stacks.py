@@ -432,7 +432,7 @@ class _MetadataBuffer(_Metadata):
             self.defocusV = np.concatenate((self.defocusV, defocusV), axis = 0)
             self.defocusAngle = np.concatenate((self.defocusAngle, defocusAng), axis = 0)
             self.phaseShift = np.concatenate((self.phaseShift, phaseShift), axis = 0)
-        self.sack_size = self.defocusU.shape[0]
+        self.stack_size = self.defocusU.shape[0]
         self._ensure_size_consistency()
 
 
