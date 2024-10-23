@@ -1,6 +1,6 @@
 # The CryoLike Python library
 
-This repo is dedicated to the development of the CryoLike Python library, a fast and accurate algorithm for computing the likelihood of cryo-EM images given a cryo-EM map and atomic model. The algorithm is described in the manuscript soon to be available on bioRxiv.
+This repo is dedicated to the development of the CryoLike Python library, a fast and accurate algorithm for computing the likelihood of cryo-EM images given a cryo-EM map and atomic model. The algorithm is described in this bioRxiv paper https://www.biorxiv.org/content/10.1101/2024.10.18.619077v1
 
 ## Dependencies for Python 
 
