@@ -21,7 +21,7 @@ If you are using virtual environment,
 python3 -m venv ./venv/
 source ./venv/bin/activate
 pip install numpy scipy matplotlib tqdm mrcfile mdtraj
-pip3 install torch torchvision torchaudio
+pip3 install torch torchvision
 pip install finufft
 pip install cufinufft
 ```
@@ -30,16 +30,17 @@ Note that the torch installation might depend on your system, please refer to th
 
 To install the Python library, clone the repository and run the following command in the root directory of the repository:
 ```
-pip install -e .
+pip install .
 ```
-To test the installation, run the following command:
+To test the installation, run the following commands:
 ```
+pip install pytest
 pytest
 ```
 
 ## Usage
 
-For usage of the CryoLike algorithm, please refer to the `examples` directory.
+For usage of the CryoLike algorithm, please refer to the `example` directory.
 
 To run the examples, run the following command:
 ```
