@@ -145,7 +145,7 @@ class JobPaths():
     def get_mrc_filename(self, i_file: int):
         # TODO: Might want to look for them in both padded and unpadded versions
         if self.folder_type == "restacks":
-            mrc_path = os.path.join(self.restacks_folder, f"batch_{i_file:06}_restacked.mrc")
+            mrc_path = os.path.join(self.restacks_folder, f"batch_{i_file}_restacked.mrc")
         elif self.folder_type == "downsample":
             mrc_path = os.path.join(self.downsample_folder, f"batch_{i_file:06}_downsample.mrc")
         else:
@@ -193,9 +193,9 @@ class _Metadata():
         self.defocusU = _ensure_np(defocusU)
         self.defocusV = _ensure_np(defocusV)
         self.defocusAngle = _ensure_np(defocusAngle)
-        self.sphericalAberration = sphericalAberration
-        self.voltage = voltage
-        self.amplitudeContrast = amplitudeContrast
+        self.sphericalAberration = float(sphericalAberration)
+        self.voltage = float(voltage)
+        self.amplitudeContrast = float(amplitudeContrast)
         self.phaseShift = _ensure_np(phaseShift)
         self.defocus_is_degree = defocus_is_degree
         self.phase_shift_is_degree = phase_shift_is_degree
@@ -203,7 +203,7 @@ class _Metadata():
         self.ctfScalefactor = ctfScalefactor
         self.cs_files = cs_files
         self.cs_idxs = cs_idxs
-        self.cs_pixel_size =cs_pixel_size
+        self.cs_pixel_size = cs_pixel_size
 
 
     @classmethod
