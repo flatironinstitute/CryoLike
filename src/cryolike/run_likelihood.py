@@ -80,7 +80,7 @@ def run_likelihood(
     ## load parameters
     params = load_parameters(params_input)
     
-    (torch_float_type, torch_complex_type, _) = set_precision(params.precision, Precision.DOUBLE)
+    (torch_float_type, torch_complex_type, _) = set_precision(params.precision, Precision.SINGLE)
 
     polar_grid = PolarGrid(
         radius_max = params.radius_max,
@@ -124,6 +124,28 @@ def run_likelihood(
     os.makedirs(folder_output_optimal_pose, exist_ok = True)
 
     for i_stack in range(n_stacks):
+
+        if skip_exist:
+            file_integrity = True
+            if return_likelihood_integrated_pose_fourier:
+                filename_output_log_likelihood = os.path.join(folder_output_log_likelihood, f'log_likelihood_S_stack_{i_stack:06}.pt')
+                file_integrity = os.path.exists(filename_output_log_likelihood) and file_integrity
+            if return_likelihood_optimal_pose_fourier:
+                filename_log_likelihood_optimal_pose_fourier = os.path.join(folder_output_log_likelihood, f'log_likelihood_fourier_S_stack_{i_stack:06}.pt')
+                file_integrity = os.path.exists(filename_log_likelihood_optimal_pose_fourier) and file_integrity
+            if return_likelihood_optimal_pose_physical:
+                filename_log_likelihood_optimal_pose_physical = os.path.join(folder_output_log_likelihood, f'log_likelihood_phys_S_stack_{i_stack:06}.pt')
+                file_integrity = os.path.exists(filename_log_likelihood_optimal_pose_physical) and file_integrity
+            if return_optimal_pose:
+                filename_output_cross_correlation = os.path.join(folder_output_cross_correlation, f'cross_correlation_S_stack_{i_stack:06}.pt')
+                filename_output_optimal_template_indices = os.path.join(folder_output_optimal_pose, f'optimal_template_S_stack_{i_stack:06}.pt')
+                filename_output_optimal_displacement_x =  os.path.join(folder_output_optimal_pose, f'optimal_displacement_x_S_stack_{i_stack:06}.pt')
+                filename_output_optimal_displacement_y = os.path.join(folder_output_optimal_pose, f'optimal_displacement_y_S_stack_{i_stack:06}.pt')
+                filename_output_optimal_inplane_rotation = os.path.join(folder_output_optimal_pose, f'optimal_inplane_rotation_S_stack_{i_stack:06}.pt')
+                file_integrity = os.path.exists(filename_output_cross_correlation) and os.path.exists(filename_output_optimal_template_indices) and os.path.exists(filename_output_optimal_displacement_x) and os.path.exists(filename_output_optimal_displacement_y) and os.path.exists(filename_output_optimal_inplane_rotation) and file_integrity
+            if file_integrity:
+                print("Skipping stack number: ", i_stack)
+                continue
         
         print("stack number: ", i_stack)
         image_fourier_file = os.path.join(folder_particles_fft, f'particles_fourier_stack_{i_stack:06}.pt')
@@ -152,7 +174,7 @@ def run_likelihood(
 
         fourier_images = FourierImages(images_fourier, polar_grid)
         im = Images(fourier_images_data=fourier_images, box_size=box_size, phys_grid=phys_grid)
-        device = LensDescriptor(
+        optical_device = LensDescriptor(
             defocusU = defocusU_stack,
             defocusV = defocusV_stack,
             defocusAng = defocusAng_stack,
@@ -163,7 +185,7 @@ def run_likelihood(
             phaseShift = phaseShift_stack,
             phaseShift_degree = phase_shift_is_degree,)
         ctf = CTF(
-            ctf_descriptor=device,
+            ctf_descriptor=optical_device,
             polar_grid = polar_grid,
             box_size = box_size[0], ## TODO: check this hard-coded index
             anisotropy = True
@@ -221,7 +243,6 @@ def run_likelihood(
             cclik = CrossCorrelationLikelihood(
                 templates = tp,
                 max_displacement = max_displacement,
-                # n_displacements = n_displacements,
                 n_displacements_x = n_displacements_x,
                 n_displacements_y = n_displacements_y,
                 precision = params.precision,
@@ -238,8 +259,8 @@ def run_likelihood(
                 images_fourier = im.images_fourier,
                 ctf = ctf_tensor,
                 n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
-                n_images_per_batch=n_templates_per_batch,
-                n_templates_per_batch=n_images_per_batch,
+                n_images_per_batch=n_images_per_batch,
+                n_templates_per_batch=n_templates_per_batch,
                 return_type=CrossCorrelationReturnType.OPTIMAL_POSE,
                 return_integrated_likelihood=True
             )
