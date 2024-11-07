@@ -4,7 +4,7 @@ import torch
 from math import lgamma
 from collections.abc import Callable
 from itertools import product
-from tqdm import tqdm
+from tqdm import trange
 
 from cryolike.array import to_torch, absq, fourier_bessel_transform
 from cryolike.displacement import get_possible_displacements_grid, translation_kernel_fourier
@@ -837,39 +837,38 @@ class CrossCorrelationLikelihood:
             ill_kernel = lambda _1, _2, _3, _4, _5, _6, _7: None
 
         collect_batch = self._initialize_collector(n_images, return_type)
-        batches = _make_batches(n_images_per_batch, n_images, n_templates_per_batch, self.n_templates)
-
-        for (t_batch_rng, i_batch_rng) in tqdm(batches):
-            assert isinstance(t_batch_rng, np.ndarray)
-            assert isinstance(i_batch_rng, np.ndarray)
-
-            (i_start, i_end) = (i_batch_rng[0], i_batch_rng[1])
-            (t_start, t_end) = (t_batch_rng[0], t_batch_rng[1])
-            f_imgs = images_fourier[i_start:i_end, :, :].to(device)
+        
+        for t_start in trange(0, self.n_templates, n_templates_per_batch):
+            
+            t_end = min(t_start + n_templates_per_batch, self.n_templates)
             
             weighted_templates = _get_weighted_templates(self.templates_fourier[t_start:t_end, :, :], self.weighted_translation_kernel, device = device)
             f_templates_mnw = weighted_templates.fourier_templates_mnw
             f_templates_bessel_mdnq = weighted_templates.fourier_templates_bessel_mdnq
-            # f_templates_mnw = fourier_templates_mnw[t_start:t_end, :, :].to(device)
-            # f_templates_bessel_mdnq = fourier_templates_bessel_mdnq[t_start:t_end, :, :].to(device)
-            _ctf = ctf if ctf_is_singleton else ctf[i_start:i_end, :, :].to(device)
+            
+            for i_start in range(0, n_images, n_images_per_batch):
+                
+                i_end = min(i_start + n_images_per_batch, n_images)
+            
+                f_imgs = images_fourier[i_start:i_end, :, :].to(device)
+                _ctf = ctf if ctf_is_singleton else ctf[i_start:i_end, :, :].to(device)
 
-            (cross_correlation_smdw, log_likeilhood_S) = _cross_images_and_templates(
-                device,
-                self.n_inplanes,
-                f_imgs,
-                f_templates_mnw,
-                f_templates_bessel_mdnq,
-                _ctf,
-                self.integration_weights_points.to(device),
-                self.integration_weights_points_sqrt.to(device),
-                ill_kernel
-            )
-            if torch.isnan(cross_correlation_smdw).any():
-                raise ValueError("NaN detected in cross_correlation_smdw")
-            collect_batch(i_start, i_end, t_start, t_end, cross_correlation_smdw)
-            if (log_likeilhood_S is not None):
-                self._collect_log_likelihood(i_start, i_end, t_start, t_end, log_likeilhood_S)
+                (cross_correlation_smdw, log_likeilhood_S) = _cross_images_and_templates(
+                    device,
+                    self.n_inplanes,
+                    f_imgs,
+                    f_templates_mnw,
+                    f_templates_bessel_mdnq,
+                    _ctf,
+                    self.integration_weights_points.to(device),
+                    self.integration_weights_points_sqrt.to(device),
+                    ill_kernel
+                )
+                if torch.isnan(cross_correlation_smdw).any():
+                    raise ValueError("NaN detected in cross_correlation_smdw")
+                collect_batch(i_start, i_end, t_start, t_end, cross_correlation_smdw)
+                if (log_likeilhood_S is not None):
+                    self._collect_log_likelihood(i_start, i_end, t_start, t_end, log_likeilhood_S)
 
         if return_type == CrossCorrelationReturnType.OPTIMAL_POSE:
             self._finalize_optimal_pose(n_images)
