@@ -418,6 +418,7 @@ class _MetadataBuffer(_Metadata):
         copy.defocusV = defV
         copy.defocusAngle = defA
         copy.phaseShift = phase
+        copy.stack_size = defU.shape[0]
         return copy
 
 
@@ -486,6 +487,7 @@ class ImgBuffer():
         (fourier_head, fourier_tail) = _pop_batch(self.images_fourier, _b)
         self.images_phys = phys_tail
         self.images_fourier = fourier_tail
+        self.stack_size = self.images_phys.shape[0]
         return (phys_head, fourier_head)
 
 
