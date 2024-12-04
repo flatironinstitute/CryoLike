@@ -1,9 +1,9 @@
-from cryolike.sphere_grid import SphereShell
-from cryolike.util.enums import SamplingStrategy
 from torch import Tensor, tensor, zeros_like, ones_like, float32
-from cryolike.util.types import FloatArrayType
 
-Viewing_angle_type = FloatArrayType | Tensor
+from cryolike.grids import SphereShell
+from cryolike.util import FloatArrayType, SamplingStrategy
+
+_Viewing_angle_type = FloatArrayType | Tensor
 
 class ViewingAngles:
     """Class storing the viewing angles, with weights, for a particular template/image stack.
@@ -32,7 +32,7 @@ class ViewingAngles:
     n_angles: int
 
 
-    def __init__(self, azimus: Viewing_angle_type, polars: Viewing_angle_type, gammas: Viewing_angle_type | None):
+    def __init__(self, azimus: _Viewing_angle_type, polars: _Viewing_angle_type, gammas: _Viewing_angle_type | None):
         """Constructor for stack of viewing angles.
 
         Args:

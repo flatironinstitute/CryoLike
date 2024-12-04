@@ -4,9 +4,13 @@ from scipy.special import roots_jacobi
 from typing import TypeVar, Union, Optional, cast
 from dataclasses import dataclass
 
-from cryolike.util.typechecks import ensure_positive
-from cryolike.util.enums import QuadratureType
-from cryolike.util.types import ComplexArrayType, FloatArrayType, IntArrayType
+from cryolike.util import (
+    ComplexArrayType,
+    ensure_positive,
+    FloatArrayType,
+    IntArrayType,
+    QuadratureType,
+)
 
 
 # Pydantic might be better for this
@@ -279,7 +283,7 @@ class PolarGrid:
             raise ValueError('Invalid type for f', type(f))
         if len(f.shape) > 1:
             if f.shape[-2] == self.n_shells and f.shape[-1] == self.n_inplanes:
-                f = f.reshape(-1, self.n_points)
+                f = f.reshape(-1, self.n_points) # type: ignore
             if f.shape[-1] != self.n_points:
                 raise ValueError('Invalid shape for f', f.shape)
         else:

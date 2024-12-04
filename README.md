@@ -26,6 +26,7 @@ pip install finufft
 pip install cufinufft
 ```
 Note that the torch installation might depend on your system, please refer to the pytorch official website for the installation guide https://pytorch.org/get-started/locally/.
+For detailed installation of finufft and cufinufft, please refer to the official website https://finufft.readthedocs.io/en/latest/.
 ## Installation
 
 To install the Python library, clone the repository and run the following command in the root directory of the repository:

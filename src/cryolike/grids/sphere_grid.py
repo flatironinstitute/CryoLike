@@ -1,12 +1,11 @@
 from typing import Optional, NamedTuple
-from cryolike.polar_grid import FloatArrayType, IntArrayType
-from cryolike.util.typechecks import ensure_positive_finite
 import numpy as np
 from scipy.special import roots_legendre, roots_jacobi
-from cryolike.util.enums import SamplingStrategy
 from copy import copy
 from torch import tensor, Tensor, cuda
 from math import ceil
+
+from cryolike.util import SamplingStrategy, ensure_positive_finite, FloatArrayType, IntArrayType
 
 class CartesianShell(NamedTuple):
     """Collection of Cartesian points for a sphere or spherical shell.

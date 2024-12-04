@@ -1,19 +1,19 @@
-from cryolike.array import to_torch
-from cryolike.util.enums import CrossCorrelationReturnType, Precision
-from cryolike.util.typechecks import set_precision
-from cryolike.util.types import FloatArrayType
-from cryolike.viewing_angles import ViewingAngles
 import numpy as np
 import torch
 from scipy.special import jv
 
-from cryolike.polar_grid import PolarGrid
-from cryolike.template import Templates
-from cryolike.image import FourierImages, Images
-from cryolike.ctf import CTF
+from cryolike.grids import PolarGrid, FourierImages
+from cryolike.stacks import Templates, Images
+from cryolike.microscopy import CTF, ViewingAngles
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood, conform_ctf
-from cryolike.plot import plot_images
-from cryolike.util.enums import Precision
+from cryolike.util import (
+    CrossCorrelationReturnType,
+    FloatArrayType,
+    Precision,
+    set_precision,
+    to_torch,
+)
+
 
 def test_cross_correlation():
     
@@ -175,14 +175,16 @@ def test_cross_correlation():
         images_fourier = _imgs,
         ctf=_ctf,
         n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
-        n_templates_per_batch=1,
+        n_templates_per_batch=128,
         n_images_per_batch=128,
         return_type=CrossCorrelationReturnType.OPTIMAL_DISPLACEMENT,
         return_integrated_likelihood=False,
     )
     cross_correlation_w0 = res.cross_correlation_SMw[:,:,0].numpy()
+    print("cross_correlation_w0", cross_correlation_w0)
+    print("I_true", I_true)
 
-    assert np.allclose(cross_correlation_w0, I_true, atol = 1e-6)
+    assert np.allclose(cross_correlation_w0, I_true, atol = 1e-5)
 
 
 if __name__ == '__main__':

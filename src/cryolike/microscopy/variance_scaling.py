@@ -1,10 +1,8 @@
-from cryolike.util.enums import Precision
-import torch
 import numpy as np
 
-from cryolike.polar_grid import PolarGrid
-from cryolike.cartesian_grid import CartesianGrid2D
-from cryolike.nufft import cartesian_phys_to_fourier_polar
+from cryolike.grids import CartesianGrid2D, PolarGrid
+from cryolike.util import Precision
+from .nufft import cartesian_phys_to_fourier_polar
 
 def variance_scaling(
     phys_grid : CartesianGrid2D, # physical grid

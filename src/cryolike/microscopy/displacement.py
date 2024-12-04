@@ -1,16 +1,14 @@
-from cryolike.util.types import FloatArrayType
 import numpy as np
 import torch
-from cryolike.polar_grid import PolarGrid
-from cryolike.array import to_torch
-from cryolike.util.enums import Precision
+
+from cryolike.grids import PolarGrid
+from cryolike.util import FloatArrayType, Precision, to_torch
 
 def get_possible_displacements(
     max_displacement,
     n_displacements,
     has_zero_displacement = True
 ):
-    
     if n_displacements <= 1:
         n_displacements = 1
         x_displacements = np.array([0])

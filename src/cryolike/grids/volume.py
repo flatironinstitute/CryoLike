@@ -1,68 +1,45 @@
+import mrcfile
 import numpy as np
 import torch
-import mrcfile
 from typing import Optional, cast
-from dataclasses import dataclass
 
-from cryolike.cartesian_grid import CartesianGrid3D
-from cryolike.sphere_grid import SphereGrid
-from cryolike.atomic_model import AtomicModel
+from .cartesian_grid import CartesianGrid3D
+from .sphere_grid import SphereGrid
+from .data_transfer_classes import PhysicalVolume, FourierVolume
 
-from cryolike.util.enums import NormType, Precision
-from cryolike.util.types import ComplexArrayType, FloatArrayType, IntArrayType
-from cryolike.util.reformatting import TargetType, project_descriptor
+from cryolike.util import (
+    FloatArrayType,
+    project_descriptor,
+    TargetType,
+)
 
-Voxels_count_type = int | list[int] | IntArrayType
-Voxel_size_type = float | list[float] | FloatArrayType
-Voxel_grid_descriptor = CartesianGrid3D | tuple[Voxels_count_type, Voxel_size_type]
-Density_type = FloatArrayType | ComplexArrayType
+# 
+# Density_type = FloatArrayType | ComplexArrayType
 
-def read_mrc(
-    filename : str
-) -> tuple[torch.Tensor, np.ndarray]:
-    if not filename.endswith('.mrc') or not filename.endswith('.mrcs'):
-        raise ValueError(" %% Error: File must be an mrc file. ")
-    import mrcfile
-    with mrcfile.open(filename) as mrc:
-        data = torch.from_numpy(mrc.data)
-        voxel_size = np.array([mrc.voxel_size.x, mrc.voxel_size.y, mrc.voxel_size.z], dtype = np.float64)
-    return data, voxel_size
+# def _read_mrc(
+#     filename : str
+# ) -> tuple[torch.Tensor, np.ndarray]:
+#     if not filename.endswith('.mrc') or not filename.endswith('.mrcs'):
+#         raise ValueError(" %% Error: File must be an mrc file. ")
+#     import mrcfile
+#     with mrcfile.open(filename) as mrc:
+#         data = torch.from_numpy(mrc.data)
+#         voxel_size = np.array([mrc.voxel_size.x, mrc.voxel_size.y, mrc.voxel_size.z], dtype = np.float64)
+#     return data, voxel_size
 
 
-def _ensure_phys_grid(grid_desc: Voxel_grid_descriptor) -> CartesianGrid3D:
-    if isinstance(grid_desc, CartesianGrid3D):
-        return grid_desc
-    elif isinstance(grid_desc, tuple):
-        (n_voxels, voxel_size) = grid_desc
-        return CartesianGrid3D(n_voxels = n_voxels, voxel_size = voxel_size)
-    else:
-        raise ValueError(" %% Error: Unknown physical voxel grid descriptor. ")
+# def _ensure_phys_grid(grid_desc: Voxel_grid_descriptor) -> CartesianGrid3D:
+#     if isinstance(grid_desc, CartesianGrid3D):
+#         return grid_desc
+#     elif isinstance(grid_desc, tuple):
+#         (n_voxels, voxel_size) = grid_desc
+#         return CartesianGrid3D(n_voxels = n_voxels, voxel_size = voxel_size)
+#     else:
+#         raise ValueError(" %% Error: Unknown physical voxel grid descriptor. ")
 
-@dataclass
-class FourierVolume:
-    density_fourier: torch.Tensor
-    sphere_grid: SphereGrid
-    
-    def __post_init__(self):
-        if not len(self.density_fourier.shape) == 1:
-            raise ValueError(" %% Error: Fourier volume must be a 1D array. ")
-
-@dataclass
-class PhysicalVolume:
-    density_physical: torch.Tensor
-    voxel_size: Voxel_size_type
-    voxel_grid: CartesianGrid3D = None
-    
-    def __post_init__(self):
-        if self.voxel_grid is not None:
-            raise ValueError("Manual voxel grid is not allowed--it should be inferred from the volume.")
-        if not len(self.density_physical.shape) == 3:
-            raise ValueError(" %% Error: Physical volume must be a 3D array. ")
-        n_pixels = np.array(self.density_physical.shape, dtype = int)
-        self.voxel_grid = CartesianGrid3D(n_voxels = n_pixels, voxel_size = self.voxel_size)
 
 class Volume:
-    """Class representing a volume in physical space."" or Fourier space, with methods manipulating them.
+    """Class representing a volume in physical or Fourier space, with methods manipulating them.
     
     Attributes:
         box_size (FloatArrayType): Size of the (Cartesian-space) viewing port.
@@ -70,7 +47,6 @@ class Volume:
         sphere_grid (SphereGrid): A grid describing the space in which Fourier images reside.
         density_physical (torch.Tensor): Cartesian-space density as a voxel-value array of [X-index x Y-index x Z-index].
         density_fourier (torch.Tensor): Fourier-space density as a point-value array of [point-index].
-    
     """
     
     box_size: FloatArrayType
@@ -154,7 +130,7 @@ class Volume:
     
     
     @classmethod
-    def from_mrc(cls, filename: str, voxel_size: float | list[float] | FloatArrayType = None, device: str | torch.device = 'cpu'):
+    def from_mrc(cls, filename: str, voxel_size: float | list[float] | FloatArrayType | None = None, device: str | torch.device = 'cpu'):
         """Create a new physical density from an MRC file.
 
         Args:
@@ -186,21 +162,21 @@ class Volume:
                 if np.any(_voxel_size <= 0):
                     raise ValueError(f"MRC file {filename} contains non-positive pixel sizes.")
             density_phys = torch.from_numpy(density_phys).to(device)
-            density_physical_data = PhysicalVolume(density_physical=density_phys, voxel_size=_voxel_size, voxel_grid=None)
+            density_physical_data = PhysicalVolume(density_physical=density_phys, voxel_size=_voxel_size)
         volume = cls(density_physical_data=density_physical_data)
         volume.filename = filename
         return volume
     
     
     @classmethod
-    def from_tensor_physical(cls, density_physical: torch.Tensor, voxel_size: Optional[float | list[float] | FloatArrayType]):
+    def from_tensor_physical(cls, density_physical: torch.Tensor, voxel_size: float | list[float] | FloatArrayType):
         """Create a new physical density from an MRC file.
 
         Args:
             density_physical (torch.Tensor): Physical density data to use in the volume class.
             voxel_size (Optional[float  |  list[float]  |  FloatArrayType]): Sizes of the volume voxels (Angstrom).
         """
-        density_physical_data = PhysicalVolume(density_physical=density_physical, voxel_size=voxel_size, voxel_grid=None)
+        density_physical_data = PhysicalVolume(density_physical=density_physical, voxel_size=voxel_size)
         volume = cls(density_physical_data=density_physical_data)
         return volume
     

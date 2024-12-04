@@ -1,22 +1,36 @@
 from typing import Literal, Optional, cast
-from cryolike.util.enums import NormType, Precision
-from cryolike.util.image_manipulation import get_imgs_max
-from cryolike.util.typechecks import ensure_positive
-from cryolike.viewing_angles import ViewingAngles
 import numpy as np
 import mrcfile
 import torch
 
-from cryolike.array import to_torch
-from cryolike.cartesian_grid import CartesianGrid2D, from_descriptor, Cartesian_grid_descriptor
-from cryolike.ctf import CTF
-from cryolike.displacement import translation_kernel_fourier
-from cryolike.nufft import fourier_polar_to_cartesian_phys, cartesian_phys_to_fourier_polar
-from cryolike.polar_grid import PolarGrid
-from cryolike.template import Templates
-from cryolike.util.types import ComplexArrayType, FloatArrayType, IntArrayType
-from cryolike.util.reformatting import TargetType, project_descriptor
-from cryolike.util.data_transfer_classes import FourierImages, PhysicalImages
+from cryolike.grids import (
+    CartesianGrid2D,
+    PolarGrid,
+    FourierImages,
+    PhysicalImages
+)
+from cryolike.microscopy import (
+    CTF,
+    translation_kernel_fourier,
+    fourier_polar_to_cartesian_phys,
+    cartesian_phys_to_fourier_polar,
+    translation_kernel_fourier,
+    ViewingAngles,
+)
+from .template import Templates
+from cryolike.util import (
+    ensure_positive,
+    Cartesian_grid_2d_descriptor,
+    ComplexArrayType,
+    FloatArrayType,
+    get_imgs_max,
+    IntArrayType,
+    NormType,
+    Precision,
+    project_descriptor,
+    TargetType,
+    to_torch,
+)
 
 
 # Nobody is asking for this yet
@@ -371,7 +385,7 @@ class Images:
 
     def transform_to_spatial(
         self,
-        grid: Optional[Cartesian_grid_descriptor] = None,
+        grid: CartesianGrid2D | Cartesian_grid_2d_descriptor | None = None,
         nufft_eps: float = 1e-12,
         precision: Precision = Precision.DEFAULT,
         use_cuda: bool = True
@@ -397,7 +411,7 @@ class Images:
         if grid is None and self.phys_grid is None:
             raise ValueError('No physical grid found, and physical grid parameters were not provided.')
         if grid is not None:
-            self.phys_grid = from_descriptor(grid)
+            self.phys_grid = CartesianGrid2D.from_descriptor(grid)
         device = self.images_fourier.device
         images_fourier = self.images_fourier.reshape(self.n_images, -1)
         # images_fourier = cast(ComplexArrayType, images_fourier)

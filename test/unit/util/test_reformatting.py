@@ -1,16 +1,10 @@
-from cryolike.util.reformatting import project_descriptor, project_scalar, project_vector
 import numpy as np
 from pytest import raises
 from unittest.mock import patch
 from io import StringIO
 
-from cryolike.cartesian_grid import (
-    CartesianGrid2D,
-    CartesianGrid3D,
-    _compute_grid_dims,
-    _setup_grid,
-    TargetType,
-)
+from cryolike.util.reformatting import project_descriptor, project_scalar, project_vector
+from cryolike.grids.cartesian_grid import TargetType
 
 def test_project_scalar_matches_input_type():
     my_float = 1.0

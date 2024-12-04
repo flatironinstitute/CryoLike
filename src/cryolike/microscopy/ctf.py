@@ -1,9 +1,9 @@
-from cryolike.util.types import ComplexArrayType, FloatArrayType
 import numpy as np
 import torch
 from typing import TypeVar, cast
-from cryolike.polar_grid import PolarGrid
-from cryolike.star_file import read_star_file
+
+from cryolike.grids import PolarGrid
+from cryolike.util import ComplexArrayType, FloatArrayType
 
 h =  6.62607015e-34 # Planck constant [Js] = [kgm^2/s]
 e =  1.60217663e-19 # electron charge [C]; note that [CV] = [J]
@@ -99,7 +99,7 @@ class LensDescriptor():
 
     @classmethod
     def read_from_star(cls, filename: str):
-        from cryolike.star_file import read_star_file
+        from cryolike.microscopy.star_file import read_star_file
         dataBlock, _ = read_star_file(filename) # 2nd return is the param list
         for param in dataBlock.keys():
             y = dataBlock[param]

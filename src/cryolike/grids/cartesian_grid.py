@@ -1,8 +1,14 @@
 import numpy as np
-from typing import Literal, Tuple, cast
+from typing import Literal, Tuple, cast, Union
 
-from cryolike.util.reformatting import TargetType, project_descriptor
-from cryolike.util.types import FloatArrayType, IntArrayType, Pixel_size_type, Pixels_count_type
+from cryolike.util import (
+    FloatArrayType,
+    IntArrayType,
+    Cartesian_grid_2d_descriptor,
+    project_descriptor,
+    TargetType,
+)
+
 
 class CartesianGrid2D:
     """Class implementing 2D Cartesian grid.
@@ -52,6 +58,15 @@ class CartesianGrid2D:
         (self.x_axis, self.y_axis) = axes
         (self.x_pixels, self.y_pixels) = (xels)
         self.n_pixels_total = self.x_pixels.size # Is this right? What about non-square grids?
+
+
+    @classmethod
+    def from_descriptor(cls, grid_desc: Union[Cartesian_grid_2d_descriptor, 'CartesianGrid2D']):
+        if isinstance(grid_desc, CartesianGrid2D):
+            return grid_desc
+        (n_pixels, pixel_size) = grid_desc
+        return cls(n_pixels=n_pixels, pixel_size=pixel_size)
+
 
 class CartesianGrid3D:
     """Class implementing 3D Cartesian grid.
@@ -126,30 +141,10 @@ def _compute_grid_dims(
 
     return (eff_n_xels, eff_xel_size, box_size, radius)
 
+
 def _setup_grid(radius: FloatArrayType, n_xels: IntArrayType, endpoint: bool):
     axes: list[FloatArrayType] = []
     for i in range(len(radius)):
         axes.append(np.linspace(-radius[i], radius[i], n_xels[i], endpoint = endpoint))
     computed_xels: list[FloatArrayType] = np.meshgrid(*axes, indexing='ij')
     return (axes, computed_xels)
-
-
-Cartesian_grid_descriptor = CartesianGrid2D | tuple[Pixels_count_type, Pixel_size_type]
-"""Type union of an instantiated CartesianGrid2D object, or the tuple of values required to make one.
-If a tuple, the values are (pixel_count, pixel_size).
-"""
-
-def from_descriptor(grid_desc: Cartesian_grid_descriptor) -> CartesianGrid2D:
-    """Ensures that a Cartesian_grid_descriptor is realized as a fully instantiated CartesianGrid2D object.
-
-    Args:
-        grid_desc (Cartesian_grid_descriptor): Either a viable CartesianGrid2D, or a Tuple of
-            the base values for instantiating one.
-
-    Returns:
-        CartesianGrid2D: A fully instantiated CartesianGrid2D matching the descriptors.
-    """
-    if isinstance(grid_desc, CartesianGrid2D):
-        return grid_desc
-    (n_pixels, pixel_size) = grid_desc
-    return CartesianGrid2D(n_pixels=n_pixels, pixel_size=pixel_size)

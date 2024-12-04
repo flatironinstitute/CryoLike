@@ -1,15 +1,11 @@
-from cryolike.util.enums import Precision
 import numpy as np
 import torch
 from scipy.special import gammaln as lgamma
 
-from cryolike.template import Templates
-from cryolike.image import Images
-from cryolike.ctf import CTF
-from cryolike.polar_grid import PolarGrid
-from cryolike.displacement import translation_kernel_fourier
-from cryolike.array import to_torch, absq, complex_mul_real
-from cryolike.nufft import fourier_polar_to_cartesian_phys
+from cryolike.microscopy import CTF, translation_kernel_fourier, fourier_polar_to_cartesian_phys
+from cryolike.stacks import Images, Templates
+from cryolike.grids import PolarGrid
+from cryolike.util import Precision, to_torch, absq, complex_mul_real
 
 def integrated_likelihood_BioEM(
     templates_phys : torch.Tensor,

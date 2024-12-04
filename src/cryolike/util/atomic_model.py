@@ -1,8 +1,9 @@
-from cryolike.util.types import FloatArrayType
 import numpy as np
 from typing import Union
 
-ATOMIC_RADIUS_RESNAME = {
+from .types import FloatArrayType
+
+_ATOMIC_RADIUS_RESNAME = {
     "CYS": 2.75, "PHE": 3.20, "LEU": 3.10, "TRP": 3.40,
     "VAL": 2.95, "ILE": 3.10, "MET": 3.10, "HIS": 3.05,
     "TYR": 3.25, "ALA": 2.50, "GLY": 2.25, "PRO": 2.80,
@@ -10,7 +11,7 @@ ATOMIC_RADIUS_RESNAME = {
     "GLN": 3.00, "ASP": 2.80, "LYS": 3.20, "GLU": 2.95,
 }
 
-DEFAULT_ATOM_RADII = 0.1
+_DEFAULT_ATOM_RADII = 0.1
 
 
 def _random_coordinates(
@@ -67,9 +68,9 @@ class AtomicModel:
         if box_size is None:
             print("Box size not specified. Using default box_size = 2.0.")
             box_size = 2.0
-        if not np.isscalar(box_size):
-            ## not supported yet
-            box_size = box_size[0] ## TODO: replace with proper handling
+        # if not np.isscalar(box_size):
+        #     ## not supported yet
+        #     box_size = box_size[0] ## TODO: replace with proper handling
         self.box_size = float(box_size)
         if atomic_coordinates is None:
             # raise ValueError("Atomic coordinates or pdb_file must be specified.")
@@ -163,7 +164,7 @@ class AtomicModel:
             atom_radii = np.zeros(u.topology.n_residues, dtype = np.float32)
             for i in range(u.topology.n_residues):
                 resname = res(i).name
-                atom_radii[i] = ATOMIC_RADIUS_RESNAME.get(resname, 3.0)    
+                atom_radii[i] = _ATOMIC_RADIUS_RESNAME.get(resname, 3.0)    
             print("atomic radii = ", atom_radii)
         if atom_selection is not None:
             assert isinstance(u.topology, Topology)

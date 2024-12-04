@@ -1,8 +1,7 @@
 from typing import Callable, List, Optional, Tuple
-from cryolike.util.types import FloatArrayType
 import numpy as np
-from cryolike.polar_grid import PolarGrid
-from cryolike.util.enums import QuadratureType
+from cryolike.grids import PolarGrid
+from cryolike.util import FloatArrayType, QuadratureType
 
 verbose = True
 tol = 1e-8

@@ -1,11 +1,9 @@
 import numpy as np
 import torch
 
-from cryolike.polar_grid import PolarGrid
-from cryolike.cartesian_grid import CartesianGrid2D, CartesianGrid3D
-from cryolike.nufft import fourier_polar_to_cartesian_phys, volume_phys_to_fourier_points
-from cryolike.volume import Volume, PhysicalVolume
-from cryolike.util.enums import Precision, QuadratureType
+from cryolike.grids import PolarGrid, CartesianGrid2D, CartesianGrid3D, Volume, PhysicalVolume
+from cryolike.microscopy.nufft import fourier_polar_to_cartesian_phys, volume_phys_to_fourier_points
+from cryolike.util import Precision, QuadratureType
 
 
 def test_nufft_3d():

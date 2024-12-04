@@ -1,15 +1,12 @@
-from cryolike.util.enums import Precision, AtomShape
-from cryolike.viewing_angles import ViewingAngles
 import numpy as np
 import torch
 from pathlib import Path
 
-from cryolike.polar_grid import PolarGrid
-from cryolike.template import Templates
-from cryolike.atomic_model import AtomicModel
-from cryolike.image import Images
+from cryolike.microscopy import CTF, LensDescriptor, ViewingAngles
+from cryolike.stacks import Templates, Images
+from cryolike.util import Precision, AtomShape, AtomicModel
+from cryolike.grids import PolarGrid
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
-from cryolike.ctf import CTF, LensDescriptor
 
 from time import time
 

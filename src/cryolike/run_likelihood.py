@@ -1,21 +1,18 @@
-from cryolike.viewing_angles import ViewingAngles
 import torch
 import numpy as np
 import sys, os
 from time import time, sleep
-from cryolike.util.enums import Precision, CrossCorrelationReturnType
 
-from cryolike.polar_grid import PolarGrid
-from cryolike.cartesian_grid import CartesianGrid2D
-from cryolike.template import Templates
-from cryolike.image import FourierImages, Images, PhysicalImages
-from cryolike.ctf import CTF, LensDescriptor
+from cryolike.grids import PolarGrid, CartesianGrid2D, FourierImages, PhysicalImages
+from cryolike.stacks import Templates, Images
+from cryolike.microscopy import CTF, LensDescriptor, load_parameters, ViewingAngles
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
 from cryolike.likelihood import calc_distance_optimal_templates_vs_physical_images
-from cryolike.parameters import load_parameters
-from cryolike.util.typechecks import set_precision
+from cryolike.util import Precision, CrossCorrelationReturnType, set_precision
 
 ## TODO: implement functionality : skip_exist, optimized_inplane_rotation, optimized_displacement, optimized_viewing_angle
+## TODO: REFACTOR
+
 def run_likelihood(
     params_input: str | dict = None, # parameters
     folder_templates: str = None, # folder with templates
@@ -90,7 +87,7 @@ def run_likelihood(
     )
     n_shells = polar_grid.n_shells
     n_points = polar_grid.n_points
-    max_displacement = max_displacement_pixels * params.voxel_size[0]
+    max_displacement = max_displacement_pixels * params.voxel_size
         
     phys_grid = CartesianGrid2D(
         n_pixels = params.n_voxels,
@@ -124,7 +121,7 @@ def run_likelihood(
     os.makedirs(folder_output_optimal_pose, exist_ok = True)
 
     for i_stack in range(n_stacks):
-
+        
         if skip_exist:
             file_integrity = True
             if return_likelihood_integrated_pose_fourier:
@@ -222,8 +219,8 @@ def run_likelihood(
                                 images_fourier = im.images_fourier,
                                 ctf = ctf_tensor,
                                 n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
-                                n_images_per_batch=n_templates_per_batch,
-                                n_templates_per_batch=n_images_per_batch,
+                                n_images_per_batch=n_images_per_batch,
+                                n_templates_per_batch=n_templates_per_batch,
                                 return_type=CrossCorrelationReturnType.OPTIMAL_POSE,
                                 return_integrated_likelihood=True
                             )
@@ -243,6 +240,7 @@ def run_likelihood(
             cclik = CrossCorrelationLikelihood(
                 templates = tp,
                 max_displacement = max_displacement,
+                # n_displacements = n_displacements,
                 n_displacements_x = n_displacements_x,
                 n_displacements_y = n_displacements_y,
                 precision = params.precision,
@@ -259,8 +257,8 @@ def run_likelihood(
                 images_fourier = im.images_fourier,
                 ctf = ctf_tensor,
                 n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
-                n_images_per_batch=n_images_per_batch,
-                n_templates_per_batch=n_templates_per_batch,
+                n_images_per_batch=n_templates_per_batch,
+                n_templates_per_batch=n_images_per_batch,
                 return_type=CrossCorrelationReturnType.OPTIMAL_POSE,
                 return_integrated_likelihood=True
             )

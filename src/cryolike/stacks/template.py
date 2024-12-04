@@ -1,23 +1,35 @@
 from typing import Callable, NamedTuple, Optional, cast
-from cryolike.util.typechecks import set_precision
 import numpy as np
 import torch
 from math import ceil
 
-from cryolike.polar_grid import PolarGrid
-from cryolike.atomic_model import AtomicModel
-from cryolike.nufft import fourier_polar_to_cartesian_phys, volume_phys_to_fourier_points
-from cryolike.cartesian_grid import CartesianGrid2D, from_descriptor, Cartesian_grid_descriptor
-from cryolike.volume import Volume
-from cryolike.ctf import CTF
-from cryolike.viewing_angles import ViewingAngles
+from cryolike.grids import (
+    CartesianGrid2D,
+    FourierImages,
+    PhysicalImages,
+    PolarGrid,
+    Volume
+)
 
-from cryolike.util.device_handling import check_cuda
-from cryolike.util.image_manipulation import get_imgs_max
-from cryolike.util.data_transfer_classes import FourierImages, PhysicalImages
-from cryolike.util.enums import Precision, AtomShape
-from cryolike.util.types import FloatArrayType
-from cryolike.util.reformatting import TargetType, project_descriptor
+from cryolike.microscopy import (
+    CTF,
+    fourier_polar_to_cartesian_phys,
+    volume_phys_to_fourier_points,
+    ViewingAngles,
+)
+
+from cryolike.util import (
+    AtomShape,
+    AtomicModel,
+    check_cuda,
+    Cartesian_grid_2d_descriptor,
+    FloatArrayType,
+    get_imgs_max,
+    Precision,
+    project_descriptor,
+    set_precision,
+    TargetType,
+)
 
 
 # Nobody is asking for this (yet)
@@ -73,7 +85,7 @@ def _get_offset(polar_grid: PolarGrid, float_type: torch.dtype, device: torch.de
     return offset
 
 
-class ParsedAtomicModel(NamedTuple):
+class _ParsedAtomicModel(NamedTuple):
     atomic_radius_scaled: torch.Tensor
     radius_shells: torch.Tensor
     radius_shells_sq: torch.Tensor
@@ -81,7 +93,7 @@ class ParsedAtomicModel(NamedTuple):
     atomic_coordinates_scaled: torch.Tensor
 
 
-def _parse_atomic_model(atomic_model: AtomicModel, polar_grid: PolarGrid, box_size: FloatArrayType, float_type: torch.dtype, device: torch.device) -> ParsedAtomicModel:
+def _parse_atomic_model(atomic_model: AtomicModel, polar_grid: PolarGrid, box_size: FloatArrayType, float_type: torch.dtype, device: torch.device) -> _ParsedAtomicModel:
     atomic_coordinates = torch.tensor(atomic_model.atomic_coordinates, dtype=float_type, device=device)
     atomic_radii = torch.tensor(atomic_model.atom_radii, dtype=float_type, device=device)
     box_max = np.amax(box_size)
@@ -92,7 +104,7 @@ def _parse_atomic_model(atomic_model: AtomicModel, polar_grid: PolarGrid, box_si
     pi_atomic_radius_sq_times_two = 2.0 * (np.pi * atomic_radius_scaled) ** 2
     radius_shells = torch.tensor(polar_grid.radius_shells, dtype = float_type, device = device)
     radius_shells_sq = radius_shells ** 2
-    return ParsedAtomicModel(atomic_radius_scaled, radius_shells, radius_shells_sq, pi_atomic_radius_sq_times_two, atomic_coordinates_scaled)
+    return _ParsedAtomicModel(atomic_radius_scaled, radius_shells, radius_shells_sq, pi_atomic_radius_sq_times_two, atomic_coordinates_scaled)
 
 
 def _generate_templates_from_uniform_positions_hard_sphere(
@@ -499,7 +511,7 @@ class Templates:
 
     def transform_to_spatial(
         self,
-        phys_grid: Optional[Cartesian_grid_descriptor] = None,
+        phys_grid: Cartesian_grid_2d_descriptor | CartesianGrid2D | None = None,
         nufft_eps: float = 1e-12,
         n_templates_stop: int = -1,
         precision: Precision = Precision.DEFAULT,
@@ -511,7 +523,7 @@ class Templates:
         if self.polar_grid is None:
             raise ValueError("No polar grid found")
         if phys_grid is not None:
-            self.phys_grid = from_descriptor(phys_grid)
+            self.phys_grid = CartesianGrid2D.from_descriptor(phys_grid)
         if self.phys_grid is None:
             raise ValueError("No physical grid found")
 

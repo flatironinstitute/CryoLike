@@ -1,11 +1,10 @@
 import numpy as np
 import torch
-from cryolike.polar_grid import PolarGrid
-from cryolike.template import Templates
-from cryolike.image import Images
-from cryolike.atomic_model import AtomicModel
-from cryolike.viewing_angles import ViewingAngles
-from cryolike.util.enums import Precision, AtomShape
+
+from cryolike.grids import PolarGrid
+from cryolike.stacks import Templates, Images
+from cryolike.microscopy import ViewingAngles
+from cryolike.util import Precision, AtomShape, AtomicModel
 
 def test_displacement():
 

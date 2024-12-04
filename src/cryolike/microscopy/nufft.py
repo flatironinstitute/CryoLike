@@ -4,14 +4,11 @@ from finufft import nufft2d1 as nufft2d1_cpu
 from finufft import nufft2d2 as nufft2d2_cpu
 from finufft import nufft3d2 as nufft3d2_cpu
 
-from cryolike.cartesian_grid import CartesianGrid2D
-from cryolike.polar_grid import PolarGrid
-from cryolike.util.enums import Precision
-from cryolike.util.typechecks import set_epsilon, set_precision
-from cryolike.volume import Volume
+from cryolike.grids import CartesianGrid2D, PolarGrid, Volume
+from cryolike.util import Precision, set_epsilon, set_precision
 
 # TODO: Use the one in device_handling
-def check_cuda_available() -> bool:
+def _check_cuda_available() -> bool:
     try:
         if torch.cuda.is_available():
             return True
@@ -28,7 +25,7 @@ def fourier_polar_to_cartesian_phys(
     precision: Precision = Precision.SINGLE,
     use_cuda: bool = True
 ) -> torch.Tensor:
-    use_cuda = check_cuda_available() and use_cuda
+    use_cuda = _check_cuda_available() and use_cuda
     device = torch.device('cuda' if use_cuda else 'cpu')
     print("Using device:", device)
     (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
@@ -133,7 +130,7 @@ def cartesian_phys_to_fourier_polar(
     precision: Precision = Precision.SINGLE,
     use_cuda: bool = True
 ) -> torch.Tensor:
-    use_cuda = check_cuda_available() and use_cuda
+    use_cuda = _check_cuda_available() and use_cuda
     device = torch.device('cuda' if use_cuda else 'cpu')
     (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
     eps = set_epsilon(precision, eps)
@@ -219,7 +216,7 @@ def volume_phys_to_fourier_points(
     output_device: torch.device | None = None,
     verbose: bool = False
 ):
-    use_cuda = check_cuda_available() and use_cuda
+    use_cuda = _check_cuda_available() and use_cuda
     device = torch.device('cuda' if use_cuda else 'cpu')
     if not use_cuda:
         precision = Precision.DOUBLE

@@ -1,8 +1,8 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from cryolike.polar_grid import ArbitraryPolarQuadrature
 import pytest
 
+from cryolike.grids.polar_grid import ArbitraryPolarQuadrature
 from test_polar_grid_fixtures import make_grids, integrate_functions, parameter_descriptions
 
 parameters = make_grids()

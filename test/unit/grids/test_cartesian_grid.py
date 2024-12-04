@@ -1,6 +1,6 @@
 import numpy as np
 
-from cryolike.cartesian_grid import (
+from cryolike.grids.cartesian_grid import (
     CartesianGrid2D,
     CartesianGrid3D,
     _compute_grid_dims,

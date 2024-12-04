@@ -1,17 +1,22 @@
-from typing import Literal, NamedTuple, NoReturn, overload
-import numpy as np
-import torch
-from math import lgamma
 from collections.abc import Callable
 from itertools import product
-from tqdm import trange
+from math import lgamma
+import numpy as np
+from tqdm import tqdm, trange
+from typing import Literal, NamedTuple, NoReturn, overload
+import torch
 
-from cryolike.array import to_torch, absq, fourier_bessel_transform
-from cryolike.displacement import get_possible_displacements_grid, translation_kernel_fourier
-from cryolike.template import Templates
-from cryolike.util.device_handling import get_device
-from cryolike.util.enums import CrossCorrelationReturnType, Precision
-from cryolike.util.typechecks import set_precision
+from cryolike.microscopy import get_possible_displacements_grid, translation_kernel_fourier
+from cryolike.stacks import Templates
+from cryolike.util import (
+    absq,
+    fourier_bessel_transform,
+    get_device,
+    CrossCorrelationReturnType,
+    Precision,
+    set_precision,
+    to_torch,
+)
 
 
 class WeightedTemplates(NamedTuple):
@@ -837,7 +842,16 @@ class CrossCorrelationLikelihood:
             ill_kernel = lambda _1, _2, _3, _4, _5, _6, _7: None
 
         collect_batch = self._initialize_collector(n_images, return_type)
-        
+        # batches = _make_batches(n_images_per_batch, n_images, n_templates_per_batch, self.n_templates)
+
+        # for (t_batch_rng, i_batch_rng) in tqdm(batches):
+            
+        #     assert isinstance(t_batch_rng, np.ndarray)
+        #     assert isinstance(i_batch_rng, np.ndarray)
+
+        #     (i_start, i_end) = (i_batch_rng[0], i_batch_rng[1])
+        #     (t_start, t_end) = (t_batch_rng[0], t_batch_rng[1])
+
         for t_start in trange(0, self.n_templates, n_templates_per_batch):
             
             t_end = min(t_start + n_templates_per_batch, self.n_templates)

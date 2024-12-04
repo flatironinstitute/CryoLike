@@ -2,10 +2,15 @@ import os
 import numpy as np
 
 from typing import NamedTuple, cast
-from cryolike.util.enums import Precision, AtomShape
-from cryolike.util.types import FloatArrayType, IntArrayType
-from cryolike.util.reformatting import TargetType, project_descriptor
 
+from cryolike.util import (
+    AtomShape,
+    FloatArrayType,
+    IntArrayType,
+    Precision,
+    project_descriptor,
+    TargetType,
+)
 
 class ParsedParameters(NamedTuple):
     """Class representing metadata parameters describing an image set.
@@ -142,9 +147,12 @@ def parse_parameters(
     if viewing_distance is None:
         viewing_distance = 1.0 / (4.0 * np.pi) / resolution_factor
     assert viewing_distance is not None
-    _box_size = cast(FloatArrayType, project_descriptor(box_size, "box_size", 3, TargetType.FLOAT))
-    _n_voxels = cast(IntArrayType, project_descriptor(n_voxels, "n_voxels", 3, TargetType.INT))
-    _voxel_size = cast(FloatArrayType, project_descriptor(voxel_size, "voxel_size", 3, TargetType.FLOAT))
+    # _box_size = cast(FloatArrayType, project_descriptor(box_size, "box_size", 3, TargetType.FLOAT))
+    # _n_voxels = cast(IntArrayType, project_descriptor(n_voxels, "n_voxels", 3, TargetType.INT))
+    # _voxel_size = cast(FloatArrayType, project_descriptor(voxel_size, "voxel_size", 3, TargetType.FLOAT))
+    _n_voxels = int(n_voxels)
+    _voxel_size = float(voxel_size)
+    _box_size = float(box_size)
     return ParsedParameters(
         n_voxels = _n_voxels,
         voxel_size = _voxel_size,

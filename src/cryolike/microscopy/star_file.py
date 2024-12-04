@@ -1,3 +1,11 @@
+# TODO: make more consistent/structured internal representation
+# (Or just use a library)
+
+
+from numpy import ndarray, ones_like
+
+from .ctf import CTF
+
 def read_star_file(filename, stop = None):
 
     dataList = []
@@ -65,26 +73,27 @@ def read_star_file(filename, stop = None):
 
 def write_star_file(
         filename,
-        dataList = None,
-        paramsList = None,
-        ctf = None,
+        dataList: dict[str, ndarray] = {},
+        paramsList: list[str] = [],
+        ctf: CTF | None = None,
     ):
     
     if ctf is not None:
-        import numpy as np
+        ld = ctf.lens_descriptor
+        assert ld is not None
         dataList = {
-            "DefocusU": ctf.defocusU,
-            "DefocusV": ctf.defocusV,
-            "DefocusAngle": ctf.defocusAng,
-            "SphericalAberration": ctf.sphAber * np.ones_like(ctf.defocusU),
-            "Voltage": ctf.voltage * np.ones_like(ctf.defocusU),
-            "AmplitudeContrast": ctf.ampCon * np.ones_like(ctf.defocusU),
-            "PhaseShift": ctf.phaseShift
+            "DefocusU": ld.defocusU,
+            "DefocusV": ld.defocusV,
+            "DefocusAngle": ld.defocusAng,
+            "SphericalAberration": ld.sphericalAberration * ones_like(ld.defocusU),
+            "Voltage": ld.voltage * ones_like(ld.defocusU),
+            "AmplitudeContrast": ld.amplitudeContrast * ones_like(ld.defocusU),
+            "PhaseShift": ld.phaseShift
         }      
         paramsList = [
             "DefocusU", "DefocusV", "DefocusAngle", "SphericalAberration", "Voltage", "AmplitudeContrast", "PhaseShift"
         ]
-        
+
     with open(filename, 'w') as f:
         f.write("\n")
         for j in range(len(paramsList)):

@@ -1,10 +1,9 @@
 import numpy as np
 import torch
 
-from cryolike.polar_grid import PolarGrid
-from cryolike.cartesian_grid import CartesianGrid2D
-from cryolike.nufft import fourier_polar_to_cartesian_phys, cartesian_phys_to_fourier_polar
-from cryolike.util.enums import Precision, QuadratureType
+from cryolike.grids import PolarGrid, CartesianGrid2D
+from cryolike.microscopy.nufft import fourier_polar_to_cartesian_phys, cartesian_phys_to_fourier_polar
+from cryolike.util import Precision, QuadratureType
 
 
 def test_nufft_2d():
@@ -104,7 +103,7 @@ def test_nufft_2d():
                             use_cuda = use_cuda
                         )
                         image_phys_recover_real = image_phys_recover.real
-                        l2norm_image_phys_real_recover = torch.sqrt(torch.sum(np.abs(image_phys_recover_real) ** 2 * pixel_size ** 2, dim=(1, 2)))
+                        l2norm_image_phys_real_recover = torch.sqrt(torch.sum(torch.abs(image_phys_recover_real) ** 2 * pixel_size ** 2, dim=(1, 2)))
                         cross_correlation_back = (torch.sum(image_phys_true_repeat.real * image_phys_recover_real.real * pixel_size ** 2, dim=(1,2)) / l2norm_image_phys_real_recover / l2norm_image_phys_true).real
 
                         image_phys_recover_two = fourier_polar_to_cartesian_phys(
@@ -115,7 +114,7 @@ def test_nufft_2d():
                             precision = precision,
                             use_cuda = use_cuda
                         )
-                        l2norm_image_phys_real_recover_two = torch.sqrt(torch.sum(np.abs(image_phys_recover_two.real) ** 2 * pixel_size ** 2, dim=(1, 2)))
+                        l2norm_image_phys_real_recover_two = torch.sqrt(torch.sum(torch.abs(image_phys_recover_two.real) ** 2 * pixel_size ** 2, dim=(1, 2)))
                         cross_correlation_two = (torch.sum(image_phys_true_repeat.real * image_phys_recover_two.real * pixel_size ** 2, dim=(1,2)) / l2norm_image_phys_true / l2norm_image_phys_real_recover_two).real
                         
                         assert np.allclose(cross_correlation_for, torch.ones_like(cross_correlation_for), atol = acc_tol)

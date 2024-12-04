@@ -1,18 +1,14 @@
-from cryolike.array import to_torch
-from cryolike.util.enums import AtomShape, CrossCorrelationReturnType, Precision
-from cryolike.viewing_angles import ViewingAngles
 import numpy as np
 import torch
 from pathlib import Path
 from copy import deepcopy
 
-from cryolike.polar_grid import PolarGrid
-from cryolike.template import Templates
-from cryolike.atomic_model import AtomicModel
-from cryolike.image import Images
+from cryolike.grids import PolarGrid
+from cryolike.stacks import Templates, Images
+from cryolike.microscopy import CTF, LensDescriptor, ViewingAngles
+from cryolike.util import (AtomShape, AtomicModel, CrossCorrelationReturnType, Precision, to_torch)
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood, OptimalPoseReturn, OptimizedDisplacementAndRotationReturn
 from cryolike.likelihood import calc_distance_optimal_templates_vs_physical_images
-from cryolike.ctf import CTF, LensDescriptor
 
 from time import time
 
@@ -36,16 +32,16 @@ def test_likelihood():
     n_inplanes = 256
     # viewing_distance = 8.0 / (4.0 * np.pi)
 
-    max_displacement = 3.5 * pixel_size
-    n_displacements_x = 8
-    n_displacements_y = 8
+    max_displacement = 4.0 * pixel_size
+    n_displacements_x = 9
+    n_displacements_y = 9
 
     # n_possible_displacements, possible_displacements_x, possible_displacements_y = get_possible_displacements(max_displacement, n_displacements)
-    true_displacement_x = 0.0 * pixel_size
-    true_displacement_y = 0.0 * pixel_size
+    true_displacement_x = 1.0 * pixel_size
+    true_displacement_y = 1.0 * pixel_size
     # true_displacement_x = possible_displacements_x[0]
     # true_displacement_y = possible_displacements_y[0]
-    true_rotation = 0.0#2.0 * np.pi / n_inplanes #* 20
+    true_rotation = 2.0 * np.pi / n_inplanes #* 20
 
     polar_grid = PolarGrid(
         radius_max = radius_max,
@@ -80,7 +76,7 @@ def test_likelihood():
     defocusAng = np.zeros(n_images, dtype=np.float64)#np.random.uniform(-90, 90, n_images)
     phaseShift = np.zeros(n_images, dtype=np.float64)
     ctf_desc = LensDescriptor(
-            defocusU = defocusU, # in Angstrom
+        defocusU = defocusU, # in Angstrom
         defocusV = defocusV,  # in Angstrom
         defocusAng = defocusAng, # in degrees, defocus angle
         sphericalAberration = 2.7,  # in mm, spherical aberration
