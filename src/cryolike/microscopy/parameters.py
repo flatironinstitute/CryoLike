@@ -1,16 +1,19 @@
 import os
 import numpy as np
 
-from typing import NamedTuple, cast
+from typing import Literal, NamedTuple, cast
 
 from cryolike.util import (
     AtomShape,
     FloatArrayType,
     IntArrayType,
+    interpret_precision,
     Precision,
     project_descriptor,
     TargetType,
 )
+
+# TODO: Promote to a real class
 
 class ParsedParameters(NamedTuple):
     """Class representing metadata parameters describing an image set.
@@ -82,7 +85,7 @@ def parse_parameters(
     n_voxels: int,
     voxel_size: float,
     resolution_factor: float = 1.0,
-    precision: str | Precision = 'single',
+    precision: Literal['single'] | Literal['double'] | Precision = Precision.SINGLE,
     viewing_distance: float | None = None,
     n_inplanes: int | None = None,
     atom_radii: float | None = None,
@@ -101,7 +104,7 @@ def parse_parameters(
         resolution_factor (float, optional): 1.0 (the default) for full resolution at
             Nyquist frequency, or 0.5 for half resolution at Nyquist frequency.
         precision (str | Precision, optional): Whether to use single or double precision.
-            Defaults to 'single'.
+            Defaults to single precision.
         viewing_distance (float | None, optional): Angular distance between two
             viewing angles. If unset, will default to 1/(4pi) over the resolution
             factor.
@@ -122,13 +125,7 @@ def parse_parameters(
     """
     if atom_radii is None and not use_protein_residue_model:
         raise ValueError("Atom radii must be set")
-    if type(precision) == str:
-        if precision == 'single':
-            precision = Precision.SINGLE
-        elif precision == 'double':
-            precision = Precision.DOUBLE
-        else:
-            raise ValueError("Invalid precision value")
+    precision = interpret_precision(precision)
     if type(atom_shape) == str:
         if atom_shape == 'hard-sphere':
             atom_shape = AtomShape.HARD_SPHERE
@@ -147,12 +144,9 @@ def parse_parameters(
     if viewing_distance is None:
         viewing_distance = 1.0 / (4.0 * np.pi) / resolution_factor
     assert viewing_distance is not None
-    # _box_size = cast(FloatArrayType, project_descriptor(box_size, "box_size", 3, TargetType.FLOAT))
-    # _n_voxels = cast(IntArrayType, project_descriptor(n_voxels, "n_voxels", 3, TargetType.INT))
-    # _voxel_size = cast(FloatArrayType, project_descriptor(voxel_size, "voxel_size", 3, TargetType.FLOAT))
-    _n_voxels = int(n_voxels)
-    _voxel_size = float(voxel_size)
-    _box_size = float(box_size)
+    _box_size = cast(FloatArrayType, project_descriptor(box_size, "box_size", 3, TargetType.FLOAT))
+    _n_voxels = cast(IntArrayType, project_descriptor(n_voxels, "n_voxels", 3, TargetType.INT))
+    _voxel_size = cast(FloatArrayType, project_descriptor(voxel_size, "voxel_size", 3, TargetType.FLOAT))
     return ParsedParameters(
         n_voxels = _n_voxels,
         voxel_size = _voxel_size,

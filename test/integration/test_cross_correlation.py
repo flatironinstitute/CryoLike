@@ -165,6 +165,7 @@ def test_cross_correlation():
         device = 'cuda',
         verbose = True
     )
+    assert cc.n_displacements == n_displacements_x * n_displacements_y
 
     _imgs = im.images_fourier
     _ctf = conform_ctf(to_torch(ctf.ctf, precision, "cpu"), ctf.anisotropy)

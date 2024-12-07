@@ -34,6 +34,7 @@ from .typechecks import (
     ensure_integer,
     ensure_positive,
     ensure_positive_finite,
+    interpret_precision,
     is_integral_torch_tensor,
     set_epsilon,
     set_precision

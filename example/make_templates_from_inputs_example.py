@@ -1,5 +1,5 @@
 import numpy as np
-from cryolike.stacks.make_templates_from_inputs import make_templates_from_inputs
+from cryolike.stacks.make_templates_from_inputs_api import make_templates_from_inputs
 
 list_of_inputs = [
     "data/pdb/apoferritin_ca_apo_sym.pdb",

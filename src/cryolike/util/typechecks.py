@@ -29,6 +29,18 @@ def is_integral_torch_tensor(x: Tensor):
     return not (is_floating_point(x) or is_complex(x))
 
 
+def interpret_precision(precision: Precision | str) -> Precision:
+    if isinstance(precision, Precision):
+        return precision
+    # Note: a fancier version would do some reflection and look up
+    # the enum by its value. That's neat but not worth bothering with.
+    if precision == 'single':
+        return Precision.SINGLE
+    if precision == 'double':
+        return Precision.DOUBLE
+    raise ValueError(f'Unknown string-valued precision {precision}')
+
+
 def set_precision(precision: Precision, default: Precision) -> tuple[dtype, dtype, dtype]:
     """Interprets a Precision enum to return the desired dtypes.
 

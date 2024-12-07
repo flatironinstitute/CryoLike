@@ -87,7 +87,8 @@ def run_likelihood(
     )
     n_shells = polar_grid.n_shells
     n_points = polar_grid.n_points
-    max_displacement = max_displacement_pixels * params.voxel_size
+    max_displacement = max_displacement_pixels * params.voxel_size[0]
+    print("max_displacement: ", max_displacement)
         
     phys_grid = CartesianGrid2D(
         n_pixels = params.n_voxels,
