@@ -3,8 +3,8 @@ from torch import Tensor
 from numpy import array
 
 from cryolike.util.types import Pixel_size_type
-from cryolike.cartesian_grid import CartesianGrid2D
-from cryolike.polar_grid import PolarGrid
+from cryolike.grids.cartesian_grid import CartesianGrid2D
+from cryolike.grids.polar_grid import PolarGrid
 
 @dataclass
 class FourierImages:
