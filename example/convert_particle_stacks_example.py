@@ -12,6 +12,7 @@ convert_particle_stacks_from_star_files(
     particle_file_list = particle_file_list,
     star_file_list = star_file,
     pixel_size = pixel_size,
+    batch_size=1024,
     defocus_angle_is_degree = True,
     phase_shift_is_degree = True,
     skip_exist = False,
