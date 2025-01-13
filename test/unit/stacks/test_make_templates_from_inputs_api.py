@@ -6,8 +6,8 @@ import numpy as np
 import numpy.testing as npt
 from torch.testing import assert_close
 
-from EMPM.util import Precision
-from EMPM.stacks.make_templates_from_inputs_api import (
+from cryolike.util import Precision
+from cryolike.stacks.make_templates_from_inputs_api import (
     _make_plotter_fn,
     _make_templates_config,
     _get_input_name,
@@ -17,7 +17,7 @@ from EMPM.stacks.make_templates_from_inputs_api import (
     make_templates_from_inputs
 )
 
-PKG = "EMPM.stacks.make_templates_from_inputs_api"
+PKG = "cryolike.stacks.make_templates_from_inputs_api"
 
 # Make a default TemplateConfig
 
@@ -31,7 +31,7 @@ def test_set_up_directories():
     plot_dir = local_os.path.join(out_dir, "plots")
     mock_mkdirs = Mock()
     local_os.makedirs = mock_mkdirs
-    from EMPM.stacks.make_templates_from_inputs_api import _set_up_directories
+    from cryolike.stacks.make_templates_from_inputs_api import _set_up_directories
 
     _set_up_directories(out_dir, False)
     mock_mkdirs.assert_called_once_with(out_dir, exist_ok = True)
