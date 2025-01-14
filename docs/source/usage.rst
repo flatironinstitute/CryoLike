@@ -1,58 +1,12 @@
 Usage
 =====
 
-.. _dependencies:
-
-Dependencies
-------------
-
-The Python library requires the following dependencies:
-
-- numpy
-- scipy
-- matplotlib: for plotting
-- pytorch: for GPU acceleration
-- finufft: for non-uniform FFT (https://finufft.readthedocs.io/en/latest/)
-- cufinufft: GPU version of finufft
-- tqdm: for progress bar
-- mrcfile: for reading MRC files
-- mdtraj: for reading PDB files and atom selection
-
-If you are using virtual environment,
-.. code-block:: console
-
-   $ python3 -m venv ./venv/
-   $ source ./venv/bin/activate
-   (venv) $ pip install numpy scipy matplotlib tqdm mrcfile mdtraj
-   (venv) $ pip3 install torch torchvision
-   (venv) $ pip install finufft
-   (venv) $ pip install cufinufft
-
-Note that the torch installation might depend on your system, please refer to the pytorch official website for the installation guide https://pytorch.org/get-started/locally/.
-For detailed installation of finufft and cufinufft, please refer to the official website https://finufft.readthedocs.io/en/latest/.
-
-.. _installation:
-
-Installation
-------------
-
-To install the CryoLike Python library, clone the repository and run the following command in the root directory of the repository:
-.. code-block:: console
-
-   (venv) $ pip install .
-
-To test the installation, run the following commands:
-.. code-block:: console
-
-   (venv) $ pip install pytest
-   (venv) $ pytest
-
 .. _usage:
 
-Usage
+Example Usage
 ----------------
 
-For usage of the CryoLike algorithm, please refer to the `example` directory.
+For an example usage of the CryoLike algorithm, please refer to the `example` directory.
 
 To run the examples, run the following command:
 .. code-block:: console
@@ -70,13 +24,25 @@ To plot the results, run the following command:
 
 then you can find the plots in the `output/likelihood` directory.
 
-.. _data_sources:
-
 Data Sources
-------------
+---------------
+
+.. _data_sources:
 
 Data used in the examples and test cases are retrieved from the following sources:
 - EMPIAR-10026
 - EMD: 2788
 - PDB ID: 1UAO
 - PDB ID: 4V1W
+
+Detailed Tutorials
+---------------------
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+   
+   tutorials/read_star_file
+   tutorials/read_cryosparc_file
+
+
