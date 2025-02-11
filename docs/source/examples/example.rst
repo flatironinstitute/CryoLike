@@ -1,5 +1,5 @@
-Examples
-========
+Example Scripts
+================
 
 .. toctree::
    :maxdepth: 2
