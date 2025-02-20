@@ -207,14 +207,14 @@ def load_parameters(file_output: str) -> ParsedParameters:
         radii = None if _radii == '' else cast(float, _radii)
         _selection = data['atom_selection']
         selection = None if _selection == '' else _selection
-        if isinstance(data['precision'], str):
+        if isinstance(data['precision'], str) or data['precision'].dtype.type is np.str_:
             precision = Precision(data['precision'])
         elif isinstance(data['precision'], Precision):
             precision = data['precision']
         else:
             precision = Precision.DEFAULT
             print("Warning: Invalid precision value, using default")
-        if isinstance(data['atom_shape'], str):
+        if isinstance(data['atom_shape'], str) or data['precision'].dtype.type is np.str_:
             atom_shape = AtomShape(data['atom_shape'])
         elif isinstance(data['atom_shape'], AtomShape):
             atom_shape = data['atom_shape']
