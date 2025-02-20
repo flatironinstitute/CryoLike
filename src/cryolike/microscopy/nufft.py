@@ -132,7 +132,7 @@ def cartesian_phys_to_fourier_polar(
 ) -> torch.Tensor:
     use_cuda = _check_cuda_available() and use_cuda
     device = torch.device('cuda' if use_cuda else 'cpu')
-    (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
+    (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE, use_cuda=True)
     eps = set_epsilon(precision, eps)
     if not isinstance(images_phys, torch.Tensor):
         images_phys = torch.tensor(images_phys, dtype = torch_complex_type)
@@ -197,6 +197,9 @@ def cartesian_phys_to_fourier_polar(
         return image_polar
     else:
         images_phys = images_phys.cpu().numpy()
+        (np_float_type, _, _) = set_precision(precision, default=Precision.SINGLE, use_cuda=False)
+        k1 = np.array(k1, dtype = np_float_type)
+        k2 = np.array(k2, dtype = np_float_type)
         if n_images == 1:
             image_polar = nufft2d2_cpu(k1, k2, images_phys, eps = eps, isign = isign)
         else:

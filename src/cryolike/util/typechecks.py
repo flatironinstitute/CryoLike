@@ -41,23 +41,29 @@ def interpret_precision(precision: Precision | str) -> Precision:
     raise ValueError(f'Unknown string-valued precision {precision}')
 
 
-def set_precision(precision: Precision, default: Precision) -> tuple[dtype, dtype, dtype]:
+def set_precision(precision: Precision, default: Precision, use_cuda: bool = True) -> tuple[dtype, dtype, dtype]:
     """Interprets a Precision enum to return the desired dtypes.
 
     Args:
         precision (Precision): Precision to interpret.
         default (Precision): Precision level to use if DEFAULT is requested.
+        use_cuda (bool): Whether to use cuda and hence whether to return torch dtypes.
+            Otherwise, it returns numpy dtypes
 
     Returns:
-        tuple[dtype, dtype, dtype]: Torch float-type, complex-type, and int-type
+        tuple[dtype, dtype, dtype]: Torch or numpy float-type, complex-type, and int-type
     for the requested precision.
     """
     if precision == Precision.DEFAULT:
         precision = default
     if precision == Precision.SINGLE:
-        return (float32, complex64, int32)
+        if use_cuda:
+            return (float32, complex64, int32)
+        return np.float32, np.complex64, np.int32
     elif precision == Precision.DOUBLE:
-        return (float64, complex128, int64)
+        if use_cuda:
+            return (float64, complex128, int64)
+        return np.float64, np.complex128, np.int64
     else:
         raise ValueError("Unreachable: unrecognized precision type.")
 
