@@ -77,7 +77,7 @@ class _Metadata():
         for param in dataBlock.keys():
             y = dataBlock[param]
             y_unique = np.unique(y)
-            if len(y_unique) == 1:
+            if len(y_unique) == 1 and param != 'DefocusAngle':
                 dataBlock[param] = y_unique[0]
 
         defocusU = dataBlock["DefocusU"]
