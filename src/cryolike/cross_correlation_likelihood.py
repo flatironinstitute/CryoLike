@@ -8,20 +8,21 @@ import torch
 
 from cryolike.microscopy import get_possible_displacements_grid, translation_kernel_fourier
 from cryolike.stacks import Templates
+from cryolike.grids import PolarGrid
 from cryolike.util import (
     absq,
     fourier_bessel_transform,
     get_device,
     CrossCorrelationReturnType,
     Precision,
-    set_precision,
     to_torch,
+    FloatArrayType
 )
 
 
 class WeightedTemplates(NamedTuple):
-    fourier_templates_mnw: torch.Tensor
-    fourier_templates_bessel_mdnq: torch.Tensor
+    sqrtweighted_fourier_templates_mnw: torch.Tensor
+    sqrtweighted_fourier_templates_bessel_mdnq: torch.Tensor
 
 
 class OptimalPoseReturn(NamedTuple):
@@ -132,15 +133,15 @@ Returns:
 
 def _compute_cross_correlation(
     n_inplanes: int,
-    weighted_premultiplied_CTF_image_fourier_bessel_conj_snq: torch.Tensor,
-    weighted_displaced_fourier_bessel_templates_mdnq: torch.Tensor
+    sqrtweighted_premultiplied_CTF_image_fourier_bessel_conj_snq: torch.Tensor,
+    sqrtweighted_displaced_fourier_bessel_templates_mdnq: torch.Tensor
 ) -> torch.Tensor:
     ## Compute cross correlation between sample and template
     ## This is the most computationally expensive part of the code
     cross_correlation_smdq = torch.einsum(
         "snq,mdnq->smdq",
-        weighted_premultiplied_CTF_image_fourier_bessel_conj_snq,
-        weighted_displaced_fourier_bessel_templates_mdnq
+        sqrtweighted_premultiplied_CTF_image_fourier_bessel_conj_snq,
+        sqrtweighted_displaced_fourier_bessel_templates_mdnq
     )
     ## Fourier bessel transform, irfft output only the real part
     cross_correlation_smdw = torch.fft.irfft(
@@ -156,8 +157,8 @@ def _cross_images_and_templates(
     device: torch.device,
     n_inplanes: int,
     images_fourier_snw: torch.Tensor,
-    fourier_templates_mnw: torch.Tensor,
-    fourier_templates_bessel_mdnq: torch.Tensor,
+    sqrtweighted_fourier_templates_mnw: torch.Tensor,
+    sqrtweighted_fourier_templates_bessel_mdnq: torch.Tensor,
     ctf_snw: torch.Tensor,       # should be preshaped, of appropriate precision, etc.
     integration_weights_points: torch.Tensor,
     integration_weights_points_sqrt: torch.Tensor,
@@ -193,8 +194,8 @@ def _cross_images_and_templates(
     """
     # Sending these to the device should be redundant at this point
     images_fourier_snw = images_fourier_snw.to(device)
-    fourier_templates_mnw = fourier_templates_mnw.to(device)
-    fourier_templates_bessel_mdnq = fourier_templates_bessel_mdnq.to(device)
+    sqrtweighted_fourier_templates_mnw = sqrtweighted_fourier_templates_mnw.to(device)
+    sqrtweighted_fourier_templates_bessel_mdnq = sqrtweighted_fourier_templates_bessel_mdnq.to(device)
     ctf_snw = ctf_snw.to(device)
     integration_weights_points = integration_weights_points.to(device)
     integration_weights_points_sqrt = integration_weights_points_sqrt.to(device)
@@ -202,20 +203,20 @@ def _cross_images_and_templates(
     # Apply CTF to images
     # Normally I favor using the function, but this is essentially a one-liner, & I think inlining may
     # let torch chain the operation better.
-    image_fourier_bessel_conj_snq: torch.Tensor = torch.fft.fft(
-        # this is the weighted_premultiplied_CTF_image_fourier_snw
+    sqrtweighted_image_fourier_bessel_conj_snq: torch.Tensor = torch.fft.fft(
         images_fourier_snw * ctf_snw * integration_weights_points_sqrt[None, :, :],
         dim = 2, norm = "ortho"
     ).conj()
 
     # Apply CTF to templates
-    CTF_weighted_fourier_templates_smnw = (fourier_templates_mnw * ctf_snw.unsqueeze(1))
+    CTF_sqrtweighted_fourier_templates_smnw = (sqrtweighted_fourier_templates_mnw * ctf_snw.unsqueeze(1))
 
-    Ixx_sm = torch.sum(absq(CTF_weighted_fourier_templates_smnw), dim = (2, 3))
+    Ixx_sm = torch.sum(absq(CTF_sqrtweighted_fourier_templates_smnw), dim = (2, 3))
     Iyy_s = torch.sum(absq(images_fourier_snw) * integration_weights_points, dim = (1,2))
-    Ixy_smdw = _compute_cross_correlation(n_inplanes,
-        image_fourier_bessel_conj_snq,
-        fourier_templates_bessel_mdnq
+    Ixy_smdw = _compute_cross_correlation(
+        n_inplanes,
+        sqrtweighted_image_fourier_bessel_conj_snq,
+        sqrtweighted_fourier_templates_bessel_mdnq
     )
 
     Ixx = Ixx_sm.unsqueeze(2).unsqueeze(3)
@@ -227,7 +228,7 @@ def _cross_images_and_templates(
     ill = compute_ill(
         integration_weights_points,
         integration_weights_points_sqrt,
-        CTF_weighted_fourier_templates_smnw,
+        CTF_sqrtweighted_fourier_templates_smnw,
         images_fourier_snw,
         Ixx,
         Ixy,
@@ -253,14 +254,14 @@ def conform_ctf(ctf: torch.Tensor, anisotropic: bool) -> torch.Tensor:
 
 
 # TODO: Be more memory-aware
-def _get_weighted_templates(templates_fourier: torch.Tensor, weighted_translation_kernel: torch.Tensor, device: torch.device) -> WeightedTemplates:
+def _get_sqrtweighted_templates(templates_fourier: torch.Tensor, sqrtweighted_translation_kernel: torch.Tensor, device: torch.device) -> WeightedTemplates:
     """Applies known weighted translation kernel to the full template set before computing cross-correlation.
     Doing this to the whole template set at once, rather than batching, keeps the translation kernel in
     memory, improving performance.
 
     Args:
         templates_fourier (torch.Tensor): Full set of templates, in Fourier space.
-        weighted_translation_kernel (torch.Tensor): Translation kernel to apply
+        sqrtweighted_translation_kernel (torch.Tensor): Translation kernel to apply
         device (torch.device): The device to use for the operation.
 
     Returns:
@@ -268,15 +269,15 @@ def _get_weighted_templates(templates_fourier: torch.Tensor, weighted_translatio
             of the Bessel transform.
     """
     templates_fourier = templates_fourier.to(device)
-    weighted_translation_kernel = weighted_translation_kernel.to(device)
+    sqrtweighted_translation_kernel = sqrtweighted_translation_kernel.to(device)
 
-    weighted_displaced_fourier_templates_mdnw = templates_fourier.unsqueeze(1) * weighted_translation_kernel
-    weighted_displaced_fourier_templates_bessel_mdnq = fourier_bessel_transform(weighted_displaced_fourier_templates_mdnw, 3, "ortho")
-    weighted_displaced_fourier_templates_mnw = weighted_displaced_fourier_templates_mdnw[:,0,:,:]
+    sqrtweighted_displaced_fourier_templates_mdnw = templates_fourier.unsqueeze(1) * sqrtweighted_translation_kernel
+    sqrtweighted_displaced_fourier_templates_bessel_mdnq = fourier_bessel_transform(sqrtweighted_displaced_fourier_templates_mdnw, 3, "ortho")
+    sqrtweighted_displaced_fourier_templates_mnw = sqrtweighted_displaced_fourier_templates_mdnw[:,0,:,:]
 
     return WeightedTemplates(
-        fourier_templates_mnw=weighted_displaced_fourier_templates_mnw,
-        fourier_templates_bessel_mdnq=weighted_displaced_fourier_templates_bessel_mdnq,
+        sqrtweighted_fourier_templates_mnw=sqrtweighted_displaced_fourier_templates_mnw,
+        sqrtweighted_fourier_templates_bessel_mdnq=sqrtweighted_displaced_fourier_templates_bessel_mdnq,
     )
 
 
@@ -288,7 +289,7 @@ def _ill_kernel_factory(
     def _kernel(
         integration_weights_points: torch.Tensor,
         integration_weights_points_sqrt: torch.Tensor,
-        CTF_weighted_fourier_templates_smnw: torch.Tensor,
+        CTF_sqrtweighted_fourier_templates_smnw: torch.Tensor,
         images_fourier_snw: torch.Tensor,
         Ixx: torch.Tensor,
         Ixy: torch.Tensor,
@@ -296,18 +297,18 @@ def _ill_kernel_factory(
     ):
         weighted_s_points = s_points * integration_weights_points
         sqrt_weighted_s_points = s_points * integration_weights_points_sqrt
-        Isx_sm = torch.sum(sqrt_weighted_s_points * CTF_weighted_fourier_templates_smnw.real, dim = (2,3))
-        Isy_s = torch.sum(weighted_s_points * images_fourier_snw.real, dim=(1,2))
+        Isx_sm = torch.sum(sqrt_weighted_s_points * CTF_sqrtweighted_fourier_templates_smnw, dim = (2,3))
+        Isy_s = torch.sum(weighted_s_points * images_fourier_snw, dim=(1,2))
 
         Isx = Isx_sm.unsqueeze(2).unsqueeze(3)
         Isy = Isy_s.unsqueeze(1).unsqueeze(2).unsqueeze(3)
 
-        A = - Isx ** 2 + Ixx * Iss
-        B = - Isx * Isy + Ixy * Iss
-        C =   Isy ** 2 - Iyy * Iss
+        A = - absq(Isx) + Ixx * Iss
+        B = - Isx.real * Isy.real - Isx.imag * Isy.imag + Ixy * Iss
+        C =   absq(Isy) - Iyy * Iss
         D = - (B ** 2 / A + C)
-        p = (n_pixels_phys - 3.0) / 2.0
-        constant = (1.0 - n_pixels_phys * 0.5) * np.log(2 * np.pi) - np.log(2) + p * np.log(2 * Iss) + lgamma(p)
+        p = n_pixels_phys / 2.0 - 2.0
+        constant = (3.0 - n_pixels_phys) / 2.0 * np.log(2 * np.pi) - np.log(2) - 0.5 * np.log(Iss) + lgamma(n_pixels_phys / 2.0 - 2.0) + p * np.log(2 * Iss)
         log_likelihood_smdw = -p * torch.log(D) - 0.5 * torch.log(A) + constant
         log_likelihood_sm = torch.logsumexp(log_likelihood_smdw, dim = (2, 3))
         return log_likelihood_sm
@@ -320,6 +321,7 @@ def _make_batches(n_imgs_per_batch, n_imgs, n_templates_per_batch, n_templates):
     return product(template_batch_ranges, img_batch_ranges)
 
 
+# TODO: Check inclusivity!
 def _safe_rangify_batch(n_per_batch: int, n_max: int) -> np.ndarray:
     """For batches of m elements each with total list length l, return n ndarrays
     corresponding to the start and (exclusive) end index of every batch, without
@@ -339,6 +341,77 @@ def _safe_rangify_batch(n_per_batch: int, n_max: int) -> np.ndarray:
         (a, min(a + n_per_batch, n_max))
         for a in np.array(range(n_batches)) * n_per_batch
     ], dtype=np.int64)
+
+
+## Utility functions for init
+def _get_integration_weights_points(templates: Templates, precision: Precision):
+    iwp = to_torch(templates.polar_grid.weight_points, precision, "cpu")
+    iwp = iwp.reshape(templates.polar_grid.n_shells, templates.polar_grid.n_inplanes)
+    return iwp * (2.0 * np.pi) ** 2
+
+
+def _get_log_weights_viewing(templates: Templates, precision: Precision, device: torch.device):
+    weights = templates.viewing_angles.weights_viewing
+    weights_viewing = to_torch(weights, precision, device)
+    weights_viewing /= weights_viewing.sum()
+    return torch.log(weights_viewing).unsqueeze(0)
+
+
+class _Displacements(NamedTuple):
+    n_displacements: int
+    x_displacements: FloatArrayType
+    y_displacements: FloatArrayType
+    x_disp_expt_scale: FloatArrayType
+    y_disp_expt_scale: FloatArrayType
+
+
+def _get_displacements(
+    max_displacement: float,
+    n_disp_x: int,
+    n_disp_y: int,
+    box_edge_size: float
+):
+    if (n_disp_x < 1):
+        n_disp_x = n_disp_y
+    if (n_disp_y < 1):
+        n_disp_y = n_disp_x
+    if n_disp_x < 1 and n_disp_y < 1:
+        raise ValueError("Number of displacements must be set and non-negative.")      
+
+    _max_disp = max_displacement * 2.0 / box_edge_size
+    n_disp, _x_disp, _y_disp = get_possible_displacements_grid(_max_disp, n_disp_x, n_disp_y)
+    print(f"n_displacements: {n_disp}")
+    _x_disp_expt = _x_disp / 2.0 * box_edge_size
+    _y_disp_expt = _y_disp / 2.0 * box_edge_size
+    return _Displacements(n_disp, _x_disp, _y_disp, _x_disp_expt, _y_disp_expt)
+
+
+def _get_s_points(templates: Templates, precision: Precision):
+    if templates.polar_grid.x_points is None or templates.polar_grid.y_points is None:
+        (x_pts, y_pts) = templates.polar_grid.get_cartesian_points()
+    else:
+        (x_pts, y_pts) = (templates.polar_grid.x_points, templates.polar_grid.y_points)
+    
+    x_points = to_torch(x_pts, precision, "cpu")
+    y_points = to_torch(y_pts, precision, "cpu")
+    s_points = torch.sinc(2.0 * x_points) * torch.sinc(2.0 * y_points) * 4.0
+    return s_points.reshape(templates.polar_grid.n_shells, templates.polar_grid.n_inplanes)
+
+
+def _get_translation_kernel(
+    sqrt_weights: torch.Tensor,
+    disp: _Displacements,
+    polar_grid: PolarGrid,
+    precision: Precision,
+    device: torch.device
+):
+    _integration_weights_points_sqrt = sqrt_weights.to(device)
+
+    _x_displacements = to_torch(disp.x_displacements, precision, device)
+    _y_displacements = to_torch(disp.y_displacements, precision, device)
+    translation_kernel = translation_kernel_fourier(polar_grid, _x_displacements, _y_displacements, precision, device)
+    sqrtweighted_translation_kernel = (translation_kernel * _integration_weights_points_sqrt[None, :, :]).unsqueeze(0)
+    return sqrtweighted_translation_kernel
 
 
 class CrossCorrelationLikelihood:
@@ -362,11 +435,10 @@ class CrossCorrelationLikelihood:
             integration points from the templates' underlying polar grid.
         log_weights_viewing (torch.Tensor): log of the normalized weights for the templates'
             viewing angles. Used in computing integrated log likelihood.
-        box_size (float): Side length of the (square) viewing box
         n_displacements (int): number of displacements considered in checking optimal displacement.
             Should be the length of the x_ and y_displacement vectors.
-        x_displacements (torch.Tensor): Vector of x_displacements to consider in matching
-        y_displacements (torch.Tensor): Vector of y_displacements to consider in matching
+        x_displacements_expt_scale (torch.Tensor): Vector of x_displacements to consider in matching
+        y_displacements_expt_scale (torch.Tensor): Vector of y_displacements to consider in matching
         s_points (torch.Tensor): Matrix of x- and y-points from the template grid, after
             application of sinc function. Used in computing integrated log likelihood.
         Iss (float): Integral of s_points, used in computing integrated log likelihood
@@ -382,10 +454,9 @@ class CrossCorrelationLikelihood:
     integration_weights_points: torch.Tensor
     integration_weights_points_sqrt: torch.Tensor
     log_weights_viewing: torch.Tensor
-    box_size: float
     n_displacements: int
-    x_displacements: torch.Tensor
-    y_displacements: torch.Tensor
+    x_displacements_expt_scale: torch.Tensor
+    y_displacements_expt_scale: torch.Tensor
     s_points: torch.Tensor
     Iss: float
     _log_likelihood_SM: torch.Tensor
@@ -427,59 +498,45 @@ class CrossCorrelationLikelihood:
             verbose (bool, optional): If set, will be chattier about initialization. Defaults to False.
         """
         _device = get_device(device, verbose)
-        (self.torch_float_type, self.torch_complex_type, _) = set_precision(precision, default=Precision.DOUBLE)
+        (self.torch_float_type, self.torch_complex_type, _) = precision.get_dtypes(default=Precision.DOUBLE)
+        CrossCorrelationLikelihood._validate_templates(templates)
+        box_edge_size: float = templates.box_size[0]
 
-        if templates.polar_grid is None:
-            raise ValueError("Templates polar grid must be set.")
+        self.n_inplanes = templates.polar_grid.n_inplanes
+        self.n_templates = templates.images_fourier.shape[0]
+        self.templates_fourier = to_torch(templates.images_fourier, precision, "cpu")
+
+        disp = _get_displacements(max_displacement, n_displacements_x, n_displacements_y, box_edge_size)
+        self.n_displacements = disp.n_displacements
+        self.x_displacements_expt_scale = to_torch(disp.x_disp_expt_scale, precision, _device)
+        self.y_displacements_expt_scale = to_torch(disp.y_disp_expt_scale, precision, _device)
+
+        self.integration_weights_points = _get_integration_weights_points(templates, precision)
+        self.integration_weights_points_sqrt = torch.sqrt(self.integration_weights_points)
+        self.s_points = _get_s_points(templates, precision)
+        self.Iss = torch.sum(self.s_points.abs() ** 2 * self.integration_weights_points).item()
+        self._gamma = torch.linspace(0, 2*np.pi, self.n_inplanes+1, dtype=self.torch_float_type, device=_device)[:-1]
+        self.log_weights_viewing = _get_log_weights_viewing(templates, precision, _device)
+
+        self.sqrtweighted_translation_kernel = _get_translation_kernel(
+            self.integration_weights_points_sqrt,
+            disp,
+            templates.polar_grid,
+            precision,
+            _device
+        )
+
+        ## probably not enough memory to do this
+        # self.templates_fourier = _get_weighted_templates(_templates_fourier, sqrtweighted_translation_kernel, _device)
+
+
+    @staticmethod
+    def _validate_templates(templates: Templates):
         if not templates.polar_grid.uniform:
             raise NotImplementedError("Non-uniform polar grid is not yet supported.")
         if not np.isclose(templates.box_size[0], templates.box_size[1], rtol=1e-6):
             raise NotImplementedError("Box size must be same in both dimensions")
-        if n_displacements_x == -1 and n_displacements_y == -1:
-            raise ValueError("Number of displacements must be set and non-negative.")
-        if (n_displacements_x == -1) and (n_displacements_y != -1):
-            n_displacements_x = n_displacements_y
-        if (n_displacements_y == -1) and (n_displacements_x != -1):
-            n_displacements_y = n_displacements_x
 
-        self.n_shells = templates.polar_grid.n_shells
-        self.n_inplanes = templates.polar_grid.n_inplanes
-
-        self.integration_weights_points = to_torch(templates.polar_grid.weight_points, precision, "cpu").reshape(self.n_shells, self.n_inplanes) * (2.0 * np.pi) ** 2
-        self.integration_weights_points_sqrt = torch.sqrt(self.integration_weights_points)
-        integration_weights_points_sqrt = self.integration_weights_points_sqrt.cuda()
-
-        assert templates.templates_fourier is not None
-        self.n_templates = templates.templates_fourier.shape[0]
-        self.templates_fourier = to_torch(templates.templates_fourier, precision, "cpu")
-
-        weights_viewing = to_torch(templates.viewing_angles.weights_viewing, precision, _device)
-        weights_viewing /= weights_viewing.sum()
-        self.log_weights_viewing = torch.log(weights_viewing).unsqueeze(0)
-
-        ## calculate translation kernel
-        self.box_size = templates.box_size[0]
-        _max_displacement = max_displacement * 2.0 / self.box_size
-        self.n_displacements, _x_displacements, _y_displacements = get_possible_displacements_grid(_max_displacement, n_displacements_x, n_displacements_y)
-        print(f"n_displacements: {self.n_displacements}")
-        _x_displacements = to_torch(_x_displacements, precision, _device)
-        _y_displacements = to_torch(_y_displacements, precision, _device)
-        translation_kernel = translation_kernel_fourier(templates.polar_grid, _x_displacements, _y_displacements, precision, _device)
-        self.weighted_translation_kernel = (translation_kernel * integration_weights_points_sqrt[None, :, :]).unsqueeze(0)
-        self.x_displacements_expt_scale = _x_displacements / 2.0 * self.box_size
-        self.y_displacements_expt_scale = _y_displacements / 2.0 * self.box_size
-        
-        ## probably not enough memory to do this
-        # self.templates_fourier = _get_weighted_templates(_templates_fourier, weighted_translation_kernel, _device)
-
-        assert templates.polar_grid.x_points is not None
-        assert templates.polar_grid.y_points is not None
-        x_points = to_torch(templates.polar_grid.x_points, precision, "cpu")
-        y_points = to_torch(templates.polar_grid.y_points, precision, "cpu")
-        s_points = torch.sinc(2.0 * x_points) * torch.sinc(2.0 * y_points) * 4.0
-        self.s_points = s_points.reshape(self.n_shells, self.n_inplanes)
-        self.Iss = torch.sum(self.s_points.abs() ** 2 * self.integration_weights_points).item()
-        self._gamma = torch.linspace(0, 2*np.pi, self.n_inplanes+1, dtype=self.torch_float_type, device=_device)[:-1]
 
     def _initialize_collector(self, n_images: int, return_type: CrossCorrelationReturnType):
         collect_batch = self._no_op_collector
@@ -856,9 +913,9 @@ class CrossCorrelationLikelihood:
             
             t_end = min(t_start + n_templates_per_batch, self.n_templates)
             
-            weighted_templates = _get_weighted_templates(self.templates_fourier[t_start:t_end, :, :], self.weighted_translation_kernel, device = device)
-            f_templates_mnw = weighted_templates.fourier_templates_mnw
-            f_templates_bessel_mdnq = weighted_templates.fourier_templates_bessel_mdnq
+            sqrtweighted_templates = _get_sqrtweighted_templates(self.templates_fourier[t_start:t_end, :, :], self.sqrtweighted_translation_kernel, device = device)
+            f_sqrtweighted_templates_mnw = sqrtweighted_templates.sqrtweighted_fourier_templates_mnw
+            f_sqrtweighted_templates_bessel_mdnq = sqrtweighted_templates.sqrtweighted_fourier_templates_bessel_mdnq
             
             for i_start in range(0, n_images, n_images_per_batch):
                 
@@ -871,8 +928,8 @@ class CrossCorrelationLikelihood:
                     device,
                     self.n_inplanes,
                     f_imgs,
-                    f_templates_mnw,
-                    f_templates_bessel_mdnq,
+                    f_sqrtweighted_templates_mnw,
+                    f_sqrtweighted_templates_bessel_mdnq,
                     _ctf,
                     self.integration_weights_points.to(device),
                     self.integration_weights_points_sqrt.to(device),

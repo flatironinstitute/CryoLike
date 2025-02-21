@@ -3,20 +3,21 @@ import numpy as np
 import sys, os
 from time import time, sleep
 
-from cryolike.grids import PolarGrid, CartesianGrid2D, FourierImages, PhysicalImages
+from cryolike.grids import FourierImages, PhysicalImages
 from cryolike.stacks import Templates, Images
-from cryolike.microscopy import CTF, LensDescriptor, load_parameters, ViewingAngles
+from cryolike.microscopy import CTF
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
-from cryolike.likelihood import calc_distance_optimal_templates_vs_physical_images
-from cryolike.util import Precision, CrossCorrelationReturnType, set_precision
+from cryolike.likelihood import calc_likelihood_optimal_pose
+from cryolike.metadata import ViewingAngles, ImageDescriptor, load_combined_params
+from cryolike.util import Precision, CrossCorrelationReturnType
 
 ## TODO: implement functionality : skip_exist, optimized_inplane_rotation, optimized_displacement, optimized_viewing_angle
 ## TODO: REFACTOR
 
 def run_likelihood(
-    params_input: str | dict = None, # parameters
-    folder_templates: str = None, # folder with templates
-    folder_particles: str = None, # folder with particles
+    params_input: str | ImageDescriptor, # parameters
+    folder_templates: str, # folder with templates
+    folder_particles: str, # folder with particles
     i_template: int = 0, # index of the template
     n_stacks: int = 1, # number of stacks to process
     skip_exist: bool = False, # skip if the output files exist
@@ -33,13 +34,14 @@ def run_likelihood(
     optimized_inplane_rotation : bool = True, # optimize inplane rotation
     optimized_displacement : bool = True, # optimize displacement
     optimized_viewing_angle : bool = True, # optimize viewing angle
-    folder_output: str = None, # output folder
+    folder_output: str = '', # output folder
     verbose : bool = False # verbose mode
 ):
     """Run likelihood calculation with template files and particle files
 
     Attributes:
-        params_input (str or dict): parameters file or dictionary
+        params_input (str or ImageDescriptor): ImageDescriptor object (describing the grids used for
+            the image values), or the file path to a serialized ImageDescriptor
         folder_templates (str): folder with templates
         folder_particles (str): folder with particles
         i_template (int): index of the template
@@ -61,7 +63,10 @@ def run_likelihood(
         folder_output (str): output folder
         verbose (bool): verbose mode     
     """
-    
+
+    if return_likelihood_optimal_pose_physical:
+        raise NotImplementedError("Physical likelihood is still under development and not yet available. Please use Fourier likelihood instead.")
+
     if search_batch_size:
         list_n_images_per_batch = []
         list_n_templates_per_batch = []
@@ -73,27 +78,16 @@ def run_likelihood(
             n_templates_per_batch = n_templates_per_batch // 2
         n_n_images_per_batch = len(list_n_images_per_batch)
         n_n_templates_per_batch = len(list_n_templates_per_batch)
+    else:
+        n_n_images_per_batch = 0
+        n_n_templates_per_batch = 0
 
     ## load parameters
-    params = load_parameters(params_input)
+    image_desc = ImageDescriptor.ensure(params_input)
     
-    (torch_float_type, torch_complex_type, _) = set_precision(params.precision, Precision.SINGLE)
+    (torch_float_type, torch_complex_type, _) = image_desc.precision.get_dtypes(Precision.SINGLE)
 
-    polar_grid = PolarGrid(
-        radius_max = params.radius_max,
-        dist_radii = params.dist_radii,
-        n_inplanes = params.n_inplanes,
-        uniform = True
-    )
-    n_shells = polar_grid.n_shells
-    n_points = polar_grid.n_points
-    max_displacement = max_displacement_pixels * params.voxel_size[0]
-    print("max_displacement: ", max_displacement)
-        
-    phys_grid = CartesianGrid2D(
-        n_pixels = params.n_voxels,
-        pixel_size = params.voxel_size,
-    )
+    max_displacement = max_displacement_pixels * image_desc.cartesian_grid.pixel_size[0]
     flag_returned_displacements = False
     
     template_file_list = np.load(os.path.join(folder_templates, 'template_file_list.npy'), allow_pickle = True)
@@ -101,17 +95,13 @@ def run_likelihood(
     template_file = template_file_list[i_template]
     print("template_file: ", template_file)
 
-    templates_fourier = torch.load(template_file)
-    fourier_templates_data = FourierImages(templates_fourier, polar_grid)
-    viewing_angles = ViewingAngles.from_viewing_distance(params.viewing_distance)
+    templates_fourier = torch.load(template_file, weights_only=True)
+    fourier_templates_data = FourierImages(templates_fourier, image_desc.polar_grid)
     tp = Templates(
-        fourier_templates_data = fourier_templates_data,
-        box_size = params.box_size,
-        viewing_angles = viewing_angles
+        fourier_data = fourier_templates_data,
+        phys_data = image_desc.cartesian_grid,
+        viewing_angles = image_desc.viewing_angles
     )
-    n_shells = polar_grid.n_shells
-    thetas = polar_grid.theta_shell
-    radii = polar_grid.radius_shells
 
     folder_output_template = os.path.join(folder_output, 'template%d' % i_template)
     folder_output_log_likelihood = os.path.join(folder_output_template, 'log_likelihood')
@@ -124,25 +114,27 @@ def run_likelihood(
     for i_stack in range(n_stacks):
         
         if skip_exist:
-            file_integrity = True
+            # check if the output files exist
+            # NOTE: this is not a foolproof way to check if the files exist, as the files could be corrupted
+            file_exists = True
             if return_likelihood_integrated_pose_fourier:
-                filename_output_log_likelihood = os.path.join(folder_output_log_likelihood, f'log_likelihood_S_stack_{i_stack:06}.pt')
-                file_integrity = os.path.exists(filename_output_log_likelihood) and file_integrity
+                filename_output_log_likelihood = os.path.join(folder_output_log_likelihood, f'log_likelihood_integrated_fourier_stack_{i_stack:06}.pt')
+                file_exists = os.path.exists(filename_output_log_likelihood) and file_exists
             if return_likelihood_optimal_pose_fourier:
-                filename_log_likelihood_optimal_pose_fourier = os.path.join(folder_output_log_likelihood, f'log_likelihood_fourier_S_stack_{i_stack:06}.pt')
-                file_integrity = os.path.exists(filename_log_likelihood_optimal_pose_fourier) and file_integrity
+                filename_log_likelihood_optimal_pose_fourier = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_fourier_stack_{i_stack:06}.pt')
+                file_exists = os.path.exists(filename_log_likelihood_optimal_pose_fourier) and file_exists
             if return_likelihood_optimal_pose_physical:
-                filename_log_likelihood_optimal_pose_physical = os.path.join(folder_output_log_likelihood, f'log_likelihood_phys_S_stack_{i_stack:06}.pt')
-                file_integrity = os.path.exists(filename_log_likelihood_optimal_pose_physical) and file_integrity
+                filename_log_likelihood_optimal_pose_physical = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_physical_stack_{i_stack:06}.pt')
+                file_exists = os.path.exists(filename_log_likelihood_optimal_pose_physical) and file_exists
             if return_optimal_pose:
-                filename_output_cross_correlation = os.path.join(folder_output_cross_correlation, f'cross_correlation_S_stack_{i_stack:06}.pt')
-                filename_output_optimal_template_indices = os.path.join(folder_output_optimal_pose, f'optimal_template_S_stack_{i_stack:06}.pt')
-                filename_output_optimal_displacement_x =  os.path.join(folder_output_optimal_pose, f'optimal_displacement_x_S_stack_{i_stack:06}.pt')
-                filename_output_optimal_displacement_y = os.path.join(folder_output_optimal_pose, f'optimal_displacement_y_S_stack_{i_stack:06}.pt')
-                filename_output_optimal_inplane_rotation = os.path.join(folder_output_optimal_pose, f'optimal_inplane_rotation_S_stack_{i_stack:06}.pt')
-                file_integrity = os.path.exists(filename_output_cross_correlation) and os.path.exists(filename_output_optimal_template_indices) and os.path.exists(filename_output_optimal_displacement_x) and os.path.exists(filename_output_optimal_displacement_y) and os.path.exists(filename_output_optimal_inplane_rotation) and file_integrity
-            if file_integrity:
-                print("Skipping stack number: ", i_stack)
+                filename_output_cross_correlation = os.path.join(folder_output_cross_correlation, f'cross_correlation_stack_{i_stack:06}.pt')
+                filename_output_optimal_template_indices = os.path.join(folder_output_optimal_pose, f'optimal_template_stack_{i_stack:06}.pt')
+                filename_output_optimal_displacement_x =  os.path.join(folder_output_optimal_pose, f'optimal_displacement_x_stack_{i_stack:06}.pt')
+                filename_output_optimal_displacement_y = os.path.join(folder_output_optimal_pose, f'optimal_displacement_y_stack_{i_stack:06}.pt')
+                filename_output_optimal_inplane_rotation = os.path.join(folder_output_optimal_pose, f'optimal_inplane_rotation_stack_{i_stack:06}.pt')
+                file_exists = os.path.exists(filename_output_cross_correlation) and os.path.exists(filename_output_optimal_template_indices) and os.path.exists(filename_output_optimal_displacement_x) and os.path.exists(filename_output_optimal_displacement_y) and os.path.exists(filename_output_optimal_inplane_rotation) and file_exists
+            if file_exists:
+                print("Skipping stack number: ", i_stack, " as the output files already exist")
                 continue
         
         print("stack number: ", i_stack)
@@ -152,42 +144,21 @@ def run_likelihood(
             raise ValueError("File not found: %s" % image_fourier_file)
         if not os.path.exists(image_param_file):
             raise ValueError("File not found: %s" % image_param_file)
-        images_fourier = torch.load(image_fourier_file)
-        image_param_compressed = np.load(image_param_file)
-
-        box_size = image_param_compressed['box_size']
-        n_pixels = image_param_compressed['n_pixels']
-        pixel_size = image_param_compressed['pixel_size']
-
-        defocusU_stack = image_param_compressed['defocusU']
-        defocusV_stack = image_param_compressed['defocusV']
-        defocusAng_stack = image_param_compressed['defocusAng']
-        sphericalAberration = image_param_compressed['sphericalAberration']
-        voltage = image_param_compressed['voltage']
-        amplitudeContrast = image_param_compressed['amplitudeContrast']
-        phaseShift_stack = image_param_compressed['phaseShift']
+        images_fourier = torch.load(image_fourier_file, weights_only=True)
+        (stack_img_desc, stack_lens_desc) = load_combined_params(image_param_file)
+        if not image_desc.is_compatible_with(stack_img_desc):
+            raise ValueError("Incompatible image parameters")
         
-        defocus_angle_is_degree = image_param_compressed['defocus_angle_is_degree']
-        phase_shift_is_degree = image_param_compressed['phase_shift_is_degree']
 
-        fourier_images = FourierImages(images_fourier, polar_grid)
-        im = Images(fourier_images_data=fourier_images, box_size=box_size, phys_grid=phys_grid)
-        optical_device = LensDescriptor(
-            defocusU = defocusU_stack,
-            defocusV = defocusV_stack,
-            defocusAng = defocusAng_stack,
-            defocusAng_degree = defocus_angle_is_degree,
-            sphericalAberration = sphericalAberration,
-            voltage = voltage,
-            amplitudeContrast = amplitudeContrast,
-            phaseShift = phaseShift_stack,
-            phaseShift_degree = phase_shift_is_degree,)
+        fourier_images = FourierImages(images_fourier, stack_img_desc.polar_grid)
+        im = Images(fourier_data=fourier_images, phys_data=stack_img_desc.cartesian_grid)
         ctf = CTF(
-            ctf_descriptor=optical_device,
-            polar_grid = polar_grid,
-            box_size = box_size[0], ## TODO: check this hard-coded index
+            ctf_descriptor=stack_lens_desc,
+            polar_grid = stack_img_desc.polar_grid,
+            box_size = stack_img_desc.cartesian_grid.box_size[0], ## TODO: check this hard-coded index
             anisotropy = True
         )
+
         ctf_tensor = torch.tensor(ctf.ctf, dtype = torch_float_type)
         if search_batch_size:
             success = False
@@ -206,7 +177,7 @@ def run_likelihood(
                                 # n_displacements = n_displacements,
                                 n_displacements_x = n_displacements_x,
                                 n_displacements_y = n_displacements_y,
-                                precision = params.precision,
+                                precision = image_desc.precision,
                                 device = 'cuda',
                                 verbose = verbose
                             )
@@ -214,7 +185,6 @@ def run_likelihood(
                                 displacements_set = torch.stack([cclik.x_displacements_expt_scale, cclik.y_displacements_expt_scale], dim = 1).T.cpu().numpy()
                                 torch.save(displacements_set, os.path.join(folder_output, 'displacements_set.pt'))
                                 flag_returned_displacements = True
-                            assert im.images_fourier is not None
                             optimal_pose, log_likelihood_fourier_integrated = cclik._compute_cross_correlation_likelihood(
                                 device=torch.device("cuda"),
                                 images_fourier = im.images_fourier,
@@ -244,15 +214,16 @@ def run_likelihood(
                 # n_displacements = n_displacements,
                 n_displacements_x = n_displacements_x,
                 n_displacements_y = n_displacements_y,
-                precision = params.precision,
+                precision = image_desc.precision,
                 device = 'cuda',
                 verbose = verbose
             )
             if not flag_returned_displacements:
-                displacements_set = torch.stack([cclik.x_displacements, cclik.y_displacements], dim = 1).T.cpu().numpy()
+                # displacements_set = torch.stack([cclik.x_displacements, cclik.y_displacements], dim = 1).T.cpu().numpy()
+                # TODO: CHECK: NOTE THIS CHANGE in variable name. Did this get broken in a previous PR?
+                displacements_set = torch.stack([cclik.x_displacements_expt_scale, cclik.y_displacements_expt_scale], dim = 1).T.cpu().numpy()
                 torch.save(displacements_set, os.path.join(folder_output, 'displacements_set.pt'))
                 flag_returned_displacements = True
-            assert im.images_fourier is not None
             optimal_pose, log_likelihood_fourier_integrated = cclik._compute_cross_correlation_likelihood(
                 device=torch.device("cuda"),
                 images_fourier = im.images_fourier,
@@ -264,21 +235,21 @@ def run_likelihood(
                 return_integrated_likelihood=True
             )
         if return_optimal_pose:
-            filename_output_cross_correlation = os.path.join(folder_output_cross_correlation, f'cross_correlation_S_stack_{i_stack:06}.pt')
-            filename_output_optimal_template_indices = os.path.join(folder_output_optimal_pose, f'optimal_template_S_stack_{i_stack:06}.pt')
-            filename_output_optimal_displacement_x =  os.path.join(folder_output_optimal_pose, f'optimal_displacement_x_S_stack_{i_stack:06}.pt')
-            filename_output_optimal_displacement_y = os.path.join(folder_output_optimal_pose, f'optimal_displacement_y_S_stack_{i_stack:06}.pt')
-            filename_output_optimal_inplane_rotation = os.path.join(folder_output_optimal_pose, f'optimal_inplane_rotation_S_stack_{i_stack:06}.pt')
+            filename_output_cross_correlation = os.path.join(folder_output_cross_correlation, f'cross_correlation_stack_{i_stack:06}.pt')
+            filename_output_optimal_template_indices = os.path.join(folder_output_optimal_pose, f'optimal_template_stack_{i_stack:06}.pt')
+            filename_output_optimal_displacement_x =  os.path.join(folder_output_optimal_pose, f'optimal_displacement_x_stack_{i_stack:06}.pt')
+            filename_output_optimal_displacement_y = os.path.join(folder_output_optimal_pose, f'optimal_displacement_y_stack_{i_stack:06}.pt')
+            filename_output_optimal_inplane_rotation = os.path.join(folder_output_optimal_pose, f'optimal_inplane_rotation_stack_{i_stack:06}.pt')
             torch.save(optimal_pose.cross_correlation_S, filename_output_cross_correlation)
             torch.save(optimal_pose.optimal_template_S, filename_output_optimal_template_indices)
             torch.save(optimal_pose.optimal_displacement_x_S, filename_output_optimal_displacement_x)
             torch.save(optimal_pose.optimal_displacement_y_S, filename_output_optimal_displacement_y)
             torch.save(optimal_pose.optimal_inplane_rotation_S, filename_output_optimal_inplane_rotation)
         if return_likelihood_integrated_pose_fourier:
-            filename_output_log_likelihood = os.path.join(folder_output_log_likelihood, f'log_likelihood_S_stack_{i_stack:06}.pt')
+            filename_output_log_likelihood = os.path.join(folder_output_log_likelihood, f'log_likelihood_integrated_fourier_stack_{i_stack:06}.pt')
             torch.save(log_likelihood_fourier_integrated, filename_output_log_likelihood)
         if return_likelihood_optimal_pose_fourier:
-            log_likelihood_optimal_pose_fourier_images_ = calc_distance_optimal_templates_vs_physical_images(
+            log_likelihood_optimal_pose_fourier_images_ = calc_likelihood_optimal_pose(
                 template = tp,
                 image = im,
                 ctf = ctf,
@@ -289,18 +260,18 @@ def run_likelihood(
                 inplane_rotations = optimal_pose.optimal_inplane_rotation_S,
                 return_distance = False,
                 return_likelihood = True,
-                precision = params.precision,
+                precision = image_desc.precision,
                 use_cuda = True
             )
-            filename_log_likelihood_optimal_pose_fourier = os.path.join(folder_output_log_likelihood, f'log_likelihood_fourier_S_stack_{i_stack:06}.pt')
+            filename_log_likelihood_optimal_pose_fourier = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_fourier_stack_{i_stack:06}.pt')
             torch.save(log_likelihood_optimal_pose_fourier_images_, filename_log_likelihood_optimal_pose_fourier)
         
         if return_likelihood_optimal_pose_physical:
             folder_particles_phys = os.path.join(folder_particles, 'phys')
-            images_phys = torch.load(os.path.join(folder_particles_phys, f'particles_phys_stack_{i_stack:06}.pt'))
-            phys_image_data = PhysicalImages(images_phys, pixel_size=pixel_size)
-            im_phys = Images(phys_images_data=phys_image_data, fourier_images_data=None, box_size=box_size)
-            log_likelihood_optimal_pose_physical_images_ = calc_distance_optimal_templates_vs_physical_images(
+            images_phys = torch.load(os.path.join(folder_particles_phys, f'particles_phys_stack_{i_stack:06}.pt'), weights_only=True)
+            phys_image_data = PhysicalImages(images_phys, pixel_size=image_desc.cartesian_grid.pixel_size)
+            im_phys = Images(phys_data=phys_image_data, fourier_data=None)
+            log_likelihood_optimal_pose_physical_images_ = calc_likelihood_optimal_pose(
                 template = tp,
                 image = im_phys,
                 ctf = ctf,
@@ -311,10 +282,10 @@ def run_likelihood(
                 inplane_rotations = optimal_pose.optimal_inplane_rotation_S,
                 return_distance = False,
                 return_likelihood = True,
-                precision = params.precision,
+                precision = image_desc.precision,
                 use_cuda = True
             )
-            filename_log_likelihood_optimal_pose_physical = os.path.join(folder_output_log_likelihood, f'log_likelihood_phys_S_stack_{i_stack:06}.pt') 
+            filename_log_likelihood_optimal_pose_physical = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_physical_stack_{i_stack:06}.pt') 
             torch.save(log_likelihood_optimal_pose_physical_images_, filename_log_likelihood_optimal_pose_physical)
             del images_phys
     

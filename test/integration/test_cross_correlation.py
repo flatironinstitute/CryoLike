@@ -4,25 +4,26 @@ from scipy.special import jv
 
 from cryolike.grids import PolarGrid, FourierImages
 from cryolike.stacks import Templates, Images
-from cryolike.microscopy import CTF, ViewingAngles
+from cryolike.microscopy import CTF
+from cryolike.metadata import ViewingAngles
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood, conform_ctf
 from cryolike.util import (
     CrossCorrelationReturnType,
     FloatArrayType,
     Precision,
-    set_precision,
     to_torch,
 )
 
 
 def test_cross_correlation():
     
+    n_viewings = 128
     box_size = 2.0
     n_pixels = 128
     pixel_size = box_size / n_pixels
 
     precision = Precision.SINGLE
-    (torch_float_type, torch_complex_type, _) = set_precision(precision, Precision.DOUBLE)
+    (torch_float_type, torch_complex_type, _) = precision.get_dtypes(Precision.DOUBLE)
     radius_max = n_pixels / (2.0 * np.pi) * np.pi / 2.0 #/ 2.0
     dist_radii = 1.0 / (2.0 * np.pi) * np.pi / 2.0 #/ 2.0
     n_inplanes = n_pixels * 2
@@ -77,37 +78,39 @@ def test_cross_correlation():
         I = 2 * np.pi * radius_max ** 2 * (d * jv(-1, d) * jv(0, c) - c * jv(-1, c) * jv(0, d)) / np.maximum(1e-12, c ** 2 - d ** 2)
         return I
 
-    viewing_angles = ViewingAngles.from_viewing_distance(viewing_distance=8.0 / (4.0 * np.pi))
-    polars_viewing = viewing_angles.polars
-    azimus_viewing = viewing_angles.azimus
+    torch.manual_seed(0)
+    azimus = torch.rand(size=(n_viewings,), dtype=torch_float_type) * 2 * np.pi
+    polars = torch.rand(size=(n_viewings,), dtype=torch_float_type) * np.pi
+    gammas = torch.zeros(size=(n_viewings,), dtype=torch_float_type)
+    viewing_angles = ViewingAngles(azimus, polars, gammas)
     n_viewings = viewing_angles.n_angles
 
     ##
     ## project wavevector to viewing angles
     ##
-    cos_polars_viewing = torch.cos(polars_viewing)
-    sin_polars_viewing = torch.sin(polars_viewing)
-    cos_azimus_viewing = torch.cos(azimus_viewing)
-    sin_azimus_viewing = torch.sin(azimus_viewing)
+    cos_polars = torch.cos(polars)
+    sin_polars = torch.sin(polars)
+    cos_azimus = torch.cos(azimus)
+    sin_azimus = torch.sin(azimus)
 
-    normvector_templates_x = sin_polars_viewing * cos_azimus_viewing
-    normvector_templates_y = sin_polars_viewing * sin_azimus_viewing
-    normvector_templates_z = cos_polars_viewing
+    normvector_templates_x = sin_polars * cos_azimus
+    normvector_templates_y = sin_polars * sin_azimus
+    normvector_templates_z = cos_polars
     normvector_templates = torch.stack([normvector_templates_x, normvector_templates_y, normvector_templates_z], dim = 1)
 
     wavevector = torch.tensor([0.0, 0.0, k], dtype = torch.float64)
 
     wavevector_templates = wavevector[None,:] - normvector_templates_z[:,None] * k * normvector_templates
 
-    xvector_x_templates = cos_azimus_viewing * cos_polars_viewing
-    xvector_y_templates = sin_azimus_viewing * cos_polars_viewing
-    xvector_z_templates = - sin_polars_viewing
+    xvector_x_templates = cos_azimus * cos_polars
+    xvector_y_templates = sin_azimus * cos_polars
+    xvector_z_templates = - sin_polars
     xvector_templates = torch.stack([xvector_x_templates, xvector_y_templates, xvector_z_templates], dim = 1)
     wavevector_x_templates = torch.sum(wavevector_templates * xvector_templates, dim = 1)
 
-    yvector_x_templates = - sin_azimus_viewing
-    yvector_y_templates = cos_azimus_viewing
-    yvector_z_templates = torch.zeros_like(sin_polars_viewing)
+    yvector_x_templates = - sin_azimus
+    yvector_y_templates = cos_azimus
+    yvector_z_templates = torch.zeros_like(sin_polars)
     yvector_templates = torch.stack([yvector_x_templates, yvector_y_templates, yvector_z_templates], dim = 1)
     wavevector_y_templates = torch.sum(wavevector_templates * yvector_templates, dim = 1)
 
@@ -125,7 +128,7 @@ def test_cross_correlation():
     weights = torch.from_numpy(polar_grid.weight_points).reshape(n_shells, n_inplanes).unsqueeze(0)
 
     fourier_imgs = FourierImages(images_fourier=images_fourier_wavevector.numpy(), polar_grid=polar_grid)
-    im_wavevector = Images(fourier_images_data=fourier_imgs)
+    im_wavevector = Images(fourier_data=fourier_imgs)
 
     wavevector_xy_templates = wavevector_xy_templates.numpy()
 
@@ -144,9 +147,9 @@ def test_cross_correlation():
         # images_fourier /= torch.norm(images_fourier, dim = 1, keepdim = True)
         return images_fourier.to(torch_complex_type)
     tp = Templates.generate_from_function(density_function, viewing_angles, polar_grid, precision=precision)
-    assert tp.templates_fourier is not None
 
-    im = Images.from_templates(templates = tp)
+    # im = Images.from_templates(templates = tp)
+    im = tp.to_images()
     im.transform_to_spatial(grid=(n_pixels, pixel_size), precision=precision)
     ctf = CTF(
         polar_grid = polar_grid,
@@ -165,7 +168,6 @@ def test_cross_correlation():
         device = 'cuda',
         verbose = True
     )
-    assert cc.n_displacements == n_displacements_x * n_displacements_y
 
     _imgs = im.images_fourier
     _ctf = conform_ctf(to_torch(ctf.ctf, precision, "cpu"), ctf.anisotropy)
@@ -176,8 +178,8 @@ def test_cross_correlation():
         images_fourier = _imgs,
         ctf=_ctf,
         n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
-        n_templates_per_batch=128,
-        n_images_per_batch=128,
+        n_templates_per_batch=n_viewings,
+        n_images_per_batch=n_viewings,
         return_type=CrossCorrelationReturnType.OPTIMAL_DISPLACEMENT,
         return_integrated_likelihood=False,
     )

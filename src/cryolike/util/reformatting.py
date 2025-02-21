@@ -1,4 +1,4 @@
-from typing import Literal, overload
+from typing import Literal, overload, Any, cast
 import numpy as np
 from cryolike.util.types import FloatArrayType, IntArrayType
 from enum import Enum
@@ -55,7 +55,6 @@ def project_vector(vector: list | np.ndarray, dims: int, label: str) -> IntArray
         if len(v) < dims:
             raise ValueError(f"{label} must be at least {dims}-dimensional.")
         if len(v) > dims:
-            # QUERY: should we actually allow this? It probably represents a mistake on the caller's part.
             print(f"Warning: {label} is more than {dims}-dimensional. Ignoring higher dimensions...")
         result = np.array(v[:dims])
     return result
@@ -127,3 +126,35 @@ def project_descriptor(descriptor: descriptor_types, label: str, dims: int, targ
         raise ValueError(f"{label} must have positive values.")
 
     return result
+
+
+def extract_unique_float(x: float | FloatArrayType, desc: str = '') -> float:
+    if isinstance(x, float):
+        return x
+    if isinstance(x, int):
+        return float(x)
+    unique = np.unique(x)
+    if len(unique) > 1:
+        raise ValueError(f"Array ({desc}) has multiple distinct values.")
+    return unique.item()
+
+
+def extract_unique_str(x: str | np.ndarray, desc: str = "") -> str:
+    if isinstance(x, str):
+        return x
+    v = unbox_unique(x, str, desc)
+    return cast(str, v)
+
+
+def unbox_unique(x: np.ndarray | Any, target_type: type, desc: str = ""):
+    if not isinstance(x, np.ndarray):
+        assert isinstance(x, target_type)
+        return x
+    else:
+        unique = np.unique(x)
+        if len(unique) > 1:
+            raise ValueError(f"Array ({desc}) has multiple distinct values.")
+        result = unique.item()
+        if not isinstance(result, target_type):
+            raise ValueError(f"Array ({desc}) expected to have type {target_type} and has {type(result)}")
+        return result

@@ -2,8 +2,9 @@ import numpy as np
 import torch
 from pathlib import Path
 
-from cryolike.microscopy import CTF, LensDescriptor, ViewingAngles
-from cryolike.stacks import Templates, Images
+from cryolike.microscopy import CTF
+from cryolike.metadata import LensDescriptor, ViewingAngles
+from cryolike.stacks import Templates
 from cryolike.util import Precision, AtomShape, AtomicModel
 from cryolike.grids import PolarGrid
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
@@ -57,7 +58,7 @@ def test_distance():
     atomic_model = AtomicModel.read_from_pdb(pdb_file=str(file_dir.parent.parent.joinpath("data").joinpath("1uao.pdb")), box_size=box_size, use_protein_residue_model=True)
     tp = Templates.generate_from_positions(atomic_model, viewing_angles, polar_grid, box_size, atom_shape, precision)
 
-    n_images = tp.n_templates
+    n_images = tp.n_images
     # defocus = np.random.uniform(300.0, 900.0, n_images)
     defocus = np.linspace(300.0, 900.0, n_images)
     # Astigmatism = np.random.uniform(0, 20, n_images)
@@ -69,7 +70,7 @@ def test_distance():
     microscope = LensDescriptor(
         defocusU = defocusU, # in Angstrom
         defocusV = defocusV,  # in Angstrom
-        defocusAng = defocusAng, # in degrees, defocus angle
+        defocusAngle = defocusAng, # in degrees, defocus angle
         sphericalAberration = 2.7,  # in mm, spherical aberration
         voltage = 300,  # in kV
         amplitudeContrast = 0.1,    # amplitude contrast
@@ -81,13 +82,14 @@ def test_distance():
         box_size = box_size, # in Angstrom
         anisotropy = True
     )
-    image = Images.from_templates(templates = tp)
+    # image = Images.from_templates(templates = tp)
+    image = tp.to_images()
     image.displace_images_fourier(
         x_displacements = true_displacement_x,
         y_displacements = true_displacement_y,
         precision = precision
     )
-    image.rotate_images_fourier(true_rotation)
+    image.rotate_images_fourier_discrete(true_rotation)
     image.apply_ctf(ctf)
     image.transform_to_spatial(grid=(n_pixels, pixel_size), use_cuda=use_cuda, precision=precision)
 
@@ -109,7 +111,6 @@ def test_distance():
     time_end = time()
     print("Time (init): ", time_end - time_start)
 
-    assert image.images_fourier is not None
     time_start = time()
     optimal_pose = cc.compute_optimal_pose(
         device=device,

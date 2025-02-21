@@ -16,7 +16,7 @@ for i_template in range(2):
         n_displacements_x = 16,
         n_displacements_y = 16,
         return_likelihood_integrated_pose_fourier = True,
-        return_likelihood_optimal_pose_physical = True,
+        return_likelihood_optimal_pose_physical = False,
         return_likelihood_optimal_pose_fourier = True,
         verbose = True
     )

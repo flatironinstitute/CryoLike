@@ -3,6 +3,7 @@ import torch
 from typing import TypeVar, cast
 
 from cryolike.grids import PolarGrid
+from cryolike.metadata import LensDescriptor
 from cryolike.util import ComplexArrayType, FloatArrayType
 
 h =  6.62607015e-34 # Planck constant [Js] = [kgm^2/s]
@@ -11,121 +12,6 @@ c =  2.99792458e8   # speed of light [m/s]
 m0 = 9.1093837015e-31 # electron rest mass [kg]
 
 T = TypeVar("T", bound=ComplexArrayType | torch.Tensor)
-
-
-class LensDescriptor():
-    """Class describing the properties of a device, to be used to compute
-    the relevant contrast transfer function (CTF).
-    
-    Attributes:
-        defocusU (FloatArrayType): Defocus in U-dimension, in Angstrom
-        defocusV (FloatArrayType): Defocus in V-dimension, in Angstrom
-        defocusAng (FloatArrayType): Defocus angle, in radians
-        sphericalAberration (FloatArrayType): Spherical aberration, in mm
-        voltage (FloatArrayType): Voltage, in kV
-        amplitudeContrast (FloatArrayType): Amplitude contrast
-        phaseShift (FloatArrayType): phase shift, in radians
-    """
-    defocusU: FloatArrayType
-    defocusV: FloatArrayType
-    defocusAng: FloatArrayType
-    sphericalAberration: FloatArrayType
-    voltage: FloatArrayType
-    amplitudeContrast: FloatArrayType
-    phaseShift: FloatArrayType
-
-    def __init__(self,
-        defocusU: np.ndarray = np.array([10200.0]),
-        defocusV: np.ndarray = np.array([9800.0]),
-        defocusAng: np.ndarray = np.array([90.0]),
-        defocusAng_degree: bool = True,
-        sphericalAberration: float | FloatArrayType = 2.7,
-        voltage: float | FloatArrayType = 300.0,
-        amplitudeContrast: float | FloatArrayType = 0.1,
-        phaseShift: np.ndarray = np.array([0.0]),
-        phaseShift_degree: bool = True
-    ):
-        """Constructor for device properties used to compute a CTF.
-
-        Args:
-            defocusU (np.ndarray, optional): In Angstroms. Defaults to np.array([10200.0]).
-            defocusV (np.ndarray, optional): In Angstroms. Defaults to np.array([9800.0]).
-            defocusAng (np.ndarray, optional): Defocus angle, in degrees unless otherwise
-                specified. Defaults to np.array([90.0]).
-            defocusAng_degree (bool, optional): If True (the default), defocus angle is
-                presumed to be in degrees; if False, defocus angle is treated as radians.
-            sphericalAberration (float | FloatArrayType, optional): Spherical aberration.
-                Defaults to 2.7.
-            voltage (float | FloatArrayType, optional): Voltage, in kV. Defaults to 300.0.
-            amplitudeContrast (float | FloatArrayType, optional): Amplitude contrast.
-                Defaults to 0.1.
-            phaseShift (np.ndarray, optional): Phase shift, in degrees unless otherwise
-                specified. Defaults to np.array([0.0]).
-            phaseShift_degree (bool, optional): If True, phase shift is presumed to be in
-                degrees; if False, phase shift is in radians. Defaults to True.
-        """
-        self.defocusU = _to_float_flatten_np_array(defocusU)  # in Angstrom
-        self.defocusV = _to_float_flatten_np_array(defocusV)  # in Angstrom
-        if self.defocusU.size != self.defocusV.size:
-            raise ValueError('defocusU and defocusV must have the same size')
-        n_CTF = len(defocusU)
-        self.defocusAng = _to_float_flatten_np_array(defocusAng) # in degrees, defocus angle
-        if defocusAng_degree:
-            self.defocusAng = np.radians(self.defocusAng)
-        self.sphericalAberration = np.array([sphericalAberration])  # in mm, spherical aberration
-        self.voltage = np.array([voltage])  # in kV
-        self.amplitudeContrast = np.array([amplitudeContrast])
-        self.phaseShift = _to_float_flatten_np_array(phaseShift)
-        if phaseShift_degree:
-            self.phaseShift = np.radians(phaseShift)
-        if self.phaseShift.size == 1:
-            self.phaseShift = self.phaseShift * np.ones(n_CTF)
-
-
-    @classmethod
-    def read_from_cryosparc(cls, filename: str):
-        ctf_data = np.load(filename)
-
-        return cls(
-            defocusU = ctf_data['ctf/df1_A'],
-            defocusV = ctf_data['ctf/df2_A'],
-            defocusAng = ctf_data['ctf/df_angle_rad'],
-            sphericalAberration = ctf_data['ctf/cs_mm'][0],
-            voltage = ctf_data['ctf/accel_kv'][0],
-            amplitudeContrast = ctf_data['ctf/amp_contrast'][0],
-            phaseShift = ctf_data['ctf/phase_shift_rad'],
-        )
-
-
-    @classmethod
-    def read_from_star(cls, filename: str):
-        from cryolike.microscopy.star_file import read_star_file
-        dataBlock, _ = read_star_file(filename) # 2nd return is the param list
-        for param in dataBlock.keys():
-            y = dataBlock[param]
-            y_unique = np.unique(y)
-            if len(y_unique) == 1:
-                dataBlock[param] = y_unique[0]
-
-        return cls(
-            defocusU = np.array(dataBlock["DefocusU"]),
-            defocusV = np.array(dataBlock["DefocusV"]),
-            defocusAng = np.array(dataBlock["DefocusAngle"]),
-            sphericalAberration = np.array(dataBlock["SphericalAberration"]),
-            voltage = np.array(dataBlock["Voltage"]),
-            amplitudeContrast = np.array(dataBlock["AmplitudeContrast"]),
-            phaseShift = np.array(dataBlock["PhaseShift"]),
-        )
-        
-
-def _to_float_flatten_np_array(x):
-    if isinstance(x, float):
-        return np.array([x], dtype = np.float64)
-    if not isinstance(x, np.ndarray):
-        raise ValueError('Invalid type for x')
-    if len(x.shape) > 1:
-        x = x.flatten()
-    return x
 
 
 def _ctf_relion(lens: LensDescriptor, grid: PolarGrid, box_size: float = 1.0, anisotropy: bool = True, cs_corrected: bool = False):
@@ -147,7 +33,7 @@ def _ctf_relion(lens: LensDescriptor, grid: PolarGrid, box_size: float = 1.0, an
 
     if anisotropy:
         theta_ = np.linspace(0, 2 * np.pi, grid.n_inplanes, endpoint = False)
-        local_defocus = defocus[:, None] + astigmatism[:, None] * np.cos(2 * (theta_[None,:] - lens.defocusAng[:, None]))
+        local_defocus = defocus[:, None] + astigmatism[:, None] * np.cos(2 * (theta_[None,:] - lens.defocusAngle[:, None]))
         if cs_corrected:
             gamma = - coef2 * r_shell_2[None,:,None] * local_defocus[:,None,:] - lens.phaseShift[:, None, None]
         else:
@@ -172,7 +58,7 @@ class CTF:
         n_CTF (int): Number of CTFs, which determines whether the CTF can
             effectively describe an image stack
         ctf (FloatArrayType): The value of the CTF function as a Numpy array.
-            It is indexed as [image_number, ??, ??]
+            It is indexed as [n_images, n_shells, n_inplanes]
         lens_descriptor (LensDescriptor | None): If the CTF was computed, this
             field stores the lens description which was used to compute the CTF.
     """
@@ -251,9 +137,9 @@ class CTF:
     @classmethod
     def from_file(cls, filename: str, polar_grid: PolarGrid, box_size: float):
         if filename.endswith('.star'):
-            lens = LensDescriptor.read_from_star(filename)
+            lens = LensDescriptor.from_starfile(filename)
         elif filename.endswith('.cs'):
-            lens = LensDescriptor.read_from_cryosparc(filename)
+            lens = LensDescriptor.from_cryosparc_file(filename)
         else:
             raise ValueError('Invalid filename')
         return cls(

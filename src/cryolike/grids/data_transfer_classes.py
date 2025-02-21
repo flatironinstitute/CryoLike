@@ -12,6 +12,12 @@ from .sphere_grid import SphereGrid
 
 @dataclass
 class FourierImages:
+    """Data class representing a set of Fourier images and the corresponding polar grid.
+
+    Attributes:
+        images_fourier (Tensor): Stack of images in Fourier space as (complex-valued) Tensor
+        polar_grid (PolarGrid): A grid describing the polar space in which the Fourier images reside
+    """
     images_fourier: Tensor
     polar_grid: PolarGrid
 
@@ -25,8 +31,14 @@ class FourierImages:
 
 
 class PhysicalImages:
+    """Data class representing a set of Cartesian images and the 2D grid on which they reside.
+
+    Attributes:
+        images_phys (Tensor): Stack of images in Cartesian space as (real-valued) Tensor
+        phys_grid (CartesianGrid2D): A grid describing the Cartesian space in which the images reside
+    """
     images_phys: Tensor
-    phys_grid: CartesianGrid2D | None
+    phys_grid: CartesianGrid2D
 
     def __init__(self, images_phys: Tensor, pixel_size: Pixel_size_type):
         if not len(images_phys.shape) in [2, 3]:

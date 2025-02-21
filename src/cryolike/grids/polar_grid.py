@@ -64,8 +64,8 @@ class PolarGrid:
         weight_points (FloatArrayType): Weight for each point in the list of points.
         shell_indices (IntArrayType): Index for the point lists, identifying which shell each point
             belongs to.
-            
     """
+
     uniform: bool
     radius_max: float
     dist_radii: float
@@ -138,8 +138,13 @@ class PolarGrid:
                 raise ValueError('n_inplanes must be array-valued for non-uniform quadrature')
             self._do_nonuniform_initialization(n_inplanes=n_inplanes, dist_inplane=dist_inplane)
         if return_cartesian:
-            self.x_points = self.radius_points * np.cos(self.theta_points)
-            self.y_points = self.radius_points * np.sin(self.theta_points)
+            self.get_cartesian_points()
+
+
+    def get_cartesian_points(self) -> tuple[FloatArrayType, FloatArrayType]:
+        self.x_points = self.radius_points * np.cos(self.theta_points)
+        self.y_points = self.radius_points * np.sin(self.theta_points)
+        return (self.x_points, self.y_points)
 
 
     def _set_radius_and_weight_shells(self, quadrature: QuadratureAlias):
@@ -250,7 +255,7 @@ class PolarGrid:
 
 
     def _nonuniform_inplane(self, dist_inplane: float = 1.0 / (2.0 * np.pi)):
-        ## QUERY: This next line resets any setting of self.n_inplane_shells that happened previously
+        ## TODO QUERY: This next line resets any setting of self.n_inplane_shells that happened previously
         ## (in the branch where n_inplanes is not None in set_n_inplanes_nonuniform.)
         self.n_inplane_shells = cast(IntArrayType, np.zeros(self.n_shells, dtype = int))
         for i_r in range(self.n_shells):

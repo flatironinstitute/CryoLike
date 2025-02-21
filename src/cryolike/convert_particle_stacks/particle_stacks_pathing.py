@@ -58,7 +58,7 @@ class JobPaths():
         else:
             raise NotImplementedError("Impossible value for paths folder type.")
         if not path.exists(mrc_path):
-            print(f"File {mrc_path} does not exist, breaking...")
+            print(f"Looked for file {mrc_path} but it does not exist, breaking the loop and continuing to the next step...")
             return None
         return mrc_path
 

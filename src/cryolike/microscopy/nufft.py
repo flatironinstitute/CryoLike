@@ -5,7 +5,7 @@ from finufft import nufft2d2 as nufft2d2_cpu
 from finufft import nufft3d2 as nufft3d2_cpu
 
 from cryolike.grids import CartesianGrid2D, PolarGrid, Volume
-from cryolike.util import Precision, set_epsilon, set_precision
+from cryolike.util import Precision
 
 # TODO: Use the one in device_handling
 def _check_cuda_available() -> bool:
@@ -28,8 +28,8 @@ def fourier_polar_to_cartesian_phys(
     use_cuda = _check_cuda_available() and use_cuda
     device = torch.device('cuda' if use_cuda else 'cpu')
     print("Using device:", device)
-    (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
-    eps = set_epsilon(precision, eps)
+    (torch_float_type, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
+    eps = precision.set_epsilon(eps)
 
     if not len(image_polar.shape) in [1, 2]:
         raise ValueError("image array is not 1D (single imagen (n_points,)) or 2D (multiple images, (n_images, n_points)).")
@@ -104,7 +104,11 @@ def fourier_polar_to_cartesian_phys(
                 image_phys[i_image,:,:] = image_phys_gpu.detach().cpu()
             return image_phys
     else:
-        image_polar = image_polar.cpu().numpy()
+        numpy_float_type = np.float64
+        numpy_complex_type = np.complex128
+        image_polar = image_polar.cpu().numpy().astype(numpy_complex_type)
+        k1 = k1.astype(numpy_float_type)
+        k2 = k2.astype(numpy_float_type)
         image_phys = None
         if len(image_polar.shape) == 1:
             image_polar_weighted = image_polar.flatten() * grid_fourier_polar.weight_points
@@ -132,8 +136,8 @@ def cartesian_phys_to_fourier_polar(
 ) -> torch.Tensor:
     use_cuda = _check_cuda_available() and use_cuda
     device = torch.device('cuda' if use_cuda else 'cpu')
-    (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
-    eps = set_epsilon(precision, eps)
+    (torch_float_type, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
+    eps = precision.set_epsilon(eps)
     if not isinstance(images_phys, torch.Tensor):
         images_phys = torch.tensor(images_phys, dtype = torch_complex_type)
     else:
@@ -196,7 +200,11 @@ def cartesian_phys_to_fourier_polar(
                 image_polar[i_image,:] = image_polar_gpu.detach().cpu()
         return image_polar
     else:
-        images_phys = images_phys.cpu().numpy()
+        numpy_float_type = np.float64
+        numpy_complex_type = np.complex128
+        images_phys = images_phys.cpu().numpy().astype(numpy_complex_type)
+        k1 = k1.astype(numpy_float_type)
+        k2 = k2.astype(numpy_float_type)
         if n_images == 1:
             image_polar = nufft2d2_cpu(k1, k2, images_phys, eps = eps, isign = isign)
         else:
@@ -222,8 +230,8 @@ def volume_phys_to_fourier_points(
         precision = Precision.DOUBLE
     output_device = device if output_device is None else output_device
     assert output_device is not None
-    (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
-    eps = set_epsilon(precision, eps)
+    (torch_float_type, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
+    eps = precision.set_epsilon(eps)
     if volume.voxel_grid is None:
         raise ValueError("Volume does not have a voxel grid")
     if volume.density_physical is None:
@@ -326,8 +334,10 @@ def volume_phys_to_fourier_points(
         torch.cuda.empty_cache()
     else:
         # raise NotImplementedError("CPU version not implemented")
-        numpy_float_type = np.float32 if precision == Precision.SINGLE else np.float64
-        numpy_complex_type = np.complex64 if precision == Precision.SINGLE else np.complex128
+        # numpy_float_type = np.float32 if precision == Precision.SINGLE else np.float64
+        # numpy_complex_type = np.complex64 if precision == Precision.SINGLE else np.complex128
+        numpy_float_type = np.float64
+        numpy_complex_type = np.complex128
         x_points = x_points.astype(numpy_float_type)
         y_points = y_points.astype(numpy_float_type)
         z_points = z_points.astype(numpy_float_type)

@@ -116,3 +116,7 @@ dmypy.json
 # output
 output/
 html/
+
+# profiling output
+profile.html
+profile.json

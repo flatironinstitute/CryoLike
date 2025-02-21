@@ -18,10 +18,10 @@ class CartesianGrid2D:
         pixel_size (FloatArrayType): Size of each pixel as [x, y].
         box_size (FloatArrayType): Overall area of the grid (pixel size times number of pixels) in each dimension.
         radius (FloatArrayType): Half the box size, i.e. multidimensional radius centered at the grid center.
-        x_axis (FloatArrayType): X-positions of each pixel, assuming 0 for the grid center
-        y_axis (FloatArrayType): Y-positions of each pixel, assuming 0 for the grid center
-        x_pixels (FloatArrayType): TODO NEED BETTER DESCRIPTOR
-        y_pixels (FloatArrayType): TODO NEED BETTER DESCRIPTOR
+        x_axis (FloatArrayType): 1-D array represetting X-coordinates of the grid
+        y_axis (FloatArrayType): 1-D array represetting Y-coordinates of the grid
+        x_pixels (FloatArrayType): 2-D array representing X-coordinates of each pixel on the grid
+        y_pixels (FloatArrayType): 2-D array representing Y-coordinates of each pixel on the grid
         n_pixels_total (int): Total pixel count of the grid.
     """
     n_pixels: IntArrayType
@@ -76,12 +76,12 @@ class CartesianGrid3D:
         voxel_size (FloatArrayType): Size of each voxel as [x, y, z].
         box_size (FloatArrayType): Overall area of the grid (voxel size times number of voxels) in each dimension.
         radius (FloatArrayType): Half the box size, i.e. multidimensional radius centered at the grid center.
-        x_axis (FloatArrayType): X-positions of each voxel, assuming 0 for the grid center
-        y_axis (FloatArrayType): Y-positions of each voxel, assuming 0 for the grid center
-        z_axis (FloatArrayType): Z-positions of each voxel, assuming 0 for the grid center
-        x_pixels (FloatArrayType): TODO NEED BETTER DESCRIPTOR
-        y_pixels (FloatArrayType): TODO NEED BETTER DESCRIPTOR
-        z_voxels (FloatArrayType): TODO NEED BETTER DESCRIPTOR
+        x_axis (FloatArrayType): X-axis positions of the grid, assuming 0 for the grid center
+        y_axis (FloatArrayType): Y-axis positions of the grid, assuming 0 for the grid center
+        z_axis (FloatArrayType): Z-axis positions of the grid, assuming 0 for the grid center
+        x_voxels (FloatArrayType): X-positions of each voxel
+        y_voxels (FloatArrayType): Y-positions of each voxel
+        z_voxels (FloatArrayType): Z-positions of each voxel
         n_pixels_total (int): Total pixel count of the grid.
     """
     n_voxels: IntArrayType
