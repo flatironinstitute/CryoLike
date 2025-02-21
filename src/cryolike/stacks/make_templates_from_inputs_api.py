@@ -108,7 +108,8 @@ def _get_input_name(input: str, iteration_count: int) -> tuple[str, str]:
 def _make_templates_from_mrc_file(
     mrc_file: str,
     cfg: _TemplateConfig,
-    verbose: bool
+    verbose: bool,
+    use_cuda: bool
 ) -> Templates:
     volume = Volume.from_mrc(filename = mrc_file)
     if volume.density_physical is None:
@@ -119,7 +120,8 @@ def _make_templates_from_mrc_file(
         polar_grid=cfg.polar_grid,
         viewing_angles=cfg.viewing_angles,
         precision=cfg.params.precision,
-        verbose=verbose
+        verbose=verbose,
+        use_cuda=use_cuda
     )
 
 
@@ -156,6 +158,7 @@ def _make_templates_from_memory_array(
     input: np.ndarray | torch.Tensor,
     cfg: _TemplateConfig,
     verbose: bool,
+    use_cuda: bool
 ) -> Templates:
     if isinstance(input, np.ndarray):
         input = torch.from_numpy(input)
@@ -169,7 +172,8 @@ def _make_templates_from_memory_array(
         cfg.polar_grid,
         cfg.viewing_angles,
         precision=cfg.params.precision,
-        verbose=verbose
+        verbose=verbose,
+        use_cuda=use_cuda
     )
 
 
@@ -189,7 +193,8 @@ def make_templates_from_inputs(
     atom_shape: Literal['hard-sphere'] | Literal['gaussian'] | AtomShape = AtomShape.GAUSSIAN,
     output_plots: bool = True,
     folder_output: str = "./templates/",
-    verbose: bool = False
+    verbose: bool = False,
+    use_cuda: bool = True
 ):
     """Parse a series of inputs to internal pytorch tensor representation, then save to an output directory.
 
@@ -218,6 +223,7 @@ def make_templates_from_inputs(
         folder_output (str, optional): Directory in which to write the generated Template data.
             Defaults to "./templates/".
         verbose (bool, optional): Whether to provide verbose output. Defaults to False.
+        use_cuda (bool, optional): Whether to use cuda. Defaults to True.
 
     Raises:
         ValueError: If any inputs have an unrecognized file extension or are neither string
@@ -250,7 +256,7 @@ def make_templates_from_inputs(
         if isinstance(input, str):
             if extension in ['.mrc', '.mrcs', '.map']:
                 print("mrc_name:", name)
-                tp = _make_templates_from_mrc_file(input, cfg, verbose)
+                tp = _make_templates_from_mrc_file(input, cfg, verbose, use_cuda)
             elif extension in ['.pdb']:
                 print(f"pdb_name: {name}")
                 tp = _make_templates_from_pdb_file(input, cfg, use_protein_residue_model, verbose)

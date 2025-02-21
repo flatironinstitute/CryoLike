@@ -50,13 +50,16 @@ def _do_skip_exist(skip_exist: bool, image_fourier_file: str, image_param_file: 
     return False
 
 
-def _do_image_normalization(im: Images, polar_grid: PolarGrid, precision: Precision, downsample_physical: int = 1):
+def _do_image_normalization(im: Images, polar_grid: PolarGrid,
+                            precision: Precision,
+                            downsample_physical: int = 1,
+                            use_cuda: bool = True):
     assert im.images_phys is not None
     if downsample_physical > 1:
         im.downsample_images_phys(downsample_physical)
     print("Physical images shape: ", im.images_phys.shape)
     im.center_physical_image_signal()
-    im.transform_to_fourier(polar_grid=polar_grid, precision=precision, use_cuda=True)
+    im.transform_to_fourier(polar_grid=polar_grid, precision=precision, use_cuda=use_cuda)
     im.normalize_images_fourier(ord=2, use_max=False)
     assert im.images_fourier is not None
     print("Fourier images shape: ", im.images_fourier.shape)
@@ -131,7 +134,8 @@ def convert_particle_stacks_from_star_files(
     defocus_angle_is_degree: bool = True,
     phase_shift_is_degree: bool = True,
     skip_exist: bool = False,
-    flag_plots: bool = True
+    flag_plots: bool = True,
+    use_cuda: bool = True
 ):
     """Transcode a set of particle files, with metadata described in starfile format,
     to consistent batches in a specified output folder.
@@ -194,7 +198,7 @@ def convert_particle_stacks_from_star_files(
             (batch_start, batch_end, im_batch) = _get_unbuffered_batch(i_batch, batch_size, im)
             output_filenames = _output_dirs.get_output_filenames(i_stack)
 
-            _do_image_normalization(im_batch, polar_grid, params.precision)
+            _do_image_normalization(im_batch, polar_grid, params.precision, use_cuda)
             
             _plot_images(flag_plots, im_batch, _output_dirs, i_stack)
             torch.save(im_batch.images_phys, output_filenames.phys_stack)
@@ -322,7 +326,8 @@ def convert_particle_stacks_from_cryosparc(
     pixel_size: float | FloatArrayType | None = None,
     downsample_physical: int = 1,
     skip_exist: bool = False,
-    flag_plots: bool = True
+    flag_plots: bool = True,
+    use_cuda: bool = True
 ):
     """Transcodes a set of MRC files, with a cryosparc metadata file, into internal
     representation, with optional downsampling.
@@ -403,7 +408,7 @@ def convert_particle_stacks_from_cryosparc(
         )
         _last_good_im = im
         
-        _do_image_normalization(im, polar_grid, params.precision, downsample_physical)
+        _do_image_normalization(im, polar_grid, params.precision, downsample_physical, use_cuda)
         img_buffer.append_imgs(im.images_phys, im.images_fourier)
 
         # Currently not implemented -- unclear if it would go here
@@ -449,7 +454,8 @@ def convert_particle_stacks_from_cryosparc_restack(
     pixel_size: float = -1.,
     downsample_physical: int = 1,
     skip_exist: bool = False,
-    flag_plots: bool = True
+    flag_plots: bool = True,
+    use_cuda: bool = True
 ):
     """Transcodes a set of (previously restacked) MRC files into internal
     representation, with optional downsampling.
@@ -527,7 +533,7 @@ def convert_particle_stacks_from_cryosparc_restack(
         im = Images.from_mrc(mrc_path, pixel_size = _pixel_size)
 
         i_file += 1
-        _do_image_normalization(im, polar_grid, params.precision, downsample_physical)
+        _do_image_normalization(im, polar_grid, params.precision, downsample_physical, use_cuda)
         
         stack_end_file = stack_start_file + im.n_images
         img_buffer.append_imgs(im.images_phys, im.images_fourier)

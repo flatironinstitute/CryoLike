@@ -447,7 +447,9 @@ class CrossCorrelationLikelihood:
 
         self.integration_weights_points = to_torch(templates.polar_grid.weight_points, precision, "cpu").reshape(self.n_shells, self.n_inplanes) * (2.0 * np.pi) ** 2
         self.integration_weights_points_sqrt = torch.sqrt(self.integration_weights_points)
-        integration_weights_points_sqrt = self.integration_weights_points_sqrt.cuda()
+        integration_weights_points_sqrt = self.integration_weights_points_sqrt
+        if device == 'cuda':
+            integration_weights_points_sqrt = integration_weights_points_sqrt.cuda()
 
         assert templates.templates_fourier is not None
         self.n_templates = templates.templates_fourier.shape[0]
