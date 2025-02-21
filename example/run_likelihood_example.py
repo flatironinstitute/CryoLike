@@ -18,5 +18,6 @@ for i_template in range(2):
         return_likelihood_integrated_pose_fourier = True,
         return_likelihood_optimal_pose_physical = True,
         return_likelihood_optimal_pose_fourier = True,
-        verbose = True
+        verbose = True,
+        use_cuda = True
     )

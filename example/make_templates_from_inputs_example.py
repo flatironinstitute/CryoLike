@@ -28,5 +28,6 @@ make_templates_from_inputs(
     use_protein_residue_model = True, # False,
     atom_shape = 'hard-sphere', # 'gaussian',
     folder_output = "./output/templates/",
-    verbose = True
+    verbose = True,
+    use_cuda = True
 )
