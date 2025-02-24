@@ -48,6 +48,8 @@ def get_device(dev: str | device | None, verbose: bool = False) -> device:
         print(f"Using requested device {dev}")
     return device(dev)
 
+def get_cuda_bool(device: device) -> bool:
+    return device.type == 'cuda'
 
 def check_nufft_status() -> str:
     spec = find_spec('cufinufft')

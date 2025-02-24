@@ -9,7 +9,7 @@ from cryolike.microscopy import CTF
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
 from cryolike.likelihood import calc_likelihood_optimal_pose
 from cryolike.metadata import ViewingAngles, ImageDescriptor, load_combined_params
-from cryolike.util import Precision, CrossCorrelationReturnType
+from cryolike.util import Precision, CrossCorrelationReturnType, check_cuda
 
 ## TODO: implement functionality : skip_exist, optimized_inplane_rotation, optimized_displacement, optimized_viewing_angle
 ## TODO: REFACTOR
@@ -35,7 +35,8 @@ def run_likelihood(
     optimized_displacement : bool = True, # optimize displacement
     optimized_viewing_angle : bool = True, # optimize viewing angle
     folder_output: str = '', # output folder
-    verbose : bool = False # verbose mode
+    verbose : bool = False, # verbose mode
+    use_cuda: bool = True
 ):
     """Run likelihood calculation with template files and particle files
 
@@ -61,11 +62,14 @@ def run_likelihood(
         optimized_displacement (bool): optimize displacement
         optimized_viewing_angle (bool): optimize viewing angle
         folder_output (str): output folder
-        verbose (bool): verbose mode     
+        verbose (bool): verbose mode
+        use_cuda (bool): whether to use cuda (default True)
     """
 
     if return_likelihood_optimal_pose_physical:
         raise NotImplementedError("Physical likelihood is still under development and not yet available. Please use Fourier likelihood instead.")
+
+    device = check_cuda(use_cuda)
 
     if search_batch_size:
         list_n_images_per_batch = []
@@ -178,7 +182,7 @@ def run_likelihood(
                                 n_displacements_x = n_displacements_x,
                                 n_displacements_y = n_displacements_y,
                                 precision = image_desc.precision,
-                                device = 'cuda',
+                                device = device,
                                 verbose = verbose
                             )
                             if not flag_returned_displacements:
@@ -186,7 +190,7 @@ def run_likelihood(
                                 torch.save(displacements_set, os.path.join(folder_output, 'displacements_set.pt'))
                                 flag_returned_displacements = True
                             optimal_pose, log_likelihood_fourier_integrated = cclik._compute_cross_correlation_likelihood(
-                                device=torch.device("cuda"),
+                                device=device,
                                 images_fourier = im.images_fourier,
                                 ctf = ctf_tensor,
                                 n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
@@ -215,7 +219,7 @@ def run_likelihood(
                 n_displacements_x = n_displacements_x,
                 n_displacements_y = n_displacements_y,
                 precision = image_desc.precision,
-                device = 'cuda',
+                device = device,
                 verbose = verbose
             )
             if not flag_returned_displacements:
@@ -225,7 +229,7 @@ def run_likelihood(
                 torch.save(displacements_set, os.path.join(folder_output, 'displacements_set.pt'))
                 flag_returned_displacements = True
             optimal_pose, log_likelihood_fourier_integrated = cclik._compute_cross_correlation_likelihood(
-                device=torch.device("cuda"),
+                device=device,
                 images_fourier = im.images_fourier,
                 ctf = ctf_tensor,
                 n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
@@ -261,7 +265,7 @@ def run_likelihood(
                 return_distance = False,
                 return_likelihood = True,
                 precision = image_desc.precision,
-                use_cuda = True
+                use_cuda = use_cuda
             )
             filename_log_likelihood_optimal_pose_fourier = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_fourier_stack_{i_stack:06}.pt')
             torch.save(log_likelihood_optimal_pose_fourier_images_, filename_log_likelihood_optimal_pose_fourier)
@@ -283,7 +287,7 @@ def run_likelihood(
                 return_distance = False,
                 return_likelihood = True,
                 precision = image_desc.precision,
-                use_cuda = True
+                use_cuda = use_cuda
             )
             filename_log_likelihood_optimal_pose_physical = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_physical_stack_{i_stack:06}.pt') 
             torch.save(log_likelihood_optimal_pose_physical_images_, filename_log_likelihood_optimal_pose_physical)

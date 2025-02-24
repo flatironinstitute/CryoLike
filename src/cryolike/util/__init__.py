@@ -14,7 +14,8 @@ from .atomic_model import AtomicModel
 from .device_handling import (
     check_cuda,
     check_nufft_status,
-    get_device
+    get_device,
+    get_cuda_bool
 )
 
 from .enums import (
