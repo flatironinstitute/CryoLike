@@ -41,12 +41,12 @@ def _make_plotter_fn(plot_output_dir: str | None):
         ...  # "function body intentionally left blank"
     if plot_output_dir is None:
         return _no_op
-    def _generate_plots(tp: Templates, params: ImageDescriptor, name: str):
+    def _generate_plots(tp: Templates, params: ImageDescriptor, name: str, use_cuda: bool = True):
         if not tp.has_fourier_images():
             return
         plot_images(tp.images_fourier, grid=tp.polar_grid, n_plots=16, filename=os.path.join(plot_output_dir, "templates_fourier_%s.png" % name), show=False)
         plot_power_spectrum(source=tp, filename_plot=os.path.join(plot_output_dir, "power_spectrum_%s.png" % name), show=False)
-        templates_phys = tp.transform_to_spatial(grid=params.cartesian_grid, max_to_transform=16)
+        templates_phys = tp.transform_to_spatial(grid=params.cartesian_grid, max_to_transform=16, use_cuda=use_cuda)
         plot_images(templates_phys, grid=params.cartesian_grid, n_plots=16, filename=os.path.join(plot_output_dir, "templates_phys_%s.png" % name), show=False)
     return _generate_plots
 
@@ -232,7 +232,7 @@ def make_templates_from_inputs(
     for i, input in enumerate(list_of_inputs):
         (tp, name) = _make_raw_template(input, i, descriptor, t_float, device, verbose)
         tp.normalize_images_fourier(ord=2, use_max=False)
-        plotter_fn(tp, descriptor, name)
+        plotter_fn(tp, descriptor, name, use_cuda)
         template_file = _get_template_output_filename(folder_output, name)
         torch.save(tp.images_fourier, template_file)
         template_file_list.append(template_file)

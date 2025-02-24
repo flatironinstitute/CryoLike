@@ -384,7 +384,7 @@ class Templates(Images):
             fourier_slices = fourier_slices,
             eps = nufft_eps,
             precision = Precision.SINGLE if precision == Precision.DEFAULT else precision,
-            use_cuda = True,
+            use_cuda = use_cuda,
             output_device = device,
             verbose = verbose
         )
@@ -395,7 +395,7 @@ class Templates(Images):
             fourier_slices = origin,
             eps = nufft_eps,
             precision = Precision.SINGLE if precision == Precision.DEFAULT else precision,
-            use_cuda = True,
+            use_cuda = use_cuda,
             output_device = device,
             verbose = verbose
         )
