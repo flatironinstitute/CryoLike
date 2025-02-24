@@ -36,7 +36,7 @@ def run_likelihood(
     optimized_viewing_angle : bool = True, # optimize viewing angle
     folder_output: str = '', # output folder
     verbose : bool = False, # verbose mode
-    use_cuda: bool = True
+    use_cuda: bool = True # whether to use cuda
 ):
     """Run likelihood calculation with template files and particle files
 
