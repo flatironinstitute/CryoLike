@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 from .template import Templates
-from cryolike.util import Precision, AtomicModel, check_cuda
+from cryolike.util import Precision, AtomicModel, check_cuda, get_cuda_bool
 from cryolike.grids import Volume, PhysicalVolume
 from cryolike.plot import plot_images, plot_power_spectrum
 from cryolike.metadata import ImageDescriptor
@@ -41,12 +41,12 @@ def _make_plotter_fn(plot_output_dir: str | None):
         ...  # "function body intentionally left blank"
     if plot_output_dir is None:
         return _no_op
-    def _generate_plots(tp: Templates, params: ImageDescriptor, name: str):
+    def _generate_plots(tp: Templates, params: ImageDescriptor, name: str, use_cuda: bool = True):
         if not tp.has_fourier_images():
             return
         plot_images(tp.images_fourier, grid=tp.polar_grid, n_plots=16, filename=os.path.join(plot_output_dir, "templates_fourier_%s.png" % name), show=False)
         plot_power_spectrum(source=tp, filename_plot=os.path.join(plot_output_dir, "power_spectrum_%s.png" % name), show=False)
-        templates_phys = tp.transform_to_spatial(grid=params.cartesian_grid, max_to_transform=16)
+        templates_phys = tp.transform_to_spatial(grid=params.cartesian_grid, max_to_transform=16, use_cuda=use_cuda)
         plot_images(templates_phys, grid=params.cartesian_grid, n_plots=16, filename=os.path.join(plot_output_dir, "templates_phys_%s.png" % name), show=False)
     return _generate_plots
 
@@ -69,6 +69,7 @@ def _make_templates_from_mrc_file(
     device: torch.device,
     verbose: bool
 ) -> Templates:
+    use_cuda = get_cuda_bool(device)
     volume = Volume.from_mrc(filename = mrc_file)
     if volume.density_physical is None:
         raise ValueError(f"Can't happen: parsing mrc file {mrc_file} did not generate a physical density.")
@@ -78,14 +79,16 @@ def _make_templates_from_mrc_file(
         polar_grid=descriptor.polar_grid,
         viewing_angles=descriptor.viewing_angles,
         precision=descriptor.precision,
-        verbose=verbose
+        verbose=verbose,
+        use_cuda=use_cuda
     )
 
 
 def _make_templates_from_pdb_file(
     pdb_file: str,
     descriptor: ImageDescriptor,
-    verbose: bool
+    verbose: bool,
+    use_cuda: bool = True
 ) -> Templates:
     if not descriptor.is_compatible_with_pdb():
         raise ValueError("Attempting to read templates from PDB file, but the atom_radii parameter or use_protein_residue_model=True is not set.")
@@ -107,7 +110,8 @@ def _make_templates_from_pdb_file(
         box_size=box_size,
         atom_shape=descriptor.atom_shape,
         precision=descriptor.precision,
-        verbose = verbose
+        verbose = verbose,
+        use_cuda = use_cuda
     )
 
 
@@ -132,7 +136,8 @@ def _make_templates_from_memory_array(
         descriptor.polar_grid,
         descriptor.viewing_angles,
         precision=descriptor.precision,
-        verbose=verbose
+        verbose=verbose,
+        use_cuda=get_cuda_bool(device)
     )
 
 
@@ -154,6 +159,7 @@ def _make_raw_template(
     device: torch.device,
     verbose: bool
 ):
+    use_cuda = get_cuda_bool(device)
     (name, extension) = _get_input_name(input, iteration_cnt)
     if isinstance(input, str):
         # TODO: it might be better to do a more reliable test
@@ -162,7 +168,7 @@ def _make_raw_template(
             tp = _make_templates_from_mrc_file(input, descriptor, t_float, device, verbose)
         elif extension in PDB_EXTENSIONS:
             print(f"pdb_name: {name}")
-            tp = _make_templates_from_pdb_file(input, descriptor, verbose)
+            tp = _make_templates_from_pdb_file(input, descriptor, verbose, use_cuda)
         else:
             raise ValueError("Unknown input format")
     elif isinstance(input, np.ndarray) or isinstance(input, torch.Tensor):
@@ -187,7 +193,8 @@ def make_templates_from_inputs(
     image_parameters_file: str,
     output_plots: bool = True,
     folder_output: str = "./templates/",
-    verbose: bool = False
+    verbose: bool = False,
+    use_cuda: bool = True
 ):
     """Parse a series of inputs to internal pytorch tensor representation, then save to an output directory.
 
@@ -199,6 +206,7 @@ def make_templates_from_inputs(
         folder_output (str, optional): Directory in which to write the generated Template data.
             Defaults to "./templates/".
         verbose (bool, optional): Whether to provide verbose output. Defaults to False.
+        use_cuda (bool, optional): Whether to use cuda. Defaults to True.
 
     Raises:
         ValueError: If any inputs have an unrecognized file extension or are neither string
@@ -213,7 +221,7 @@ def make_templates_from_inputs(
     descriptor = ImageDescriptor.load(image_parameters_file)
     precision = Precision.from_str(descriptor.precision)
     (t_float, _, _) = precision.get_dtypes(default=Precision.SINGLE)
-    device = check_cuda(True)
+    device = check_cuda(use_cuda)
 
     if _inputs_include_pdb_files(list_of_inputs) and not descriptor.is_compatible_with_pdb():
         raise ValueError("To process PDB files, you must either set an atom_radii or set use_protein_residue_model=True.")
@@ -224,7 +232,7 @@ def make_templates_from_inputs(
     for i, input in enumerate(list_of_inputs):
         (tp, name) = _make_raw_template(input, i, descriptor, t_float, device, verbose)
         tp.normalize_images_fourier(ord=2, use_max=False)
-        plotter_fn(tp, descriptor, name)
+        plotter_fn(tp, descriptor, name, use_cuda)
         template_file = _get_template_output_filename(folder_output, name)
         torch.save(tp.images_fourier, template_file)
         template_file_list.append(template_file)
