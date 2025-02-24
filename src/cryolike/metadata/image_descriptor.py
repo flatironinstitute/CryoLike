@@ -152,8 +152,21 @@ class ImageDescriptor():
         return self.serialize().model_dump()
 
 
-    def save(self, filename: str):
-        save_descriptors(filename, self.to_dict())
+    def save(self, filename: str, overwrite: bool = False):
+        """Create NPZ file named `filename` from the to_dict() representations of
+        the data in *self*.
+
+        Args:
+            filename (str): NPZ file to use as output. Operation will be canceled if
+                this named file already exists unless *overwrite* is **True**
+
+        Kwargs:
+            overwrite (bool): whether to allow overwriting existing files. Default False
+
+        Raises:
+            ValueError: If the requested output filename already exists unless *overwrite* is **True**
+        """
+        save_descriptors(filename, self.to_dict(), overwrite=overwrite)
 
 
     @classmethod

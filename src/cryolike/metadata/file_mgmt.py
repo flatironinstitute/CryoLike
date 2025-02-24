@@ -9,7 +9,8 @@ def save_combined_params(
     img_desc: ImageDescriptor,
     lens_desc: LensDescriptor,
     n_imgs_this_stack: int,
-    overall_batch_start: int | None = None
+    overall_batch_start: int | None = None,
+    overwrite: bool = False
 ):
     if n_imgs_this_stack <= 0:
         raise ValueError("Request to store image stack with nonpositive image count.")
@@ -20,7 +21,8 @@ def save_combined_params(
             "stack_end": overall_batch_start + n_imgs_this_stack
         })
 
-    save_descriptors(fn, img_desc.to_dict(), lens_desc.to_dict(), counts)
+    save_descriptors(fn, img_desc.to_dict(), lens_desc.to_dict(), counts,
+                     overwrite=overwrite)
 
 
 def load_combined_params(fn: str):

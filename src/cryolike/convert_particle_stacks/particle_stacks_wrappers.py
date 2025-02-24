@@ -17,7 +17,8 @@ def convert_particle_stacks_from_star_files(
     downsample_factor: int = 1,
     downsample_type: Literal['mean'] | Literal['max'] = 'mean',
     skip_exist: bool = False,
-    flag_plots: bool = True
+    flag_plots: bool = True,
+    overwrite: bool = False
 ):
     """Transcode a set of particle files, with metadata described in starfile format,
     to consistent batches in a specified output folder.
@@ -47,6 +48,7 @@ def convert_particle_stacks_from_star_files(
             inadvertently dropping data. Defaults to False.
         flag_plots (bool, optional): Whether to plot images and power spectrum along with
             the transcoding results. Defaults to True.
+        overwrite (bool, optional): Whether to overwrite existing stacks. Defaults to False.
     """
     converter = ParticleStackConverter(
         image_descriptor=params_input,
@@ -63,7 +65,7 @@ def convert_particle_stacks_from_star_files(
         defocus_angle_is_degree=defocus_angle_is_degree,
         phase_shift_is_degree=phase_shift_is_degree
     )
-    converter.convert_stacks(batch_size=batch_size)
+    converter.convert_stacks(batch_size=batch_size, overwrite=overwrite)
 
 
 def convert_particle_stacks_from_indexed_star_files(
