@@ -80,6 +80,12 @@ def test_save_descriptors_raises_on_existing_file(exists: Mock):
     with raises(ValueError, match="already exists"):
         save_descriptors(str(my_name), {'key': 'value'})
 
+@patch(f"{PKG}.os.path.exists")
+def test_save_descriptors_no_raises_on_existing_file_overwrite(exists: Mock):
+    my_name = "file.npz"
+    exists.return_value = True
+    save_descriptors(str(my_name), {'key': 'value'}, overwrite=True)
+
 
 def test_save_descriptors_raises_on_key_loss():
     dict_one = {'a': 1, 'b': 2}
