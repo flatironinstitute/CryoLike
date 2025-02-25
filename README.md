@@ -8,15 +8,7 @@ The algorithm is described in this bioRxiv paper https://www.biorxiv.org/content
 
 The Python library requires the following dependencies:
 
-- numpy
-- scipy
-- matplotlib: for plotting
-- pytorch: for GPU acceleration
-- finufft: for non-uniform FFT (https://finufft.readthedocs.io/en/latest/)
-- cufinufft: GPU version of finufft
-- tqdm: for progress bar
-- mrcfile: for reading MRC files
-- mdtraj: for reading PDB files and atom selection
+- Cuda 
 
 If you are using virtual environment,
 ```

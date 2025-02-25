@@ -21,14 +21,20 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.23.5",
     "scipy",
-    "torch>=2.2.0"
+    "torch>=2.2.0",
+    "pydantic",
+    "starfile",
+    "numpy", 
+    "matplotlib", 
+    "tqdm", 
+    "mrcfile",
+    "mdtraj >= 1.10.0"
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest >= 7.4.3",
     "pytest-cov >= 4.1.8",
-    "mdtraj >= 1.10.0"
 ]
 
 [tool.mypy]
