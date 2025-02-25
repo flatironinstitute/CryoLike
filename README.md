@@ -14,7 +14,6 @@ If you are using virtual environment,
 ```
 python3 -m venv ./venv/
 source ./venv/bin/activate
-pip install numpy scipy matplotlib tqdm mrcfile mdtraj
 pip3 install torch torchvision
 pip install finufft
 pip install cufinufft
@@ -29,7 +28,7 @@ pip install .
 ```
 To test the installation, run the following commands:
 ```
-pip install pytest
+pip install .[test]
 pytest
 ```
 
