@@ -34,20 +34,23 @@ def load_file(file: str) -> dict:
     return out_dict
 
 
-def save_descriptors(filename: str, *args): # type: ignore
+def save_descriptors(filename: str, *args, **kwargs): # type: ignore
     """Create NPZ file named `filename` from the to_dict() representations of
     the objects passed as args.
 
     Args:
         filename (str): NPZ file to use as output. Operation will be canceled if
-            this named file already exists.
+            this named file already exists unless *overwrite* is **True**
+
+    Kwargs:
+        overwrite (bool): whether to allow overwriting existing files. Default False
 
     Raises:
-        ValueError: If the requested output filename already exists.
+        ValueError: If the requested output filename already exists unless *overwrite* is **True**.
     """
     if len(args) == 0:
         return
-    if os.path.exists(filename):
+    if os.path.exists(filename) and not kwargs.get('overwrite', False):
         raise ValueError(f"Requested filename {filename} already exists. Aborting to avoid overwrite.")
     all_keys_count = sum([len(x) for x in args])
     def merge(x, y):
