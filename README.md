@@ -22,7 +22,7 @@ If you are using virtual environment,
 ```
 python3 -m venv ./venv/
 source ./venv/bin/activate
-pip install numpy scipy matplotlib tqdm mrcfile mdtraj
+pip install numpy scipy matplotlib tqdm mrcfile mdtraj starfile pydantic
 pip3 install torch torchvision
 pip install finufft
 pip install cufinufft
