@@ -245,6 +245,7 @@ class ParticleStackConverter():
     downsample_factor: int
     downsample_type: Literal['mean'] | Literal['max']
     skip_exist: bool
+    overwrite : bool
     output_plots: bool
     max_imgs_to_plot: int
 
@@ -257,6 +258,7 @@ class ParticleStackConverter():
         downsample_factor: int = 1,
         downsample_type: Literal['mean'] | Literal['max'] = 'mean',
         skip_exist: bool = False,
+        overwrite: bool = False,
         flag_plots: bool = True,
         device: str | torch.device = 'cpu'
     ):
@@ -283,6 +285,7 @@ class ParticleStackConverter():
                 downsampling will be done to that level during image processing.
                 Defaults to 1 (no downsampling).
             skip_exist (bool, optional): Not inmplemented. Defaults to False.
+            overwrite (bool, optional): Whether to overwrite exiting files. Defaults to False.
             flag_plots (bool, optional): Whether to emit plots of a few images
                 of each processed batch. Defaults to True.
             device (str | torch.device, optional): Device on which to do image conversion
@@ -309,6 +312,7 @@ class ParticleStackConverter():
         if skip_exist:
             raise NotImplementedError("Skip-exist is not yet implemented.")
         self.skip_exist = skip_exist
+        self.overwrite = overwrite
         self.output_plots = flag_plots
         self.max_imgs_to_plot = 16
         self.i_stacks = 0
@@ -471,7 +475,7 @@ class ParticleStackConverter():
         print(f"Fourier images shape: {im.images_fourier.shape}")
 
 
-    def convert_stacks(self, batch_size: int = 1024, never_combine_input_files: bool = False, overwrite: bool = False):
+    def convert_stacks(self, batch_size: int = 1024, never_combine_input_files: bool = False):
         """After preprocessing is complete, this function actually does the image conversion
         and outputs regular-sized batches. For Starfile inputs, each input file will result
         in one or more output stacks; for Cryosparc files, image inputs will be buffered
@@ -488,7 +492,6 @@ class ParticleStackConverter():
                 generate one or more output stacks, but no output stack will contain images
                 from multiple source files. Defaults to False.
 
-            overwrite (bool, optional): Whether to overwrite. Defaults to False.
         """
         if len(self.inputs_buffer) == 0:
             print(f"Warning: you must prepare input files before running convert_stacks.")
@@ -505,9 +508,7 @@ class ParticleStackConverter():
                 using_overall_counter = True
                 self._stack_absolute_index = 0
             while self.images_buffer.stack_size >= target_buffer_size:
-                # allow overwrite when starting
-                overwrite = overwrite if self.i_stacks == 0 else False
-                self._write_batch(batch_size, using_overall_counter, overwrite=overwrite)
+                self._write_batch(batch_size, using_overall_counter)
                 self.i_stacks += 1
                 if self.max_stacks > 0 and self.i_stacks >= self.max_stacks:
                     # Abandon unprocessed files and anything left in the buffer
@@ -576,7 +577,7 @@ class ParticleStackConverter():
         self._must_flush_buffer = False
 
 
-    def _write_batch(self, batch_size: int, use_overall_counter: bool = False, overwrite: bool = False):
+    def _write_batch(self, batch_size: int, use_overall_counter: bool = False):
         lens_batch = self.lens_desc_buffer.pop_batch(batch_size)
         (phys_batch, fourier_batch) = self.images_buffer.pop_imgs(batch_size)
         if lens_batch.stack_size != len(phys_batch):
@@ -598,7 +599,7 @@ class ParticleStackConverter():
             lens_batch,
             n_imgs_this_stack=actual_batch_size,
             overall_batch_start=self._stack_absolute_index if use_overall_counter else None,
-            overwrite=overwrite
+            overwrite=self.overwrite
         )
         if use_overall_counter:
             self._stack_absolute_index += actual_batch_size

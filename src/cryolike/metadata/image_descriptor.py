@@ -208,6 +208,34 @@ class ImageDescriptor():
         use_protein_residue_model: bool = True,
         atom_shape: AtomShape | str = AtomShape.GAUSSIAN
     ):
+        """Create an ImageDescriptor from a small set of values.
+        This will produce a square Cartesian grid and uniform polar grid.
+        Only the Cartesian-grid dimensions are required: other values will be
+        set to defaults if not provided.
+        As a reminder, values other than the grids have no effect on Images,
+        and only impact Templates during the template-creation process.
+        Args:
+            n_pixels (int): Number of pixels per side of the grid
+            pixel_size (float): Size of each pixel in Angstrom
+            precision ('single' | 'double' | Precision, optional): Precision at which
+                to carry out computations. Defaults to Precision.SINGLE.
+            resolution_factor (float, optional): The resolution factor for template 
+                generation. Defaults to 1.0.
+            viewing_distance (float | None, optional): Viewing distance of the
+                image capture device. Used to compute viewing angles. Defaults to None.
+            n_inplanes (int | None, optional): Number of points per ring of the
+                polar quadrature grid. Defaults to None.
+            atom_radii (float | None, optional): Radius of atoms in the model being
+                interpreted. Defaults to None.
+            atom_selection (str | None, optional): Which atoms from the PDB file
+                to read. Ignored for non-PDB files. Defaults to "name CA".
+            use_protein_residue_model (bool, optional): Whether to use the default
+                sizes for proteins in PDB. Defaults to True.
+            atom_shape (AtomShape | str, optional): Whether to treat atoms as hard
+                spheres or Gaussian clouds. Defaults to AtomShape.GAUSSIAN.
+        Returns:
+            ImageDescriptor: A fully-populated ImageDescriptor object.
+        """
         _cartesian_grid = CartesianGrid2D(n_pixels, pixel_size)
 
         _n_inplanes = n_pixels * 2 if n_inplanes is None else n_inplanes

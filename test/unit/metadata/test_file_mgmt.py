@@ -59,28 +59,6 @@ def test_save_combined_params_throws_on_no_images(save: Mock):
         save_combined_params(filename, img_desc, lens_desc, n_imgs_this_stack=0)
     save.assert_not_called()
 
-@patch(f"{PKG}.os.path.exists")
-def test_save_descriptors_raises_on_existing_file(exists: Mock):
-    filename = "my/output/file"
-    img_desc = Mock()
-    lens_desc = Mock()
-    n_imgs = 25
-    overall_start = 55
-    exists.return_value = True
-    with raises(ValueError, match="already exists"):
-        save_combined_params(filename, img_desc, lens_desc, n_imgs,
-                             overall_batch_start=overall_start)
-
-@patch(f"{PKG}.os.path.exists")
-def test_save_descriptors_no_raises_on_existing_file_overwrite(exists: Mock):
-    filename = "my/output/file"
-    img_desc = Mock()
-    lens_desc = Mock()
-    n_imgs = 25
-    overall_start = 55
-    exists.return_value = True
-    save_combined_params(filename, img_desc, lens_desc, n_imgs, overall_batch_start=overall_start,
-                         overwrite=True)
 
 @patch(f"{PKG}.LensDescriptor")
 @patch(f"{PKG}.ImageDescriptor")

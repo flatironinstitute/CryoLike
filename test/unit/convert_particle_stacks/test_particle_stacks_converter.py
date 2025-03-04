@@ -552,7 +552,7 @@ def test_write_batch_throws_on_mismatched_lengths():
 
 
 def test_convert_stacks():
-    sut = get_base_converter(pixel_size=1.)
+    sut = get_base_converter(pixel_size=1., overwrite=False)
     img_cnt = 8
     batch_size = 5
     # With these numbers, we will load a stack, write 6 (have 3 left),
