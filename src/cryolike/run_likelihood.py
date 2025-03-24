@@ -229,8 +229,8 @@ def run_likelihood(
                 images_fourier = im.images_fourier,
                 ctf = ctf_tensor,
                 n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
-                n_images_per_batch=n_templates_per_batch,
-                n_templates_per_batch=n_images_per_batch,
+                n_images_per_batch=n_images_per_batch,
+                n_templates_per_batch=n_templates_per_batch,
                 return_type=CrossCorrelationReturnType.OPTIMAL_POSE,
                 return_integrated_likelihood=True
             )
