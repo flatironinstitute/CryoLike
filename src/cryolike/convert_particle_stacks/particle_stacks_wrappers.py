@@ -65,7 +65,7 @@ def convert_particle_stacks_from_star_files(
         defocus_angle_is_degree=defocus_angle_is_degree,
         phase_shift_is_degree=phase_shift_is_degree
     )
-    converter.convert_stacks(batch_size=batch_size, overwrite=overwrite)
+    converter.convert_stacks(batch_size=batch_size)
 
 
 def convert_particle_stacks_from_indexed_star_files(
