@@ -109,7 +109,6 @@ def run_likelihood_batch(
     os.makedirs(folder_output_optimal_pose, exist_ok = True)
 
     if skip_exist:
-        raise NotImplementedError()      # TODO
         file_integrity = True
         if return_likelihood_integrated_pose_fourier:
             filename_output_log_likelihood = os.path.join(folder_output_log_likelihood, f'log_likelihood_S_stack_{i_stack:06}.pt')
