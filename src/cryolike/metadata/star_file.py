@@ -36,7 +36,7 @@ def read_star_file(filename: str | Path, stop = None):
 
     if not ("Voltage" in list(starfile_dataframe.keys())):
         raise ValueError ('voltage missing from starfile')
-    if not ("SphericalAberration" in starfile_dataframe):
+    if not ("SphericalAberration" in in list(starfile_dataframe.keys()):
             raise ValueError ('spherical abberation missing from starfile')
 
     paramsList: list[str] = list(starfile_dataframe.keys())
