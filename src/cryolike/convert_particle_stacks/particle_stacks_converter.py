@@ -219,8 +219,7 @@ class ParticleStackConverter():
             match the one in the source file, or an error will be generated.
         downsample_factor (int): If set, downsample by this factor
         downsample_type (Literal['mean'] | Literal['max']): The type of downsampling to use in physical space
-        skip_exist (bool): Not implemented. Once implemented, if set, this
-            will cause the converter to attempt to skip files that appear
+        skip_exist (bool): If set, this will cause the converter to attempt to skip files that appear
             to have already been processed.
         output_plots (bool): If True, we will emit plots of the processed images
         max_imgs_to_plot (int): Sets the maximum number of images to plot; has
