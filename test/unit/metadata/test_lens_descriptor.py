@@ -3,6 +3,8 @@ from pytest import raises, mark
 import numpy as np
 import numpy.testing as npt
 
+import starfile
+
 from cryolike.util import Precision, AtomShape
 from cryolike.grids import CartesianGrid2D, PolarGrid
 from cryolike.metadata.lens_descriptor import LensDescriptor, RELION_FIELDS, ALL_ANGLE_FIELDS
@@ -222,6 +224,8 @@ FIX_INDEXED_STARFILE_VALUES = {
     'DefocusU': np.array([1., 1., 1.]),
     'DefocusV': np.array([2., 2., 2.]),
     'DefocusAngle': np.array([30., 30., 30.]),
+    'OriginXAngst': np.array([2., 2., 2.]),
+    'OriginYAngst': np.array([2., 2., 2.]),
     'PhaseShift': np.array([60., 60., 60.]),
     'SphericalAberration': np.array([3., 3., 3.]),
     'Voltage': np.array([4., 4., 4.]),
@@ -239,6 +243,7 @@ FIX_INDEXED_STARFILE_VALUES = {
 DEFAULTABLES = []
 SKIPPABLES = []
 REQUIRED = []
+
 for x in RELION_FIELDS:
     if x.defaultable:
         DEFAULTABLES.append(x.relion_field)
@@ -269,19 +274,25 @@ def test_from_indexed_starfile(read: Mock, incl_opt: bool):
     load_mock_indexed_starfile_reader(read, include_optionals=incl_opt)
     file = "myfile.star"
     sut = LensDescriptor.from_indexed_starfile(file)
+    print('printing sut')
+    print(sut)
+    print(vars(sut))
+    print('printing sut')
 
     scalar_fields = ['sphericalAberration', 'voltage', 'amplitudeContrast']
     for x in RELION_FIELDS:
+        print(x.defaultable)
+        print(x)
         val = getattr(sut, x.descriptor_field)
-        if not incl_opt and not x.required:
-            assert val is None
-            continue
         if not incl_opt and x.defaultable:
             if isinstance(x.default, tuple):
                 assert x.default[0] == 'expand'
                 npt.assert_allclose(val, np.ones_like(sut.defocusU) * x.default[1])
             else:
                 assert val == x.default
+            continue
+        if not incl_opt and not x.required and not x.defaultable :
+            assert val is None
             continue
         if x.descriptor_field in scalar_fields:
             assert val == FIX_INDEXED_STARFILE_VALUES[x.relion_field][0]
