@@ -247,6 +247,8 @@ class LensDescriptor():
             self.defocusU[start:end],
             self.defocusV[start:end],
             self.defocusAngle[start:end],
+            self.originXAngst[start:end],
+            self.originYAngst[start:end],
             self.phaseShift[start:end],
             ar,
             at,
