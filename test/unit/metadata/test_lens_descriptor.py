@@ -281,8 +281,6 @@ def test_from_indexed_starfile(read: Mock, incl_opt: bool):
 
     scalar_fields = ['sphericalAberration', 'voltage', 'amplitudeContrast']
     for x in RELION_FIELDS:
-        print(x.defaultable)
-        print(x)
         val = getattr(sut, x.descriptor_field)
         if not incl_opt and x.defaultable:
             if isinstance(x.default, tuple):
