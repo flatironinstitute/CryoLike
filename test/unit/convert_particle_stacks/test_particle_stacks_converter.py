@@ -437,6 +437,9 @@ def test_load_starfile(from_mrc: Mock, from_starfile: Mock):
     img_cnt = 10
     lens_desc = make_lens_descriptor(img_cnt)
     from_starfile.return_value = lens_desc
+    print('here')
+    print(lens_desc.to_dict())
+
     stack = make_mock_imagestack(img_cnt)
     from_mrc.return_value = stack
 

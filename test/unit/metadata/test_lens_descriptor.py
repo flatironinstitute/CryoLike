@@ -3,6 +3,8 @@ from pytest import raises, mark
 import numpy as np
 import numpy.testing as npt
 
+import starfile
+
 from cryolike.util import Precision, AtomShape
 from cryolike.grids import CartesianGrid2D, PolarGrid
 from cryolike.metadata.lens_descriptor import LensDescriptor, RELION_FIELDS, ALL_ANGLE_FIELDS
@@ -13,6 +15,8 @@ defaults = {
     'defocusU': np.array([1., 2., 3.]),
     'defocusV': np.array([3., 4., 5.]),
     'defocusAngle': np.array([90., 180., 135.]),
+    'originXAngst': np.array([3., 4., 5.]),
+    'originYAngst': np.array([3., 4., 5.]),
     'phaseShift': np.array([45., 135., 60.]),
     'sphericalAberration': 3.2,
     'voltage': 320.,
@@ -115,6 +119,7 @@ def test_get_selections():
     sut = LensDescriptor(**defaults, defocusAngle_degree=False, phaseShift_degree=False)
     selections = np.array([0, 2])
     result = sut.get_selections(selections)
+    print(result)
 
     for field in ['defocusU', 'defocusV', 'defocusAngle', 'phaseShift']:
         orig = getattr(sut, field)
@@ -126,6 +131,7 @@ def test_get_selections():
 def test_serialization_roundtrip():
     sut = LensDescriptor(**defaults)
     rt = LensDescriptor.from_dict(sut.to_dict())
+    print(rt.to_dict())
 
     for f in defaults.keys():
         orig = getattr(sut, f)
@@ -160,7 +166,7 @@ def test_from_cryosparc_file(load: Mock):
     res = LensDescriptor.from_cryosparc_file(putative_file, True)
     load.assert_called_once_with(putative_file)
     for x in defaults.keys():
-        if x in ['ctfBfactor', 'ctfScalefactor', 'angleRotation', 'angleTilt', 'anglePsi']:
+        if x in ['ctfBfactor', 'ctfScalefactor', 'angleRotation', 'angleTilt', 'anglePsi', 'originXAngst', 'originYAngst']:
             continue
         orig = defaults[x]
         actual = getattr(res, x)
@@ -188,6 +194,8 @@ def test_from_starfile(read: Mock):
         'DefocusU': defaults['defocusU'],
         'DefocusV': defaults['defocusV'],
         'DefocusAngle': defaults['defocusAngle'],
+        'OriginXAngst': defaults['originXAngst'],
+        'OriginYAngst': defaults['originYAngst'],
         'SphericalAberration': defaults['sphericalAberration'],
         'Voltage': np.ones((5,)) * defaults['voltage'],
         'AmplitudeContrast': defaults['amplitudeContrast'],
@@ -222,6 +230,8 @@ FIX_INDEXED_STARFILE_VALUES = {
     'DefocusU': np.array([1., 1., 1.]),
     'DefocusV': np.array([2., 2., 2.]),
     'DefocusAngle': np.array([30., 30., 30.]),
+    'OriginXAngst': np.array([2., 2., 2.]),
+    'OriginYAngst': np.array([-2., -2., -2.]),
     'PhaseShift': np.array([60., 60., 60.]),
     'SphericalAberration': np.array([3., 3., 3.]),
     'Voltage': np.array([4., 4., 4.]),
@@ -239,6 +249,7 @@ FIX_INDEXED_STARFILE_VALUES = {
 DEFAULTABLES = []
 SKIPPABLES = []
 REQUIRED = []
+
 for x in RELION_FIELDS:
     if x.defaultable:
         DEFAULTABLES.append(x.relion_field)
@@ -273,15 +284,15 @@ def test_from_indexed_starfile(read: Mock, incl_opt: bool):
     scalar_fields = ['sphericalAberration', 'voltage', 'amplitudeContrast']
     for x in RELION_FIELDS:
         val = getattr(sut, x.descriptor_field)
-        if not incl_opt and not x.required:
-            assert val is None
-            continue
         if not incl_opt and x.defaultable:
             if isinstance(x.default, tuple):
                 assert x.default[0] == 'expand'
                 npt.assert_allclose(val, np.ones_like(sut.defocusU) * x.default[1])
             else:
                 assert val == x.default
+            continue
+        if not incl_opt and not x.required and not x.defaultable :
+            assert val is None
             continue
         if x.descriptor_field in scalar_fields:
             assert val == FIX_INDEXED_STARFILE_VALUES[x.relion_field][0]

@@ -19,6 +19,8 @@ RELION_FIELDS: list[RelionField] = [
     RelionField('DefocusU', 'defocusU', '', None, False, True),
     RelionField('DefocusV', 'defocusV', '', None, False, True),
     RelionField('DefocusAngle', 'defocusAngle', '', None, False, True),
+    RelionField('OriginXAngst', 'originXAngst', 'x shift from origin', 0, True, False),
+    RelionField('OriginYAngst', 'originYAngst', 'y shift from origin', 0, True, False),
     RelionField('PhaseShift', 'phaseShift', 'CTF phase shift', ('expand', 0.), True, True),
     RelionField('SphericalAberration', 'sphericalAberration', '', None, False, True),
     RelionField('Voltage', 'voltage', '', None, False, True),
@@ -42,6 +44,8 @@ class BatchableLensFields(NamedTuple):
     defocusU: FloatArrayType
     defocusV: FloatArrayType
     defocusAngle: FloatArrayType
+    originXAngst: FloatArrayType
+    originYAngst: FloatArrayType
     phaseShift: FloatArrayType
     angleRotation: FloatArrayType | None
     angleTilt: FloatArrayType | None
@@ -52,6 +56,8 @@ class SerializedLensDescriptor(BaseModel):
     defocusU: FloatArrayType
     defocusV: FloatArrayType
     defocusAngle: FloatArrayType
+    originXAngst: FloatArrayType
+    originYAngst: FloatArrayType
     phaseShift: FloatArrayType | float
     sphericalAberration: float
     voltage: float
@@ -76,6 +82,8 @@ class LensDescriptor():
         defocusU (FloatArrayType): Defocus in U-dimension, in Angstrom
         defocusV (FloatArrayType): Defocus in V-dimension, in Angstrom
         defocusAngle (FloatArrayType): Defocus angle, in radians
+        originYAngst (FloatArrayType): x-shift from origin of particle.
+        originYAngst (FloatArrayType): y-shift from origin of particle.
         phaseShift (FloatArrayType): phase shift, in radians
         sphericalAberration (float): Spherical aberration, in mm
         voltage (float): Voltage, in kV
@@ -97,6 +105,8 @@ class LensDescriptor():
     defocusU: FloatArrayType
     defocusV: FloatArrayType
     defocusAngle: FloatArrayType
+    originXAngst: FloatArrayType | None
+    originYAngst: FloatArrayType | None
     phaseShift: FloatArrayType
     sphericalAberration: float
     voltage: float
@@ -112,9 +122,11 @@ class LensDescriptor():
 
 
     def __init__(self, *,
-        defocusU: float | np.ndarray = np.array([10200.0]),
+        defocusU: float | np.ndarray = np.array([10200.0]), # these defaults are weird. 
         defocusV: float | np.ndarray = np.array([9800.0]),
         defocusAngle: float | np.ndarray = np.array([90.0]),
+        originXAngst: float | None = None,
+        originYAngst: float | None = None,
         phaseShift: float | np.ndarray = np.array([0.0]),
         sphericalAberration: float | FloatArrayType = 2.7,
         voltage: float | FloatArrayType = 300.0,
@@ -136,6 +148,7 @@ class LensDescriptor():
             defocusU (float | np.ndarray, optional): In Angstroms. Defaults to 10200.0.
             defocusV (float | np.ndarray, optional): In Angstroms. Defaults to 9800.0.
             defocusAngle (float | np.ndarray, optional): Defocus angle, in degrees
+            originXAngst (float | np.array, optional). Defaults to None but gets filled by zeros.
                 unless otherwise specified. Defaults to np.array([90.0]).
             phaseShift (float | np.ndarray, optional): Phase shift, in degrees unless
                 otherwise specified. Defaults to 0.0.
@@ -167,6 +180,14 @@ class LensDescriptor():
         """
         self.defocusU = to_float_flatten_np_array(defocusU)
         self.defocusV = to_float_flatten_np_array(defocusV)
+
+        if originXAngst is None or originYAngst is None:
+            self.originXAngst = np.zeros(self.defocusU.shape)
+            self.originYAngst = np.zeros(self.defocusV.shape)
+        else:
+            self.originXAngst = originXAngst
+            self.originYAngst = originYAngst
+
         if self.defocusU.size != self.defocusV.size:
             raise ValueError('defocusU and defocusV must have the same size')
         self.defocusAngle = to_float_flatten_np_array(defocusAngle)
@@ -185,6 +206,10 @@ class LensDescriptor():
         self.angleRotation = angleRotation
         self.angleTilt = angleTilt
         self.anglePsi = anglePsi
+        #print(self.defocusAngle)
+        #self.originXAngst = originXAngst
+        #print(self.originXAngst)
+        #self.originYAngst = originYAngst
         self.ref_pixel_size = ref_pixel_size
         self.files = files
         self.idxs = idxs
@@ -203,6 +228,8 @@ class LensDescriptor():
             self.defocusU,
             self.defocusV,
             self.defocusAngle,
+            self.originXAngst,
+            self.originYAngst,
             self.phaseShift,
             self.angleRotation,
             self.angleTilt,
@@ -229,6 +256,8 @@ class LensDescriptor():
             self.defocusU[start:end],
             self.defocusV[start:end],
             self.defocusAngle[start:end],
+            self.originXAngst[start:end],
+            self.originYAngst[start:end],
             self.phaseShift[start:end],
             ar,
             at,
@@ -254,6 +283,8 @@ class LensDescriptor():
             self.defocusU[selections],
             self.defocusV[selections],
             self.defocusAngle[selections],
+            self.originXAngst[selections],
+            self.originYAngst[selections],
             self.phaseShift[selections],
             ar,
             at,
@@ -266,6 +297,8 @@ class LensDescriptor():
             defocusU = self.defocusU,
             defocusV = self.defocusV,
             defocusAngle = self.defocusAngle,
+            originXAngst = self.originXAngst,
+            originYAngst = self.originYAngst,
             phaseShift = self.phaseShift,
             sphericalAberration = self.sphericalAberration,
             voltage = self.voltage,
@@ -293,6 +326,8 @@ class LensDescriptor():
             defocusU=data.defocusU,
             defocusV=data.defocusV,
             defocusAngle=data.defocusAngle,
+            originXAngst=data.originXAngst,
+            originYAngst=data.originYAngst,
             phaseShift=data.phaseShift,
             sphericalAberration=data.sphericalAberration,
             voltage=data.voltage,
@@ -390,6 +425,14 @@ class LensDescriptor():
 
         defocusU = dataBlock["DefocusU"]
         defocusV = dataBlock["DefocusV"]
+        print('checking keys')
+        if 'OriginXAngst' in dataBlock.keys() and 'OriginYAngst' in dataBlock.keys():
+            originXAngst = dataBlock["OriginXAngst"]
+            originYAngst = dataBlock["OriginYAngst"]
+        else:
+            originXAngst = np.zeros(len(dataBlock['DefocusU']))
+            originYAngst = np.zeros(len(dataBlock['DefocusV']))
+
         defocusAngle = dataBlock["DefocusAngle"]
         sphericalAberration = dataBlock["SphericalAberration"]
         voltage = dataBlock["Voltage"]
@@ -418,6 +461,8 @@ class LensDescriptor():
             defocusU=defocusU,
             defocusV=defocusV,
             defocusAngle=defocusAngle,
+            originXAngst=originXAngst,
+            originYAngst=originYAngst,
             phaseShift=phaseShift,
             sphericalAberration=sphericalAberration,
             voltage=voltage,
@@ -448,6 +493,8 @@ class LensDescriptor():
 
         files_list: list[str] = []
         indices_list: list[int] = []
+        # This needs to be fixed. We should be using starfile for everything. 
+
         # Note: arbitrary splitting of potentially-irregular-length strings
         # on an arbitrary-positioned character is unlikely to benefit too
         # much from vectorized operations.
