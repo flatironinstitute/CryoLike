@@ -13,6 +13,8 @@ mock_vals = {
     "defocusU": np.array([1., 2., 3.]),
     "defocusV": np.array([2., 3., 4.]),
     "defocusAngle_deg": np.array([30., 60., 90.]),
+    "originXAngst": np.array([2., 2., 2.]),
+    "originYAngst": np.array([-2., -2., -2.]),
     "sphericalAberration": np.array([4., 4., 4.,]),
     "voltage": np.array([5., 5., 5.,]),
     "amplitudeContrast": np.array([6., 6., 6.]),
@@ -29,6 +31,8 @@ mock_buffer_vals = {
     "phaseShift": np.array([4., 4.])
 }
 mock_buffer_optionals = {
+    "originXAngst" : np.array([2.,2.]),
+    "originYAngst" : np.array([-2.,-2.]),
     "angleRotation": np.array([5., 5.]),
     "angleTilt": np.array([6., 6.]),
     "anglePsi": np.array([7., 7.])
@@ -78,6 +82,8 @@ def fix_make_batch(with_optionals: bool = False):
     else:
         batch = BatchableLensFields(
             **mock_buffer_vals,
+            originXAngst=None,
+            originYAngst=None,
             angleRotation=None,
             angleTilt=None,
             anglePsi=None
@@ -195,6 +201,7 @@ def _check_pop_equal(batch_size: int, sut: LensDescriptorBuffer, popped: LensDes
 @mark.parametrize("with_optionals", [(False), (True)])
 def test_buffer_enqueue_when_empty(with_optionals):
     sut = fix_make_buffer()
+    print(sut.to_dict())
     assert sut.stack_size == 0
     assert sut.is_empty()
 

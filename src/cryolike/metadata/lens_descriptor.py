@@ -19,8 +19,8 @@ RELION_FIELDS: list[RelionField] = [
     RelionField('DefocusU', 'defocusU', '', None, False, True),
     RelionField('DefocusV', 'defocusV', '', None, False, True),
     RelionField('DefocusAngle', 'defocusAngle', '', None, False, True),
-    RelionField('OriginXAngst', 'originXAngst', '', 0.0, True, False),
-    RelionField('OriginYAngst', 'originYAngst', '', 0.0, True, False),
+    RelionField('OriginXAngst', 'originXAngst', 'x shift from origin', 0, True, False),
+    RelionField('OriginYAngst', 'originYAngst', 'y shift from origin', 0, True, False),
     RelionField('PhaseShift', 'phaseShift', 'CTF phase shift', ('expand', 0.), True, True),
     RelionField('SphericalAberration', 'sphericalAberration', '', None, False, True),
     RelionField('Voltage', 'voltage', '', None, False, True),
@@ -105,8 +105,8 @@ class LensDescriptor():
     defocusU: FloatArrayType
     defocusV: FloatArrayType
     defocusAngle: FloatArrayType
-    originXAngst: FloatArrayType
-    originYAngst: FloatArrayType
+    originXAngst: FloatArrayType | None
+    originYAngst: FloatArrayType | None
     phaseShift: FloatArrayType
     sphericalAberration: float
     voltage: float
@@ -125,8 +125,8 @@ class LensDescriptor():
         defocusU: float | np.ndarray = np.array([10200.0]), # these defaults are weird. 
         defocusV: float | np.ndarray = np.array([9800.0]),
         defocusAngle: float | np.ndarray = np.array([90.0]),
-        originXAngst: float | np.ndarray = np.array([0.0]),
-        originYAngst: float | np.ndarray = np.array([0.0]),
+        originXAngst: float | None = None,
+        originYAngst: float | None = None,
         phaseShift: float | np.ndarray = np.array([0.0]),
         sphericalAberration: float | FloatArrayType = 2.7,
         voltage: float | FloatArrayType = 300.0,
@@ -148,6 +148,7 @@ class LensDescriptor():
             defocusU (float | np.ndarray, optional): In Angstroms. Defaults to 10200.0.
             defocusV (float | np.ndarray, optional): In Angstroms. Defaults to 9800.0.
             defocusAngle (float | np.ndarray, optional): Defocus angle, in degrees
+            originXAngst (float | np.array, optional). Defaults to None but gets filled by zeros.
                 unless otherwise specified. Defaults to np.array([90.0]).
             phaseShift (float | np.ndarray, optional): Phase shift, in degrees unless
                 otherwise specified. Defaults to 0.0.
@@ -180,8 +181,12 @@ class LensDescriptor():
         self.defocusU = to_float_flatten_np_array(defocusU)
         self.defocusV = to_float_flatten_np_array(defocusV)
 
-        self.originXAngst = to_float_flatten_np_array(originXAngst)
-        self.originYAngst = to_float_flatten_np_array(originYAngst)
+        if originXAngst is None or originYAngst is None:
+            self.originXAngst = np.zeros(self.defocusU.shape)
+            self.originYAngst = np.zeros(self.defocusV.shape)
+        else:
+            self.originXAngst = originXAngst
+            self.originYAngst = originYAngst
 
         if self.defocusU.size != self.defocusV.size:
             raise ValueError('defocusU and defocusV must have the same size')
@@ -201,6 +206,10 @@ class LensDescriptor():
         self.angleRotation = angleRotation
         self.angleTilt = angleTilt
         self.anglePsi = anglePsi
+        #print(self.defocusAngle)
+        #self.originXAngst = originXAngst
+        #print(self.originXAngst)
+        #self.originYAngst = originYAngst
         self.ref_pixel_size = ref_pixel_size
         self.files = files
         self.idxs = idxs
@@ -274,6 +283,8 @@ class LensDescriptor():
             self.defocusU[selections],
             self.defocusV[selections],
             self.defocusAngle[selections],
+            self.originXAngst[selections],
+            self.originYAngst[selections],
             self.phaseShift[selections],
             ar,
             at,
@@ -315,6 +326,8 @@ class LensDescriptor():
             defocusU=data.defocusU,
             defocusV=data.defocusV,
             defocusAngle=data.defocusAngle,
+            originXAngst=data.originXAngst,
+            originYAngst=data.originYAngst,
             phaseShift=data.phaseShift,
             sphericalAberration=data.sphericalAberration,
             voltage=data.voltage,
