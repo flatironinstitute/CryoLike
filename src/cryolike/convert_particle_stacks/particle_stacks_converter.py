@@ -219,8 +219,7 @@ class ParticleStackConverter():
             match the one in the source file, or an error will be generated.
         downsample_factor (int): If set, downsample by this factor
         downsample_type (Literal['mean'] | Literal['max']): The type of downsampling to use in physical space
-        skip_exist (bool): Not implemented. Once implemented, if set, this
-            will cause the converter to attempt to skip files that appear
+        skip_exist (bool): If set, this will cause the converter to attempt to skip files that appear
             to have already been processed.
         output_plots (bool): If True, we will emit plots of the processed images
         max_imgs_to_plot (int): Sets the maximum number of images to plot; has
@@ -465,7 +464,7 @@ class ParticleStackConverter():
             self.inputs_buffer.append(("sequential_cryosparc", SequentialCryosparc(mrc_path)))
 
     
-    def _normalize_images(self, im: Images):
+    def _transform_and_normalize_images(self, im: Images):
         if self.downsample_factor > 1:
             im.downsample_images_phys(self.downsample_factor, self.downsample_type)
         print(f"Physical images shape: {im.images_phys.shape}")
@@ -542,7 +541,7 @@ class ParticleStackConverter():
         lens_desc = LensDescriptor.from_starfile(r.star_file, r.defocus_is_degree, r.phase_shift_is_degree)
         self.lens_desc_buffer.update_parent(lens_desc)
         im = Images.from_mrc(r.particle_file, self.pixel_size, self.device)
-        self._normalize_images(im)
+        self._transform_and_normalize_images(im)
 
         self.images_buffer.append_imgs(im)
         self.lens_desc_buffer.enqueue(lens_desc.batch_whole())
@@ -558,7 +557,7 @@ class ParticleStackConverter():
         #     return
         im = Images.from_mrc(r.mrc_file, self.pixel_size, self.device)
         im.select_images(r.selected_img_indices)
-        self._normalize_images(im)
+        self._transform_and_normalize_images(im)
 
         self.images_buffer.append_imgs(im)
         self.lens_desc_buffer.enqueue(self.lens_desc.get_selections(r.selected_lensdesc_indices))
@@ -567,7 +566,7 @@ class ParticleStackConverter():
 
     def _load_sequential_cryosparc(self, r: SequentialCryosparc):
         im = Images.from_mrc(r.mrc_file, self.pixel_size, self.device)
-        self._normalize_images(im)
+        self._transform_and_normalize_images(im)
         slice_start = self._stack_start_file
         slice_end = slice_start + im.n_images
         self._stack_start_file = slice_end

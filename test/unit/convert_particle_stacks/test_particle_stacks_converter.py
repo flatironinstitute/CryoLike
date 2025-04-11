@@ -412,7 +412,7 @@ def test_normalize_images(_print: Mock):
 
 
     # test no downsample
-    sut._normalize_images(im)
+    sut._transform_and_normalize_images(im)
     assert isinstance(im.downsample_images_phys, Mock)
     im.downsample_images_phys.assert_not_called()
     assert im.center_physical_image_signal.call_count == 1
@@ -422,7 +422,7 @@ def test_normalize_images(_print: Mock):
     # test with downsample
     sut.downsample_factor = 3
     sut.downsample_type = "mean"
-    sut._normalize_images(im)
+    sut._transform_and_normalize_images(im)
     im.downsample_images_phys.assert_called_once_with(3, "mean")
 
     assert _print.call_count == 4
@@ -437,6 +437,7 @@ def test_load_starfile(from_mrc: Mock, from_starfile: Mock):
     img_cnt = 10
     lens_desc = make_lens_descriptor(img_cnt)
     from_starfile.return_value = lens_desc
+
     stack = make_mock_imagestack(img_cnt)
     from_mrc.return_value = stack
 
