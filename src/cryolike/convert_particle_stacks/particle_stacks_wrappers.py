@@ -57,7 +57,8 @@ def convert_particle_stacks_from_star_files(
         pixel_size=pixel_size,
         downsample_factor=downsample_factor,
         downsample_type=downsample_type,
-        flag_plots=flag_plots
+        flag_plots=flag_plots,
+        overwrite=overwrite
     )
     converter.prepare_star_files(
         particle_file_list=particle_file_list,

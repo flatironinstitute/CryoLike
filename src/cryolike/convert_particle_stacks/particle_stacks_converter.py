@@ -136,6 +136,7 @@ def _get_filenames_and_indices(
         # Now look up the selected image/metadata indices from the cs_idxs field
         # for those entries:
         selected_img_indices = (lens_desc.idxs[original_file_list_indices]).squeeze()
+        selected_img_indices = selected_img_indices.astype(np.int64)
         entry = (mrc_file_path, selected_img_indices, original_file_list_indices)
         mrc_files_with_img_indices.append(entry)
     if len(mrc_files_with_img_indices) == 0:
@@ -485,12 +486,10 @@ class ParticleStackConverter():
 
         Args:
             batch_size (int, optional): Target stack size. Defaults to 1024.
-
             never_combine_input_files (bool, optional): If set, Cryosparc source files will
                 be restacked in the same way as Starfile sources, i.e. one source file will
                 generate one or more output stacks, but no output stack will contain images
                 from multiple source files. Defaults to False.
-
         """
         if len(self.inputs_buffer) == 0:
             print(f"Warning: you must prepare input files before running convert_stacks.")
