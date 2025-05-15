@@ -1,18 +1,14 @@
 import numpy as np
 import torch
-from typing import TypeVar, cast
 
 from cryolike.grids import PolarGrid
 from cryolike.metadata import LensDescriptor
-from cryolike.util import ComplexArrayType, FloatArrayType
+from cryolike.util import FloatArrayType, Precision, to_torch
 
 h =  6.62607015e-34 # Planck constant [Js] = [kgm^2/s]
 e =  1.60217663e-19 # electron charge [C]; note that [CV] = [J]
 c =  2.99792458e8   # speed of light [m/s]
 m0 = 9.1093837015e-31 # electron rest mass [kg]
-
-T = TypeVar("T", bound=ComplexArrayType | torch.Tensor)
-
 
 def _ctf_relion(lens: LensDescriptor, grid: PolarGrid, box_size: float = 1.0, anisotropy: bool = True, cs_corrected: bool = False):
     defocus = 0.5 * (lens.defocusU + lens.defocusV)
@@ -43,7 +39,7 @@ def _ctf_relion(lens: LensDescriptor, grid: PolarGrid, box_size: float = 1.0, an
             gamma = - coef2 * r_shell_2[None, :] * defocus[:, None] - lens.phaseShift[:, None]
         else:
             gamma = - coef2 * r_shell_2[None, :] * defocus[:, None] + coef4 * r_shell_4[None, :] - lens.phaseShift[:, None]
-    ctf = - np.sqrt(1 - lens.amplitudeContrast * lens.amplitudeContrast) * np.sin(gamma) + lens.amplitudeContrast * np.cos(gamma)
+    ctf: FloatArrayType = - np.sqrt(1 - lens.amplitudeContrast * lens.amplitudeContrast) * np.sin(gamma) + lens.amplitudeContrast * np.cos(gamma)
 
     return ctf
 
@@ -57,7 +53,7 @@ class CTF:
         cs_corrected (bool): Whether the described CTF is CS-corrected
         n_CTF (int): Number of CTFs, which determines whether the CTF can
             effectively describe an image stack
-        ctf (FloatArrayType): The value of the CTF function as a Numpy array.
+        ctf (torch.Tensor): The value of the CTF function as a Numpy array.
             It is indexed as [n_images, n_shells, n_inplanes]
         lens_descriptor (LensDescriptor | None): If the CTF was computed, this
             field stores the lens description which was used to compute the CTF.
@@ -66,18 +62,19 @@ class CTF:
     anisotropy: bool
     cs_corrected: bool
     n_CTF: int
-    ctf: FloatArrayType
+    ctf: torch.Tensor
     # Not sure if we actually need to keep this around
     lens_descriptor: LensDescriptor | None
 
 
     def __init__(
         self,
-        ctf_descriptor: np.ndarray | LensDescriptor,
+        ctf_descriptor: torch.Tensor | LensDescriptor,
         polar_grid: PolarGrid | None = None,
         box_size: float = -1.,
         anisotropy: bool = True,
-        cs_corrected: bool = False
+        cs_corrected: bool = False,
+        precision: Precision = Precision.DOUBLE
     ):
         """Constructor for class representing a contrast transfer function.
 
@@ -85,8 +82,8 @@ class CTF:
         description of the properties of the apparatus.
 
         Args:
-            ctf_descriptor (np.ndarray | LensDescriptor): The CTF itself, If
-                represented as a Numpy array, the values will be used directly.
+            ctf_descriptor (torch.Tensor | LensDescriptor): The CTF itself, If
+                represented as a Tensor, the values will be used directly.
                 Otherwise, this should be a descriptor of the apparatus so that
                 the CTF can be computed as per relion.
             polar_grid (PolarGrid): The Fourier-space grid in which the CTF lives
@@ -96,7 +93,8 @@ class CTF:
         """
         self.anisotropy = anisotropy
         self.cs_corrected = cs_corrected
-        if isinstance(ctf_descriptor, np.ndarray):
+
+        if isinstance(ctf_descriptor, torch.Tensor):
             self.ctf = ctf_descriptor
             if len(self.ctf.shape) == 1:
                 if self.anisotropy:
@@ -131,7 +129,8 @@ class CTF:
         #     self.box_size = box_size[0]
         # else:
         self.box_size = box_size
-        self.ctf = _ctf_relion(ctf_descriptor, polar_grid, box_size, anisotropy, cs_corrected)
+        ctf = _ctf_relion(ctf_descriptor, polar_grid, box_size, anisotropy, cs_corrected)
+        self.ctf = to_torch(ctf, precision=precision)
 
 
     @classmethod
@@ -150,13 +149,9 @@ class CTF:
         )
 
     
-    def apply(self, image_fourier: T) -> T:
-        ctf = self.ctf
-        if type(image_fourier) is np.ndarray:
-            ctf = np.array(self.ctf, dtype = image_fourier.dtype)
-        if type(image_fourier) is torch.Tensor and type(self.ctf) is np.ndarray:
-            ctf = torch.tensor(self.ctf, dtype = image_fourier.dtype, device = image_fourier.device)
+    def apply(self, image_fourier: torch.Tensor) -> torch.Tensor:
+        ctf = self.ctf.to(dtype = image_fourier.dtype, device = image_fourier.device)
         if self.anisotropy:
-            return cast(T, image_fourier * ctf[:,:,:])
+            return image_fourier * ctf[:,:,:]
         else:
-            return cast(T, image_fourier * ctf[:,:,None])
+            return image_fourier * ctf[:,:,None]

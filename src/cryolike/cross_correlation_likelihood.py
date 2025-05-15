@@ -225,7 +225,7 @@ def _cross_images_and_templates(
     cross_correlation_smdw = Ixy / torch.sqrt(Ixx * Iyy)
 
     # This fn should be a no-op returning None if ILL computation was not requested
-    ill = compute_ill(
+    log_likelihood_smdw = compute_ill(
         integration_weights_points,
         integration_weights_points_sqrt,
         CTF_sqrtweighted_fourier_templates_smnw,
@@ -234,10 +234,10 @@ def _cross_images_and_templates(
         Ixy,
         Iyy
     )
+    return (cross_correlation_smdw, log_likelihood_smdw)
 
-    return (cross_correlation_smdw, ill)
 
-
+# TODO: Move this functionality into the CTF object
 def conform_ctf(ctf: torch.Tensor, anisotropic: bool) -> torch.Tensor:
     """Ensure the CTF has appropriate dimensions to be applied to image/template sets.
 
@@ -310,8 +310,7 @@ def _ill_kernel_factory(
         p = n_pixels_phys / 2.0 - 2.0
         constant = (3.0 - n_pixels_phys) / 2.0 * np.log(2 * np.pi) - np.log(2) - 0.5 * np.log(Iss) + lgamma(n_pixels_phys / 2.0 - 2.0) + p * np.log(2 * Iss)
         log_likelihood_smdw = -p * torch.log(D) - 0.5 * torch.log(A) + constant
-        log_likelihood_sm = torch.logsumexp(log_likelihood_smdw, dim = (2, 3))
-        return log_likelihood_sm
+        return log_likelihood_smdw
     return _kernel
 
 
@@ -470,6 +469,7 @@ class CrossCorrelationLikelihood:
         max_displacement: float = 0,
         n_displacements_x: int = -1,
         n_displacements_y: int = -1,
+        identity_kernel: Callable = _get_s_points,
         precision: Precision = Precision.DEFAULT,
         device: str | torch.device = "cpu",
         verbose: bool = False
@@ -513,7 +513,10 @@ class CrossCorrelationLikelihood:
 
         self.integration_weights_points = _get_integration_weights_points(templates, precision)
         self.integration_weights_points_sqrt = torch.sqrt(self.integration_weights_points)
-        self.s_points = _get_s_points(templates, precision)
+
+        if not callable(identity_kernel):
+            raise ValueError("identity_kernel must be a callable function")
+        self.s_points = identity_kernel(templates, precision)
         self.Iss = torch.sum(self.s_points.abs() ** 2 * self.integration_weights_points).item()
         self._gamma = torch.linspace(0, 2*np.pi, self.n_inplanes+1, dtype=self.torch_float_type, device=_device)[:-1]
         self.log_weights_viewing = _get_log_weights_viewing(templates, precision, _device)
@@ -877,7 +880,9 @@ class CrossCorrelationLikelihood:
         n_images_per_batch: int,
         n_templates_per_batch: int,
         return_type: CrossCorrelationReturnType,
-        return_integrated_likelihood: bool
+        return_integrated_likelihood: bool,
+        __ill_kernel_factory: Callable = _ill_kernel_factory,
+        log_likelihood_keep_displacement_and_rotation: bool = False,
         # TODO: Verbose?
     ) -> integrated_log_likelihood_type | cross_correlation_result_type | tuple[cross_correlation_result_type, integrated_log_likelihood_type]:
         # Assume that the device is available.
@@ -892,9 +897,12 @@ class CrossCorrelationLikelihood:
         n_images = images_fourier.shape[0]
 
         if return_integrated_likelihood:
-            self._initialize_log_likelihood(n_images, device)
+            if log_likelihood_keep_displacement_and_rotation:
+                self._initialize_log_likelihood_keep_displacement_and_rotation(n_images)
+            else:
+                self._initialize_log_likelihood(n_images, device)
             s_points_cuda = self.s_points.to(device)
-            ill_kernel = _ill_kernel_factory(self.Iss, n_pixels_phys, s_points_cuda)
+            ill_kernel = __ill_kernel_factory(self.Iss, n_pixels_phys, s_points_cuda)
         else:
             ill_kernel = lambda _1, _2, _3, _4, _5, _6, _7: None
 
@@ -908,7 +916,7 @@ class CrossCorrelationLikelihood:
 
         #     (i_start, i_end) = (i_batch_rng[0], i_batch_rng[1])
         #     (t_start, t_end) = (t_batch_rng[0], t_batch_rng[1])
-
+        
         for t_start in trange(0, self.n_templates, n_templates_per_batch):
             
             t_end = min(t_start + n_templates_per_batch, self.n_templates)
@@ -924,7 +932,7 @@ class CrossCorrelationLikelihood:
                 f_imgs = images_fourier[i_start:i_end, :, :].to(device)
                 _ctf = ctf if ctf_is_singleton else ctf[i_start:i_end, :, :].to(device)
 
-                (cross_correlation_smdw, log_likeilhood_S) = _cross_images_and_templates(
+                (cross_correlation_smdw, log_likelihood_smdw) = _cross_images_and_templates(
                     device,
                     self.n_inplanes,
                     f_imgs,
@@ -938,13 +946,20 @@ class CrossCorrelationLikelihood:
                 if torch.isnan(cross_correlation_smdw).any():
                     raise ValueError("NaN detected in cross_correlation_smdw")
                 collect_batch(i_start, i_end, t_start, t_end, cross_correlation_smdw)
-                if (log_likeilhood_S is not None):
-                    self._collect_log_likelihood(i_start, i_end, t_start, t_end, log_likeilhood_S)
+                if (log_likelihood_smdw is not None):
+                    if log_likelihood_keep_displacement_and_rotation:
+                        self._collect_log_likelihood_keep_displacement_and_rotation(i_start, i_end, t_start, t_end, log_likelihood_smdw)
+                    else:
+                        self._collect_log_likelihood(i_start, i_end, t_start, t_end, log_likelihood_smdw)
 
         if return_type == CrossCorrelationReturnType.OPTIMAL_POSE:
             self._finalize_optimal_pose(n_images)
         if return_integrated_likelihood:
-            integrated_log_likelihood = self._finalize_log_likelihood()
+            if log_likelihood_keep_displacement_and_rotation:
+                # self._log_likelihood_SM = torch.logsumexp(self._log_likelihood_SMDW, dim=(2, 3))
+                integrated_log_likelihood = self._log_likelihood_SMDW
+            else:
+                integrated_log_likelihood = self._finalize_log_likelihood()
             if return_type == CrossCorrelationReturnType.NONE:
                 return integrated_log_likelihood
             return (self._result_collection, integrated_log_likelihood)
@@ -953,11 +968,19 @@ class CrossCorrelationLikelihood:
 
     def _initialize_log_likelihood(self, n_images, device):
         self._log_likelihood_SM = torch.zeros((n_images, self.n_templates), dtype=self.torch_float_type, device=device)#"cpu")
+    
+
+    def _initialize_log_likelihood_keep_displacement_and_rotation(self, n_images: int):
+        self._log_likelihood_SMDW = torch.zeros((n_images, self.n_templates, self.n_displacements, self.n_inplanes), dtype=self.torch_float_type, device="cpu")
 
 
-    def _collect_log_likelihood(self, s_start: int, s_end: int, m_start: int, m_end: int, log_likelihood_sm: torch.Tensor):
-        self._log_likelihood_SM[s_start:s_end, m_start:m_end] = log_likelihood_sm#.cpu()
+    def _collect_log_likelihood(self, s_start: int, s_end: int, m_start: int, m_end: int, log_likelihood_smdw: torch.Tensor):
+        self._log_likelihood_SM[s_start:s_end, m_start:m_end] = torch.logsumexp(log_likelihood_smdw, dim=(2,3))
 
+
+    def _collect_log_likelihood_keep_displacement_and_rotation(self, s_start: int, s_end: int, m_start: int, m_end: int, log_likelihood_smdw: torch.Tensor):
+        self._log_likelihood_SMDW[s_start:s_end, m_start:m_end, :, :] = log_likelihood_smdw#.cpu()
+        
 
     def _finalize_log_likelihood(self) -> torch.Tensor:
         log_likelihood_S = torch.logsumexp(self._log_likelihood_SM + self.log_weights_viewing, dim=1) - np.log(self.n_displacements) - np.log(self.n_inplanes)
