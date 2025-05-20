@@ -16,7 +16,9 @@ def _concatenate_image_batches(file_list, num_workers):
     return concatenated_tensor
 
 
-def stitch_log_likelihood_matrices(n_templates: int = 0, n_image_stacks: int = 0, output_directory: str = ''):
+def stitch_log_likelihood_matrices(n_templates: int = 0, n_image_stacks: int = 0, output_directory: str = '',phys=False,opt=False,integrated=False, cc=False):
+    if phys == False and opt == False and integrated == False and cc == False:
+       raise ValueError('at least one of physical, integrated or optimal log likelihoods must be post processed.') 
     n_cpus = cpu_count()
     if n_cpus == 1:
         raise RuntimeError("This function is not useful for single core machines")
@@ -32,18 +34,35 @@ def stitch_log_likelihood_matrices(n_templates: int = 0, n_image_stacks: int = 0
     opt_fourier_list = []
     phys_list = []
     int_fourier_list = []
+    cc_list = []
     for i_template in range(n_templates):
         folder_log_likelihood = os.path.join(output_directory, 'likelihood', 'template%d'%i_template, 'log_likelihood')
+        folder_cc = os.path.join(output_directory, 'likelihood', 'template%d'%i_template, 'cross_correlation')
         for i_stack in range(n_image_stacks):
-            opt_fourier_list.append(os.path.join(folder_log_likelihood, f'log_likelihood_fourier_S_stack_{i_stack:06}.pt'))
-            phys_list.append(os.path.join(folder_log_likelihood, f'log_likelihood_phys_S_stack_{i_stack:06}.pt'))
-            int_fourier_list.append(os.path.join(folder_log_likelihood, f'log_likelihood_S_stack_{i_stack:06}.pt'))
-    opt_phys_ll_matrix = _concatenate_image_batches(opt_fourier_list, num_workers).reshape(n_templates, -1)
-    opt_fourier_ll_matrix = _concatenate_image_batches(phys_list, num_workers).reshape(n_templates, -1)
-    int_fourier_ll_matrix = _concatenate_image_batches(int_fourier_list, num_workers).reshape(n_templates, -1)
+            if opt == True:
+                opt_fourier_list.append(os.path.join(folder_log_likelihood, f'log_likelihood_fourier_S_stack_{i_stack:06}.pt'))
+            if phys == True:
+                phys_list.append(os.path.join(folder_log_likelihood, f'log_likelihood_phys_S_stack_{i_stack:06}.pt'))
+            if integrated == True:
+                int_fourier_list.append(os.path.join(folder_log_likelihood, f'log_likelihood_S_stack_{i_stack:06}.pt'))
+            if cc == True:
+                cc_list.append(os.path.join(folder_cc, f'cross_correlation_S_stack_{i_stack:06}.pt'))
+    if phys == True:
+        opt_phys_ll_matrix = _concatenate_image_batches(phys_list, num_workers).reshape(n_templates, -1)
+    if opt == True:
+        opt_fourier_ll_matrix = _concatenate_image_batches(opt_fourier_list, num_workers).reshape(n_templates, -1)
+    if integrated == True:
+        int_fourier_ll_matrix = _concatenate_image_batches(int_fourier_list, num_workers).reshape(n_templates, -1)
+    if cc == True:
+        cc_matrix = _concatenate_image_batches(cc_list, num_workers).reshape(n_templates, -1)
 
-    output_directory_likelihood_matrix = os.path.join(output_directory, 'likelihood_matrix')
-    os.makedirs(output_directory_likelihood_matrix, exist_ok=True)
-    torch.save(opt_phys_ll_matrix, os.path.join(output_directory_likelihood_matrix, 'optimal_physical_log_likelihood_matrix.pt'))
-    torch.save(opt_fourier_ll_matrix, os.path.join(output_directory_likelihood_matrix, 'optimal_fourier_log_likelihood_matrix.pt'))
-    torch.save(int_fourier_ll_matrix, os.path.join(output_directory_likelihood_matrix, 'integrated_fourier_log_likelihood_matrix.pt'))
+    output_matrix_directory = os.path.join(output_directory, 'concatenated_matrices')
+    os.makedirs(output_matrix_directory, exist_ok=True)
+    if phys == True:
+        torch.save(opt_phys_ll_matrix, os.path.join(output_matrix_directory, 'optimal_physical_log_likelihood_matrix.pt'))
+    if opt == True:
+        torch.save(opt_fourier_ll_matrix, os.path.join(output_matrix_directory, 'optimal_fourier_log_likelihood_matrix.pt'))
+    if integrated == True:
+        torch.save(int_fourier_ll_matrix, os.path.join(output_matrix_directory, 'integrated_fourier_log_likelihood_matrix.pt'))
+    if cc == True:
+        torch.save(cc_matrix, os.path.join(output_matrix_directory, 'cross_correlation_matrix.pt'))
