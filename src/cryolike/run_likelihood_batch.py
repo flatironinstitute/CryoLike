@@ -264,7 +264,7 @@ def run_likelihood_batch(
         images_phys = torch.load(os.path.join(folder_particles_phys, f'particles_phys_stack_{i_stack:06}.pt'), weights_only=True)
         phys_image_data = PhysicalImages(images_phys, pixel_size=image_desc.cartesian_grid.pixel_size)
         im_phys = Images(phys_data=phys_image_data, fourier_data=None)
-        log_likelihood_optimal_pose_physical_images_ = calc_distance_optimal_templates_vs_physical_images(
+        log_likelihood_optimal_pose_physical_images_ = calc_likelihood_optimal_pose(
             template = tp,
             image = im_phys,
             ctf = ctf,

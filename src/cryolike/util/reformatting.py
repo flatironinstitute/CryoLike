@@ -108,8 +108,7 @@ def project_descriptor(descriptor: descriptor_types, label: str, dims: int, targ
 
     # TODO: Typing contravariant stuff.
     if np.isscalar(descriptor):
-        assert isinstance(descriptor, (int, float))
-        result = project_scalar(descriptor, dims)
+        result = project_scalar(descriptor, dims) # type: ignore
     else:
         assert isinstance(descriptor, (list, np.ndarray))
         result = project_vector(descriptor, dims, label)

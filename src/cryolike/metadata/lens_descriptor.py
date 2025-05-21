@@ -2,7 +2,15 @@ import numpy as np
 from typing import Any, NamedTuple, Literal
 from pydantic import BaseModel, ConfigDict
 
-from cryolike.util import FloatArrayType, IntArrayType, to_float_flatten_np_array, extract_unique_float
+from cryolike.util import (
+    FloatArrayType,
+    IntArrayType,
+    to_float_flatten_np_array,
+    extract_unique_float,
+    ensure_positive,
+    project_descriptor,
+    TargetType
+)
 from .star_file import read_star_file
 
 
@@ -104,7 +112,7 @@ class LensDescriptor():
     angleRotation: FloatArrayType | None
     angleTilt: FloatArrayType | None
     anglePsi: FloatArrayType | None
-    ref_pixel_size: FloatArrayType | None
+    ref_pixel_size: FloatArrayType | float | None
     files: np.ndarray | None
     idxs: IntArrayType | None
     ctfBfactor: float | FloatArrayType | None
@@ -185,6 +193,9 @@ class LensDescriptor():
         self.angleRotation = angleRotation
         self.angleTilt = angleTilt
         self.anglePsi = anglePsi
+        if ref_pixel_size is not None:
+            ensure_positive(ref_pixel_size, "pixel size")
+            ref_pixel_size = project_descriptor(ref_pixel_size, "pixel size", 2, TargetType.FLOAT)
         self.ref_pixel_size = ref_pixel_size
         self.files = files
         self.idxs = idxs
