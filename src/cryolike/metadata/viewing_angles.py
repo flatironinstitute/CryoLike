@@ -1,4 +1,5 @@
-from torch import Tensor, tensor, zeros_like, ones_like, float32
+from torch import Tensor, tensor, zeros_like, ones_like, float32, concatenate, rand, arccos
+from numpy import pi
 
 from cryolike.grids import SphereShell
 from cryolike.util import FloatArrayType, SamplingStrategy
@@ -75,3 +76,47 @@ class ViewingAngles:
         obj = cls(azimus=viewing_shell.azimu_points, polars=viewing_shell.polar_points, gammas=None)
         obj.weights_viewing = tensor(viewing_shell.weight_points)
         return obj
+
+    @classmethod
+    def from_random(cls, n_angles: int) -> "ViewingAngles":
+        """Constructs a set of random viewing angles.
+
+        Args:
+            n_angles (int): The number of angles to generate
+
+        Returns:
+            ViewingAngles: The set of random viewing angles
+        """
+        _azimus = rand(n_angles) * 2 * pi
+        _cos_polars = rand(n_angles) * 2 - 1
+        _polars = arccos(_cos_polars)
+        _gammas = rand(n_angles) * 2 * pi
+        _weights_viewing = ones_like(_azimus) / n_angles
+        return cls(azimus=_azimus, polars=_polars, gammas=_gammas)
+
+
+    def clone(self) -> "ViewingAngles":
+        """Returns a copy of the ViewingAngles object.
+
+        Returns:
+            ViewingAngles: A copy of the ViewingAngles object
+        """
+        return ViewingAngles(self.azimus.clone(), self.polars.clone(), self.gammas.clone())
+
+
+    def concatenate(self, other: "ViewingAngles") -> "ViewingAngles":
+        """Concatenates two ViewingAngles objects.
+
+        Args:
+            other (ViewingAngles): The other ViewingAngles object to concatenate
+
+        Returns:
+            ViewingAngles: A new ViewingAngles object with the concatenated angles
+        """
+        azimus = concatenate([self.azimus, other.azimus], dim=0)
+        polars = concatenate([self.polars, other.polars], dim=0)
+        gammas = concatenate([self.gammas, other.gammas], dim=0)
+        weights_viewing = concatenate([self.weights_viewing, other.weights_viewing], dim=0)
+        viewing_angles = ViewingAngles(azimus=azimus, polars=polars, gammas=gammas)
+        viewing_angles.weights_viewing = weights_viewing
+        return viewing_angles
