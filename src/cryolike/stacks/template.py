@@ -97,8 +97,10 @@ class _ParsedAtomicModel(NamedTuple):
 def _parse_atomic_model(atomic_model: AtomicModel, polar_grid: PolarGrid, box_size: FloatArrayType, float_type: torch.dtype, device: torch.device) -> _ParsedAtomicModel:
     atomic_coordinates = torch.tensor(atomic_model.atomic_coordinates, dtype=float_type, device=device)
     box_max = np.amax(box_size)
+    if atomic_model.n_frames == 1:
+        atomic_coordinates = atomic_coordinates.T
     ## TODO: handle anisotropic box sizes
-    atomic_coordinates_scaled = atomic_coordinates.T / box_max * 2.0 * (- 2.0 * np.pi)
+    atomic_coordinates_scaled = atomic_coordinates * 2.0 / box_max * (- 2.0 * np.pi)
 
     atomic_radii = torch.tensor(atomic_model.atom_radii, dtype=float_type, device=device)
     atomic_radius_scaled = atomic_radii / box_max * 2.0
@@ -170,15 +172,29 @@ def _make_uniform_hard_sphere_kernel(
     # offset = np.pi * parsed_model.atomic_radius_scaled.pow(3).sum() / atomic_model.n_atoms
     
     # offset = offset.reshape(polar_grid.n_shells, polar_grid.n_inplanes).unsqueeze(0)
-    def _uniform_kernel(start: int, end: int):
-        kdotr_batch = torch.matmul(params.xyz_template_points[start:end,:,:], params.parsed_model.atomic_coordinates_scaled) ## uniform (n_templates, n_inplanes, n_atoms) or nonuniform (n_templates, n_points, n_atoms)
-        kdotr_batch = kdotr_batch[:,None,:,:] * params.parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_shells, n_inplanes, n_atoms)
-        exponent = torch.exp(1j * kdotr_batch) * kernelAtoms[None,:,None,:] ## (n_templates, n_shells, n_inplanes, n_atoms)
-        # exponent.exp_()
-        # exponent = kernelAtoms[None,:,None,:]
-        templates_fourier_batch = torch.sum(exponent, dim = 3)
-        params.templates_fourier[start:end,:,:] = templates_fourier_batch.to(params.output_device)
-    return _uniform_kernel
+    if params.parsed_model.atomic_coordinates_scaled.ndim == 2:
+        def _uniform_kernel(start: int, end: int):
+            kdotr_batch = torch.matmul(params.xyz_template_points[start:end,:,:], params.parsed_model.atomic_coordinates_scaled) ## uniform (n_templates, n_inplanes, n_atoms) or nonuniform (n_templates, n_points, n_atoms)
+            kdotr_batch = kdotr_batch[:,None,:,:] * params.parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_shells, n_inplanes, n_atoms)
+            exponent = torch.exp(1j * kdotr_batch) * kernelAtoms[None,:,None,:] ## (n_templates, n_shells, n_inplanes, n_atoms)
+            # exponent.exp_()
+            # exponent = kernelAtoms[None,:,None,:]
+            templates_fourier_batch = torch.sum(exponent, dim = 3)
+            params.templates_fourier[start:end,:,:] = templates_fourier_batch.to(params.output_device)
+        return _uniform_kernel
+    elif params.parsed_model.atomic_coordinates_scaled.ndim == 3:
+        def _uniform_kernel(start: int, end: int):
+            _xyz_template_points_batch = params.xyz_template_points[start:end,:,:]
+            _atomic_coordinates_batch = params.parsed_model.atomic_coordinates_scaled[start:end,:,:]
+            kdotr_batch = torch.einsum("ikx,iax->ika", _xyz_template_points_batch, _atomic_coordinates_batch)
+            kdotr_batch = kdotr_batch[:,None,:,:] * params.parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_shells, n_inplanes, n_atoms)
+            exponent = torch.exp(1j * kdotr_batch) * kernelAtoms[None,:,None,:] ## (n_templates, n_shells, n_inplanes, n_atoms)
+            # exponent.exp_()
+            # exponent = kernelAtoms[None,:,None,:]
+            templates_fourier_batch = torch.sum(exponent, dim = 3)
+            params.templates_fourier[start:end,:,:] = templates_fourier_batch.to(params.output_device)
+        return _uniform_kernel
+    return None
 
 
 def _make_uniform_gaussian_kernel(
@@ -191,14 +207,27 @@ def _make_uniform_gaussian_kernel(
     ## Gaussian kernel
     gaussKernelAtoms = - params.parsed_model.radius_shells_sq[:,None] * params.parsed_model.pi_atomic_radius_sq_times_two[None,:] + log_norm[None,:]
 
-    def _uniform_kernel(start: int, end: int):
-        kdotr_batch = torch.matmul(params.xyz_template_points[start:end,:,:], params.parsed_model.atomic_coordinates_scaled) ## uniform (n_templates, n_inplanes, n_atoms) or nonuniform (n_templates, n_points, n_atoms)
-        kdotr_batch = kdotr_batch[:,None,:,:] * params.parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_inplanes, n_shells, n_atoms)
-        exponent = torch.complex(gaussKernelAtoms[None,:,None,:], kdotr_batch) ## (n_templates, n_inplanes, n_shells, n_atoms)
-        exponent.exp_()
-        templates_fourier_batch = torch.sum(exponent, dim = 3) - offset
-        params.templates_fourier[start:end,:,:] = templates_fourier_batch.to(params.output_device)
-    return _uniform_kernel
+    if params.parsed_model.atomic_coordinates_scaled.ndim == 2:
+        def _uniform_kernel(start: int, end: int):
+            kdotr_batch = torch.matmul(params.xyz_template_points[start:end,:,:], params.parsed_model.atomic_coordinates_scaled) ## uniform (n_templates, n_inplanes, n_atoms) or nonuniform (n_templates, n_points, n_atoms)
+            kdotr_batch = kdotr_batch[:,None,:,:] * params.parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_inplanes, n_shells, n_atoms)
+            exponent = torch.complex(gaussKernelAtoms[None,:,None,:], kdotr_batch) ## (n_templates, n_inplanes, n_shells, n_atoms)
+            exponent.exp_()
+            templates_fourier_batch = torch.sum(exponent, dim = 3) - offset
+            params.templates_fourier[start:end,:,:] = templates_fourier_batch.to(params.output_device) ## (n_templates, n_inplanes, n_shells)
+        return _uniform_kernel
+    elif params.parsed_model.atomic_coordinates_scaled.ndim == 3:
+        def _uniform_kernel(start: int, end: int):
+            _xyz_template_points_batch = params.xyz_template_points[start:end,:,:]
+            _atomic_coordinates_batch = params.parsed_model.atomic_coordinates_scaled[start:end,:,:]
+            kdotr_batch = torch.einsum("ikx,iax->ika", _xyz_template_points_batch, _atomic_coordinates_batch)
+            kdotr_batch = kdotr_batch[:,None,:,:] * params.parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_inplanes, n_shells, n_atoms)
+            exponent = torch.complex(gaussKernelAtoms[None,:,None,:], kdotr_batch) ## (n_templates, n_inplanes, n_shells, n_atoms)
+            exponent.exp_()
+            templates_fourier_batch = torch.sum(exponent, dim = 3) - offset
+            params.templates_fourier[start:end,:,:] = templates_fourier_batch.to(params.output_device) ## (n_templates, n_inplanes, n_shells)
+        return _uniform_kernel
+    return None
 
 
 # TODO: On the pattern of the others, this should just return the kernel
