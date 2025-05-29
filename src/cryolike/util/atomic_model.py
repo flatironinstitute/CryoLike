@@ -42,9 +42,11 @@ class AtomicModel:
     """
     atomic_coordinates: FloatArrayType
     atom_radii: np.ndarray
-    pdb_file: str
+    top_file: str
+    trj_file: str
     box_size: float
-
+    n_frames: int
+    n_atoms: int
 
     def __init__(
         self,
@@ -77,7 +79,12 @@ class AtomicModel:
             print("Atomic coordinates or pdb_file not specified. Using default random set of coordinates.")
             atomic_coordinates = _random_coordinates(radius = self.box_size / 4)
         self.atomic_coordinates = atomic_coordinates
-        self.n_atoms = self.atomic_coordinates.shape[0]
+        if atomic_coordinates.ndim == 2:
+            self.n_frames = 1
+            self.n_atoms = self.atomic_coordinates.shape[0]
+        elif atomic_coordinates.ndim == 3:
+            self.n_frames = self.atomic_coordinates.shape[0]
+            self.n_atoms = self.atomic_coordinates.shape[1]
 
         if np.isscalar(atom_radii):
             assert isinstance(atom_radii, float)
@@ -85,7 +92,7 @@ class AtomicModel:
         else:
             assert isinstance(atom_radii, np.ndarray)
             self.atom_radii = atom_radii
-        self.pdb_file = ""
+        self.top_file = ""
         self.check_model()
 
     
@@ -100,11 +107,11 @@ class AtomicModel:
         if self.atomic_coordinates is None:
             print("Atomic coordinates not specified. Defaulting to randomly chosen coordinates.")
             self.atomic_coordinates = _random_coordinates(radius = self.box_size / 4)
-        if len(self.atomic_coordinates.shape) != 2:
-            raise ValueError("Atomic coordinates must be a 2D array.")
-        if self.atomic_coordinates.shape[1] != 3:
-            raise ValueError("atomic_coordinates.shape[1] != 3")
-        self.n_atoms = self.atomic_coordinates.shape[0]
+        # if len(self.atomic_coordinates.shape) != 2:
+        #     raise ValueError("Atomic coordinates must be a 2D array.")
+        if self.atomic_coordinates.shape[-1] != 3:
+            raise ValueError("atomic_coordinates.shape[-1] != 3")
+        self.n_atoms = self.atomic_coordinates.shape[-2]
         ### Add check if atomic coordinates are within the box_size
         ### ...
         ###
@@ -181,5 +188,72 @@ class AtomicModel:
         if centering:
             atomic_coordinates = atomic_coordinates - np.mean(atomic_coordinates, axis = -2)
         instance = cls(atomic_coordinates, atom_radii, box_size)
-        instance.pdb_file = pdb_file
+        instance.top_file = pdb_file
+        instance.trj_file = None
+        return instance
+
+
+    @classmethod
+    def read_from_traj(cls,
+        top_file: str,
+        trj_file: str,
+        stride: int = 1,
+        in_nanometer: bool = True,
+        box_size: float | None = None,
+        atom_radii: np.ndarray | float | None = 0.1,
+        atom_selection: str | None = None,
+        centering: bool = True,
+        use_protein_residue_model: bool = True,
+    ):
+        """Build an atomic model from a trajectory file.
+
+        Args:
+            traj_file (str): Path to the trajectory file to load
+            box_size (float | None, optional): Size of the viewing box. If None (the default),
+                a default box size defined in the AtomicModel constructor will be used.
+            atom_radii (Union[np.ndarray, float], optional): Radii of the atoms, either
+                as a per-atom array of values or a single value for all atoms. Defaults to 0.1.
+            atom_selection (str | None, optional): Which atoms to choose from the model.
+                If using a protein residue model, will be set automatically. Otherwise,
+                it should be a valid index of the PDB file's Topology. Defaults to None.
+            centering (bool, optional): Whether to center the coordinates to a zero mean.
+                Defaults to True.
+            use_protein_residue_model (bool, optional): If True, will use the 'name CA'
+                atom selection and read atomic radii from known amino acid sizes.
+                Defaults to True.
+
+        Returns:
+            AtomicModel: Instantiated atomic model from the PDB file.
+        """
+        if atom_radii is None and not use_protein_residue_model:
+            raise ValueError("Cannot read an atomic model from PDB if atom_radii is unset and use_protein_residue_model is False.")
+        from mdtraj import load, Trajectory, Topology
+        u = load(trj_file, top=top_file, stride=stride)
+        if use_protein_residue_model:
+            atom_selection = "name CA"
+            assert isinstance(u.topology, Topology)
+            res = u.topology.residue
+            atom_radii = np.zeros(u.topology.n_residues, dtype = np.float32)
+            for i in range(u.topology.n_residues):
+                resname = res(i).name
+                atom_radii[i] = _ATOMIC_RADIUS_RESNAME.get(resname, 3.0)    
+            print("atomic radii = ", atom_radii)
+        assert atom_radii is not None
+        if atom_selection is not None:
+            assert isinstance(u.topology, Topology)
+            indices = u.topology.select(atom_selection)
+            if len(indices) == 0:
+                raise ValueError("No atoms selected.")
+            atomic_coordinates = u.xyz[:,indices,:]
+        else:
+            atomic_coordinates = u.xyz
+        if in_nanometer:
+            atomic_coordinates = atomic_coordinates * 10.0
+        assert u.xyz is not None
+        atomic_coordinates = np.array(atomic_coordinates, dtype = np.float32)
+        if centering:
+            atomic_coordinates = atomic_coordinates - np.mean(atomic_coordinates, axis = -2, keepdims=True)
+        instance = cls(atomic_coordinates, atom_radii, box_size)
+        instance.top_file = top_file
+        instance.trj_file = trj_file
         return instance
