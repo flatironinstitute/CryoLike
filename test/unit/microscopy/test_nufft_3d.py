@@ -84,28 +84,24 @@ def test_nufft_3d():
             fourier_slices_z = torch.zeros_like(fourier_slices_x)
             fourier_slices = torch.stack([fourier_slices_x, fourier_slices_y, fourier_slices_z], dim = 1)
             for precision in [Precision.SINGLE, Precision.DOUBLE]:
-
                 nufft_eps = nufft_eps_single if precision == Precision.SINGLE else nufft_eps_double
-
-                for use_cuda in [True, False]:
-
-                    if not use_cuda and precision == Precision.SINGLE:
+                for device in ["cpu", "cuda"]:
+                    if device == "cpu" and precision == Precision.SINGLE:
                         continue
-
                     image_fourier = volume_phys_to_fourier_points(
                         volume = volume,
                         fourier_slices = fourier_slices,
                         eps = nufft_eps,
-                        precision = precision,
-                        use_cuda = use_cuda
+                        input_device = device,
+                        precision = precision
                     )
                     image_phys_recover = fourier_polar_to_cartesian_phys(
                         grid_fourier_polar = polar_grid,
                         grid_cartesian_phys = phys_grid,
                         image_polar = image_fourier,
                         eps = nufft_eps,
-                        precision = precision,
-                        use_cuda = use_cuda
+                        device = device,
+                        precision = precision
                     )[0]
                     l2norm_image_phys_recover = torch.sqrt(torch.sum(torch.abs(image_phys_recover) ** 2 * pixel_size ** 2))
                     cross_correlation_back = (torch.sum(image_phys_true * image_phys_recover * pixel_size ** 2) / l2norm_image_phys_recover / l2norm_image_phys_true).real.item()

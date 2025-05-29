@@ -1,18 +1,16 @@
-import torch
-import numpy as np
-import sys, os
-from time import time, sleep
+from torch import cuda, device, dtype, Tensor, cuda
+from math import ceil
+from typing import Callable, Literal
 
-from cryolike.grids import FourierImages, PhysicalImages
-from cryolike.stacks import Templates, Images
-from cryolike.microscopy import CTF
-from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
-from cryolike.likelihood import calc_likelihood_optimal_pose
-from cryolike.metadata import ViewingAngles, ImageDescriptor, load_combined_params
-from cryolike.util import Precision, CrossCorrelationReturnType
+from EMPM.file_mgmt import LikelihoodFileManager, LikelihoodOutputDataSources
+from EMPM.stacks import Templates, Images
+from EMPM.microscopy import CTF
+from EMPM.cross_correlation_likelihood import CrossCorrelationLikelihood, OptimalPoseReturn
+from EMPM.likelihood import calc_likelihood_optimal_pose
+from EMPM.metadata import ImageDescriptor
+from EMPM.util import CrossCorrelationReturnType, OutputConfiguration
 
-## TODO: implement functionality : skip_exist, optimized_inplane_rotation, optimized_displacement, optimized_viewing_angle
-## TODO: REFACTOR
+## TODO: implement functionality: optimized_inplane_rotation, optimized_displacement, optimized_viewing_angle
 
 def run_likelihood(
     params_input: str | ImageDescriptor, # parameters
@@ -23,10 +21,11 @@ def run_likelihood(
     skip_exist: bool = False, # skip if the output files exist
     n_templates_per_batch: int = 1, # number of templates per batch
     n_images_per_batch: int = 128, # number of images per batch
-    search_batch_size: bool = False, # search for the batch size that fits in the GPU memory
+    estimate_batch_size: bool = False, # search for the batch size that fits in the GPU memory
     max_displacement_pixels: float = 8.0, # maximum displacement in pixels
     n_displacements_x: int = -1, # number of displacements in x
     n_displacements_y: int = -1, # number of displacements in y
+    return_cross_correlation_pose: bool = False,
     return_likelihood_integrated_pose_fourier : bool = False, # return integrated likelihood in fourier space
     return_likelihood_optimal_pose_physical : bool = False, # return likelihood of optimal pose in physical space
     return_likelihood_optimal_pose_fourier : bool = False, # return likelihood of optimal pose in fourier space
@@ -49,10 +48,13 @@ def run_likelihood(
         skip_exist (bool): skip if the output files exist
         n_templates_per_batch (int): number of templates per batch
         n_images_per_batch (int): number of images per batch
-        search_batch_size (bool): search for the batch size that fits in the GPU memory
+        estimate_batch_size (bool): compute the batch size that fits in the GPU memory. If True,
+            n_templates_per_batch and n_images_per_batch will be ignored.
         max_displacement_pixels (float): maximum displacement in pixels
         n_displacements_x (int): number of displacements in x
         n_displacements_y (int): number of displacements in y
+        return_cross_correlation_pose (bool): return the cross correlation of each image and each pose.
+            If True, no other return types will be computed.
         return_likelihood_integrated_pose_fourier (bool): return integrated likelihood in fourier space
         return_likelihood_optimal_pose_physical (bool): return likelihood of optimal pose in physical space
         return_likelihood_optimal_pose_fourier (bool): return likelihood of optimal pose in fourier space
@@ -61,241 +63,213 @@ def run_likelihood(
         optimized_displacement (bool): optimize displacement
         optimized_viewing_angle (bool): optimize viewing angle
         folder_output (str): output folder
-        verbose (bool): verbose mode     
+        verbose (bool): verbose mode
     """
 
-    if return_likelihood_optimal_pose_physical:
-        raise NotImplementedError("Physical likelihood is still under development and not yet available. Please use Fourier likelihood instead.")
-
-    if search_batch_size:
-        list_n_images_per_batch = []
-        list_n_templates_per_batch = []
-        while n_images_per_batch > 0:
-            list_n_images_per_batch.append(n_images_per_batch)
-            n_images_per_batch = n_images_per_batch // 2
-        while n_templates_per_batch > 0:
-            list_n_templates_per_batch.append(n_templates_per_batch)
-            n_templates_per_batch = n_templates_per_batch // 2
-        n_n_images_per_batch = len(list_n_images_per_batch)
-        n_n_templates_per_batch = len(list_n_templates_per_batch)
-    else:
-        n_n_images_per_batch = 0
-        n_n_templates_per_batch = 0
-
-    ## load parameters
-    image_desc = ImageDescriptor.ensure(params_input)
-    
-    (torch_float_type, torch_complex_type, _) = image_desc.precision.get_dtypes(Precision.SINGLE)
-
-    max_displacement = max_displacement_pixels * image_desc.cartesian_grid.pixel_size[0]
-    flag_returned_displacements = False
-    
-    template_file_list = np.load(os.path.join(folder_templates, 'template_file_list.npy'), allow_pickle = True)
-    folder_particles_fft = os.path.join(folder_particles, 'fft')
-    template_file = template_file_list[i_template]
-    print("template_file: ", template_file)
-
-    templates_fourier = torch.load(template_file, weights_only=True)
-    fourier_templates_data = FourierImages(templates_fourier, image_desc.polar_grid)
-    tp = Templates(
-        fourier_data = fourier_templates_data,
-        phys_data = image_desc.cartesian_grid,
-        viewing_angles = image_desc.viewing_angles
+    # TODO: Push this to a separate config creation
+    filemgr = LikelihoodFileManager(
+        folder_output,
+        folder_templates,
+        folder_particles,
+        n_stacks,
+        i_template,
+        return_likelihood_optimal_pose_physical
     )
 
-    folder_output_template = os.path.join(folder_output, 'template%d' % i_template)
-    folder_output_log_likelihood = os.path.join(folder_output_template, 'log_likelihood')
-    os.makedirs(folder_output_log_likelihood, exist_ok = True)
-    folder_output_cross_correlation = os.path.join(folder_output_template, 'cross_correlation')
-    os.makedirs(folder_output_cross_correlation, exist_ok = True)
-    folder_output_optimal_pose = os.path.join(folder_output_template, 'optimal_pose')
-    os.makedirs(folder_output_optimal_pose, exist_ok = True)
+    # TODO: Push this to a separate config creation
+    outputs = OutputConfiguration(
+        return_cross_correlation_pose=return_cross_correlation_pose,
+        return_likelihood_integrated_pose_fourier=return_likelihood_integrated_pose_fourier,
+        return_likelihood_optimal_pose_physical=return_likelihood_optimal_pose_physical,
+        return_likelihood_optimal_pose_fourier=return_likelihood_optimal_pose_fourier,
+        return_optimal_pose=return_optimal_pose,
+        optimized_inplane_rotation=optimized_inplane_rotation,
+        optimized_displacement=optimized_displacement,
+        optimized_viewing_angle=optimized_viewing_angle
+    )
+
+    if outputs.optimal_phys_pose_likelihood:
+        raise NotImplementedError("Physical likelihood is still under development and not yet available. Please use Fourier likelihood instead.")
+
+    (tp, image_desc, torch_float_type, max_displacement) = filemgr.load_template(params_input, max_displacement_pixels, i_template)
+    optimal_pose_ll_partial = _get_optimal_pose_log_likelihood_partial(tp, image_desc)
+
+    cclik = CrossCorrelationLikelihood(
+        templates = tp,
+        max_displacement = max_displacement,
+        n_displacements_x = n_displacements_x,
+        n_displacements_y = n_displacements_y,
+        precision = image_desc.precision,
+        device = 'cuda',
+        verbose = verbose
+    )
+    filemgr.save_displacements(cclik.x_displacements_expt_scale, cclik.y_displacements_expt_scale)
+    per_loop_computation = _get_batch_likelihood_computation_partial(
+        outputs,
+        cclik,
+        optimal_pose_ll_partial,
+        torch_float_type,
+        filemgr
+    )
 
     for i_stack in range(n_stacks):
-        
-        if skip_exist:
-            # check if the output files exist
+        if skip_exist and filemgr.outputs_exist(i_stack, outputs):
             # NOTE: this is not a foolproof way to check if the files exist, as the files could be corrupted
-            file_exists = True
-            if return_likelihood_integrated_pose_fourier:
-                filename_output_log_likelihood = os.path.join(folder_output_log_likelihood, f'log_likelihood_integrated_fourier_stack_{i_stack:06}.pt')
-                file_exists = os.path.exists(filename_output_log_likelihood) and file_exists
-            if return_likelihood_optimal_pose_fourier:
-                filename_log_likelihood_optimal_pose_fourier = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_fourier_stack_{i_stack:06}.pt')
-                file_exists = os.path.exists(filename_log_likelihood_optimal_pose_fourier) and file_exists
-            if return_likelihood_optimal_pose_physical:
-                filename_log_likelihood_optimal_pose_physical = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_physical_stack_{i_stack:06}.pt')
-                file_exists = os.path.exists(filename_log_likelihood_optimal_pose_physical) and file_exists
-            if return_optimal_pose:
-                filename_output_cross_correlation = os.path.join(folder_output_cross_correlation, f'cross_correlation_stack_{i_stack:06}.pt')
-                filename_output_optimal_template_indices = os.path.join(folder_output_optimal_pose, f'optimal_template_stack_{i_stack:06}.pt')
-                filename_output_optimal_displacement_x =  os.path.join(folder_output_optimal_pose, f'optimal_displacement_x_stack_{i_stack:06}.pt')
-                filename_output_optimal_displacement_y = os.path.join(folder_output_optimal_pose, f'optimal_displacement_y_stack_{i_stack:06}.pt')
-                filename_output_optimal_inplane_rotation = os.path.join(folder_output_optimal_pose, f'optimal_inplane_rotation_stack_{i_stack:06}.pt')
-                file_exists = os.path.exists(filename_output_cross_correlation) and os.path.exists(filename_output_optimal_template_indices) and os.path.exists(filename_output_optimal_displacement_x) and os.path.exists(filename_output_optimal_displacement_y) and os.path.exists(filename_output_optimal_inplane_rotation) and file_exists
-            if file_exists:
-                print("Skipping stack number: ", i_stack, " as the output files already exist")
-                continue
-        
-        print("stack number: ", i_stack)
-        image_fourier_file = os.path.join(folder_particles_fft, f'particles_fourier_stack_{i_stack:06}.pt')
-        image_param_file = os.path.join(folder_particles_fft, f'particles_fourier_stack_{i_stack:06}.npz')
-        if not os.path.exists(image_fourier_file):
-            raise ValueError("File not found: %s" % image_fourier_file)
-        if not os.path.exists(image_param_file):
-            raise ValueError("File not found: %s" % image_param_file)
-        images_fourier = torch.load(image_fourier_file, weights_only=True)
-        (stack_img_desc, stack_lens_desc) = load_combined_params(image_param_file)
-        if not image_desc.is_compatible_with(stack_img_desc):
-            raise ValueError("Incompatible image parameters")
-        
+            print(f"Skipping stack number: {i_stack} as all output files already exist")
+            continue
+        (im, ctf) = filemgr.load_img_stack(i_stack, image_desc)
 
-        fourier_images = FourierImages(images_fourier, stack_img_desc.polar_grid)
-        im = Images(fourier_data=fourier_images, phys_data=stack_img_desc.cartesian_grid)
-        ctf = CTF(
-            ctf_descriptor=stack_lens_desc,
-            polar_grid = stack_img_desc.polar_grid,
-            box_size = stack_img_desc.cartesian_grid.box_size[0], ## TODO: check this hard-coded index
-            anisotropy = True
-        )
+        if estimate_batch_size:
+            n_templates_per_batch, n_images_per_batch = _compute_batch_sizes(tp, im, cclik)
 
-        ctf_tensor = torch.tensor(ctf.ctf, dtype = torch_float_type)
-        if search_batch_size:
-            success = False
-            for i_diag in range(n_n_images_per_batch + n_n_templates_per_batch):
-                i_x = i_diag
-                i_y = 0
-                while i_x >= 0:
-                    cc = None
-                    if i_x < n_n_templates_per_batch and i_y < n_n_images_per_batch:
-                        n_templates_per_batch = list_n_templates_per_batch[i_x]
-                        n_images_per_batch = list_n_images_per_batch[i_y]
-                        try:
-                            cclik = CrossCorrelationLikelihood(
-                                templates = tp,
-                                max_displacement = max_displacement,
-                                # n_displacements = n_displacements,
-                                n_displacements_x = n_displacements_x,
-                                n_displacements_y = n_displacements_y,
-                                precision = image_desc.precision,
-                                device = 'cuda',
-                                verbose = verbose
-                            )
-                            if not flag_returned_displacements:
-                                displacements_set = torch.stack([cclik.x_displacements_expt_scale, cclik.y_displacements_expt_scale], dim = 1).T.cpu().numpy()
-                                torch.save(displacements_set, os.path.join(folder_output, 'displacements_set.pt'))
-                                flag_returned_displacements = True
-                            optimal_pose, log_likelihood_fourier_integrated = cclik._compute_cross_correlation_likelihood(
-                                device=torch.device("cuda"),
-                                images_fourier = im.images_fourier,
-                                ctf = ctf_tensor,
-                                n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
-                                n_images_per_batch=n_images_per_batch,
-                                n_templates_per_batch=n_templates_per_batch,
-                                return_type=CrossCorrelationReturnType.OPTIMAL_POSE,
-                                return_integrated_likelihood=True
-                            )
-                            success = True
-                        except torch.cuda.OutOfMemoryError:
-                            del cc
-                            torch.cuda.empty_cache()
-                            print('n_templates_per_batch', n_templates_per_batch, 'n_images_per_batch', n_images_per_batch, 'out of memory')
-                    torch.cuda.empty_cache()
-                    i_x -= 1
-                    i_y += 1
-                if success:
-                    break
-            if not success:
-                raise ValueError("Out of memory")
+        out_data = per_loop_computation(im, ctf, n_images_per_batch, n_templates_per_batch, i_stack, image_desc)
+        filemgr.write_outputs(i_stack, outputs, out_data)
+        cuda.empty_cache()
+
+
+def _compute_batch_sizes(
+    templates: Templates,
+    images: Images,
+    cclik: CrossCorrelationLikelihood
+):
+    if not cuda.is_available():
+        raise ValueError("Requested to estimate batch sizes but no GPU.")
+
+    n_templates = templates.n_images
+    n_imgs = images.n_images
+    n_shells = templates.polar_grid.n_shells
+    n_inplanes = templates.polar_grid.n_inplanes
+    n_disp = cclik.n_displacements
+    size_float = cclik.torch_float_type.itemsize ## in bytes
+    size_complex = cclik.torch_complex_type.itemsize ## in bytes
+
+    def memory_usage_batchsize(bs_temp: int, bs_img: int) -> int:
+        ## This is a rough estimate of the memory usage for the given batch sizes
+        ## Only consider the significant memory usage
+        
+        _usage = 0
+        _usage += bs_temp * n_shells * n_inplanes * size_complex ## sqrtweighted_fourier_templates_mnw
+        _usage += bs_img * n_shells * n_inplanes * size_complex ## images_fourier_snw
+        _usage += bs_temp * n_disp * n_shells * n_inplanes * size_complex ## sqrtweighted_fourier_templates_bessel_mdnq
+        _usage += bs_img * n_shells * n_inplanes * size_complex ## sqrtweighted_image_fourier_bessel_conj_snq
+        _usage += bs_temp * bs_img * n_shells * n_inplanes * size_complex ## CTF_sqrtweighted_fourier_templates_smnw
+        _usage += bs_temp * bs_img * n_disp * n_inplanes * size_complex ## cross_correlation_smdq
+        _usage += bs_temp * bs_img * n_disp * n_inplanes * size_complex ## cross_correlation_smdw
+        _usage += bs_temp * bs_img * n_disp * (n_inplanes // 2 + 1) * size_complex ## aten::_fft_c2r
+        _usage += bs_temp * bs_img * n_disp * n_inplanes * size_complex ## aten::fft_irfft
+
+        return _usage ## in bytes
+
+    free_bytes = cuda.mem_get_info()[0]
+    batch_size_templates = n_templates
+    batch_size_images = n_imgs
+    while(True):
+        _usage = memory_usage_batchsize(batch_size_templates, batch_size_images)
+        if _usage > free_bytes:
+            if batch_size_templates > 1 and batch_size_images > 1:
+                if batch_size_templates > batch_size_images:
+                    batch_size_templates //= 2
+                else:
+                    batch_size_images //= 2
+            elif batch_size_templates > 1:
+                batch_size_templates //= 2
+            elif batch_size_images > 1:
+                batch_size_images //= 2
+            else:
+                raise ValueError("Cannot estimate batch sizes, as both batch sizes are already 1. Possibly the GPU memory is too small for the cross correlation calculation. Try reducing the resolution.")
         else:
-            cclik = CrossCorrelationLikelihood(
-                templates = tp,
-                max_displacement = max_displacement,
-                # n_displacements = n_displacements,
-                n_displacements_x = n_displacements_x,
-                n_displacements_y = n_displacements_y,
-                precision = image_desc.precision,
-                device = 'cuda',
-                verbose = verbose
-            )
-            if not flag_returned_displacements:
-                # displacements_set = torch.stack([cclik.x_displacements, cclik.y_displacements], dim = 1).T.cpu().numpy()
-                # TODO: CHECK: NOTE THIS CHANGE in variable name. Did this get broken in a previous PR?
-                displacements_set = torch.stack([cclik.x_displacements_expt_scale, cclik.y_displacements_expt_scale], dim = 1).T.cpu().numpy()
-                torch.save(displacements_set, os.path.join(folder_output, 'displacements_set.pt'))
-                flag_returned_displacements = True
-            optimal_pose, log_likelihood_fourier_integrated = cclik._compute_cross_correlation_likelihood(
-                device=torch.device("cuda"),
-                images_fourier = im.images_fourier,
-                ctf = ctf_tensor,
-                n_pixels_phys = im.phys_grid.n_pixels[0] * im.phys_grid.n_pixels[1],
-                n_images_per_batch=n_templates_per_batch,
-                n_templates_per_batch=n_images_per_batch,
-                return_type=CrossCorrelationReturnType.OPTIMAL_POSE,
-                return_integrated_likelihood=True
-            )
-        if return_optimal_pose:
-            filename_output_cross_correlation = os.path.join(folder_output_cross_correlation, f'cross_correlation_stack_{i_stack:06}.pt')
-            filename_output_optimal_template_indices = os.path.join(folder_output_optimal_pose, f'optimal_template_stack_{i_stack:06}.pt')
-            filename_output_optimal_displacement_x =  os.path.join(folder_output_optimal_pose, f'optimal_displacement_x_stack_{i_stack:06}.pt')
-            filename_output_optimal_displacement_y = os.path.join(folder_output_optimal_pose, f'optimal_displacement_y_stack_{i_stack:06}.pt')
-            filename_output_optimal_inplane_rotation = os.path.join(folder_output_optimal_pose, f'optimal_inplane_rotation_stack_{i_stack:06}.pt')
-            torch.save(optimal_pose.cross_correlation_S, filename_output_cross_correlation)
-            torch.save(optimal_pose.optimal_template_S, filename_output_optimal_template_indices)
-            torch.save(optimal_pose.optimal_displacement_x_S, filename_output_optimal_displacement_x)
-            torch.save(optimal_pose.optimal_displacement_y_S, filename_output_optimal_displacement_y)
-            torch.save(optimal_pose.optimal_inplane_rotation_S, filename_output_optimal_inplane_rotation)
-        if return_likelihood_integrated_pose_fourier:
-            filename_output_log_likelihood = os.path.join(folder_output_log_likelihood, f'log_likelihood_integrated_fourier_stack_{i_stack:06}.pt')
-            torch.save(log_likelihood_fourier_integrated, filename_output_log_likelihood)
-        if return_likelihood_optimal_pose_fourier:
-            log_likelihood_optimal_pose_fourier_images_ = calc_likelihood_optimal_pose(
-                template = tp,
-                image = im,
-                ctf = ctf,
-                mode = "fourier",
-                template_indices = optimal_pose.optimal_template_S,
-                displacements_x = optimal_pose.optimal_displacement_x_S,
-                displacements_y = optimal_pose.optimal_displacement_y_S,
-                inplane_rotations = optimal_pose.optimal_inplane_rotation_S,
-                return_distance = False,
-                return_likelihood = True,
-                precision = image_desc.precision,
-                use_cuda = True
-            )
-            filename_log_likelihood_optimal_pose_fourier = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_fourier_stack_{i_stack:06}.pt')
-            torch.save(log_likelihood_optimal_pose_fourier_images_, filename_log_likelihood_optimal_pose_fourier)
-        
-        if return_likelihood_optimal_pose_physical:
-            folder_particles_phys = os.path.join(folder_particles, 'phys')
-            images_phys = torch.load(os.path.join(folder_particles_phys, f'particles_phys_stack_{i_stack:06}.pt'), weights_only=True)
-            phys_image_data = PhysicalImages(images_phys, pixel_size=image_desc.cartesian_grid.pixel_size)
-            im_phys = Images(phys_data=phys_image_data, fourier_data=None)
-            log_likelihood_optimal_pose_physical_images_ = calc_likelihood_optimal_pose(
-                template = tp,
-                image = im_phys,
-                ctf = ctf,
-                mode = "phys",
-                template_indices = optimal_pose.optimal_template_S,
-                displacements_x = optimal_pose.optimal_displacement_x_S,
-                displacements_y = optimal_pose.optimal_displacement_y_S,
-                inplane_rotations = optimal_pose.optimal_inplane_rotation_S,
-                return_distance = False,
-                return_likelihood = True,
-                precision = image_desc.precision,
-                use_cuda = True
-            )
-            filename_log_likelihood_optimal_pose_physical = os.path.join(folder_output_log_likelihood, f'log_likelihood_optimal_physical_stack_{i_stack:06}.pt') 
-            torch.save(log_likelihood_optimal_pose_physical_images_, filename_log_likelihood_optimal_pose_physical)
-            del images_phys
-    
-        del im
-        del ctf
-        del images_fourier
+            break
 
-    try:
-        del cc
-    except:
-        pass
-    del tp
-    del templates_fourier
+    print(f"Estimated batch sizes: {batch_size_templates} templates, {batch_size_images} images")
+
+    return (batch_size_templates, batch_size_images)
+
+
+
+T_OptPosePartial = Callable[[Images, CTF, OptimalPoseReturn, Literal['phys'] | Literal['fourier']], Tensor]
+def _get_optimal_pose_log_likelihood_partial(tp: Templates, image_desc: ImageDescriptor):
+    def _inner(
+        im: Images,
+        ctf: CTF,
+        optimal_pose: OptimalPoseReturn,
+        mode: Literal['phys'] | Literal['fourier'] = 'fourier'
+    ) -> Tensor:
+        # TODO: This can be revised once calc_likelihood_etc is cleaned up
+        res =  calc_likelihood_optimal_pose(
+            template = tp,
+            image = im,
+            ctf = ctf,
+            mode = mode,
+            template_indices = optimal_pose.optimal_template_S,
+            displacements_x = optimal_pose.optimal_displacement_x_S,
+            displacements_y = optimal_pose.optimal_displacement_y_S,
+            inplane_rotations = optimal_pose.optimal_inplane_rotation_S,
+            return_distance = False,
+            return_likelihood = True,
+            precision = image_desc.precision,
+            use_cuda = True
+        )
+        assert isinstance(res, Tensor)
+        return res
+    return _inner
+
+
+def _get_batch_likelihood_computation_partial(
+    outputs: OutputConfiguration,
+    cclik: CrossCorrelationLikelihood,
+    optimal_pose_ll_partial: T_OptPosePartial,
+    torch_float_type: dtype,
+    filemgr: LikelihoodFileManager
+):
+    def full_fn(im: Images, ctf: CTF, n_im_per_batch: int, n_tem_per_batch: int, i_stack: int, image_desc: ImageDescriptor):
+        out_data = LikelihoodOutputDataSources()
+        full_cross_correlation_pose = cclik.compute_cross_correlation_complete(
+            device=device("cuda"),
+            images_fourier = im.images_fourier,
+            ctf= ctf.ctf.to(torch_float_type),
+            n_pixels_phys = im.phys_grid.n_pixels[0].item() * im.phys_grid.n_pixels[1].item(),
+            n_images_per_batch=n_im_per_batch,
+            n_templates_per_batch=n_tem_per_batch,
+            return_integrated_likelihood=False
+        )
+        out_data.full_pose = full_cross_correlation_pose
+        return out_data
+
+    def fourier_partial(optimal_pose: OptimalPoseReturn, i_stack: int, image_desc: ImageDescriptor, im: Images, ctf: CTF, out_data: LikelihoodOutputDataSources):
+        ll_opt_pose_fourier = optimal_pose_ll_partial(im, ctf, optimal_pose, 'fourier')
+        out_data.ll_optimal_fourier_pose = ll_opt_pose_fourier
+    
+    def phys_partial(optimal_pose: OptimalPoseReturn, i_stack: int, image_desc: ImageDescriptor, im: Images, ctf: CTF, out_data: LikelihoodOutputDataSources):
+        im_phys = filemgr.load_phys_stack(i_stack, image_desc)
+        log_likelihood_optimal_pose_physical_images_ = \
+            optimal_pose_ll_partial(im_phys, ctf, optimal_pose, 'phys')
+        out_data.ll_optimal_phys_pose = log_likelihood_optimal_pose_physical_images_
+        del im_phys
+
+    optimal_pose_partials = []
+    if outputs.optimal_fourier_pose_likelihood:
+        optimal_pose_partials.append(fourier_partial)
+    if outputs.optimal_phys_pose_likelihood:
+        optimal_pose_partials.append(phys_partial)
+
+    def optimal_pose_partial(im: Images, ctf: CTF, n_im_per_batch: int, n_tem_per_batch: int, i_stack: int, image_desc: ImageDescriptor):
+        out_data = LikelihoodOutputDataSources()
+        optimal_pose, log_likelihood_fourier_integrated = cclik._compute_cross_correlation_likelihood(
+            device=device("cuda"),
+            images_fourier = im.images_fourier,
+            ctf = ctf.ctf.to(torch_float_type),
+            n_pixels_phys = im.phys_grid.n_pixels[0].item() * im.phys_grid.n_pixels[1].item(),
+            n_images_per_batch=n_im_per_batch,
+            n_templates_per_batch=n_tem_per_batch,
+            return_type=CrossCorrelationReturnType.OPTIMAL_POSE,
+            return_integrated_likelihood=True
+        )
+        out_data.optimal_pose = optimal_pose
+        out_data.ll_fourier_integrated = log_likelihood_fourier_integrated
+        _ = [x(optimal_pose, i_stack, image_desc, im, ctf, out_data) for x in optimal_pose_partials]
+        return out_data
+
+    if outputs.cross_correlation_pose:
+        return full_fn
+    else:
+        return optimal_pose_partial

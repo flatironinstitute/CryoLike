@@ -75,8 +75,8 @@ def test_nufft_2d():
 
             for precision in [Precision.SINGLE, Precision.DOUBLE]:
                 nufft_eps = nufft_eps_single if precision == Precision.SINGLE else nufft_eps_double
-                for use_cuda in [False, True]:
-                    if not use_cuda and precision == Precision.SINGLE:
+                for device in ["cpu", "cuda"]:
+                    if device == "cpu" and precision == Precision.SINGLE:
                         continue
                     for image_repeat in [1, 2]:
                         
@@ -88,8 +88,8 @@ def test_nufft_2d():
                             grid_fourier_polar = polar_grid,
                             images_phys = image_phys_true_repeat,
                             eps = nufft_eps,
-                            precision = precision,
-                            use_cuda = use_cuda
+                            device = device,
+                            precision = precision
                         )
                         l2norm_image_fourier_recover = torch.sqrt(polar_grid.integrate(torch.abs(image_fourier_recover) ** 2))
                         cross_correlation_for = (polar_grid.integrate(image_fourier_true_repeat * torch.conj(image_fourier_recover)) / l2norm_image_fourier_recover / l2norm_image_fourier_true).real
@@ -99,8 +99,8 @@ def test_nufft_2d():
                             grid_cartesian_phys = phys_grid,
                             image_polar = image_fourier_true_repeat,
                             eps = nufft_eps,
-                            precision = precision,
-                            use_cuda = use_cuda
+                            device = device,
+                            precision = precision
                         )
                         image_phys_recover_real = image_phys_recover.real
                         l2norm_image_phys_real_recover = torch.sqrt(torch.sum(torch.abs(image_phys_recover_real) ** 2 * pixel_size ** 2, dim=(1, 2)))
@@ -111,8 +111,8 @@ def test_nufft_2d():
                             grid_cartesian_phys = phys_grid,
                             image_polar = image_fourier_recover,
                             eps = nufft_eps,
-                            precision = precision,
-                            use_cuda = use_cuda
+                            device = device,
+                            precision = precision
                         )
                         l2norm_image_phys_real_recover_two = torch.sqrt(torch.sum(torch.abs(image_phys_recover_two.real) ** 2 * pixel_size ** 2, dim=(1, 2)))
                         cross_correlation_two = (torch.sum(image_phys_true_repeat.real * image_phys_recover_two.real * pixel_size ** 2, dim=(1,2)) / l2norm_image_phys_true / l2norm_image_phys_real_recover_two).real

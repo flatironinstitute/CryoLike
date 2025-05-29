@@ -107,6 +107,13 @@ class CrossCorrelationReturnType(Enum):
     FULL_TENSOR = 10
 
 
+
+class InputFileType(Enum):
+    MRC = 1
+    PDB = 2
+    MEM = 3
+
+
 class AtomShape(Enum):
     """Type of topology for modelling atomic density"""
     HARD_SPHERE = 'hard-sphere'

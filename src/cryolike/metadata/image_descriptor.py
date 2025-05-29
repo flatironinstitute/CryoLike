@@ -59,7 +59,7 @@ class ImageDescriptor():
         cartesian_grid: CartesianGrid2D,
         polar_grid: PolarGrid,
         viewing_angles: ViewingAngles | None,
-        viewing_distance: float | None = None,
+        viewing_distance: float | None,
         atom_radii: float | FloatArrayType | None = None,
         atom_selection: str | np.ndarray | None = "name CA",
         use_protein_residue_model: bool = True,

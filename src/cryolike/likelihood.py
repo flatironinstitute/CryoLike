@@ -63,7 +63,8 @@ def likelihood_fourier(
     n_pixels: int,
     return_cross_correlation: bool = False
 ):
-    
+    # TODO: can we precompute the point/weight sets? At least s_points, x_points, y_points, Iss, Isy, Isx
+    # TODO: are there more native functions for some of these computations
     # n_shells = polar_grid.n_shells
     # n_inplanes = polar_grid.n_inplanes
     # n_pixels = n_shells * n_inplanes
@@ -85,9 +86,6 @@ def likelihood_fourier(
     Iyy = torch.sum(absq(images_fourier) * weights, dim = 1)
     Ixx = torch.sum(absq(templates_fourier) * weights, dim = 1)
     Ixy = torch.sum(complex_mul_real(images_fourier, templates_fourier.conj()) * weights, dim = 1)
-    if return_cross_correlation:
-        cross_correlation = Ixy / torch.sqrt(Ixx * Iyy)
-        cross_correlation = cross_correlation.cpu()
 
     A = - absq(Isx) + Ixx * Iss
     B = - Isx.real * Isy.real - Isx.imag * Isy.imag + Ixy * Iss
@@ -95,14 +93,22 @@ def likelihood_fourier(
     
     D = - (B ** 2 / A + C)
     p = n_pixels / 2.0 - 2.0
-    constant = (3.0 - n_pixels) / 2.0 * np.log(2 * np.pi) - np.log(2) - 0.5 * np.log(Iss) + lgamma(n_pixels / 2.0 - 2.0) + p * np.log(2 * Iss)
+    lg = lgamma(n_pixels / 2.0 - 2.0).item()
+    assert isinstance(lg, float)
+    constant = (3.0 - n_pixels) / 2.0 * np.log(2 * np.pi) \
+                - np.log(2) - 0.5 * np.log(Iss) \
+                + lg \
+                + p * np.log(2 * Iss)
     log_likelihood = -p * torch.log(D) - 0.5 * torch.log(A) + constant
+    # assert isinstance(log_likelihood, torch.Tensor)
 
     log_likelihood = log_likelihood.cpu()
     if return_cross_correlation:
+        cross_correlation = Ixy / torch.sqrt(Ixx * Iyy)
+        cross_correlation = cross_correlation.cpu()
         return log_likelihood, cross_correlation
     else:
-        return log_likelihood    
+        return log_likelihood
 
 
 def calc_likelihood_optimal_pose(
@@ -113,7 +119,7 @@ def calc_likelihood_optimal_pose(
     displacements_y : torch.Tensor | None = None,
     inplane_rotations : torch.Tensor | None = None,
     ctf : CTF | None = None,
-    mode : str = "phys",
+    mode : Literal["phys"] | Literal["fourier"] = "phys",
     return_distance : bool = True,
     return_likelihood : bool = False,
     return_cross_correlation : bool = False,
@@ -197,6 +203,8 @@ def calc_likelihood_optimal_pose(
                 log_likelihood, cross_correlation = output_likelihood
             else:
                 log_likelihood = output_likelihood
+    else:
+        raise NotImplementedError("Unreachable branch")
     if return_likelihood and not return_distance and not return_cross_correlation:
         return log_likelihood
     if  not return_likelihood and return_distance and not return_cross_correlation:

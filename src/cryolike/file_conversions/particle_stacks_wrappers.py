@@ -111,9 +111,10 @@ def convert_particle_stacks_from_indexed_star_files(
         downsample_type=downsample_type,
         flag_plots=flag_plots
     )
-    converter.prepare_indexed_star_file(
-        star_file=star_file,
-        folder_mrc=folder_mrc,
+    converter.prepare_indexed_file(
+        src_file=star_file,
+        filetype='starfile',
+        mrc_folder=folder_mrc,
     )
     converter.convert_stacks(batch_size=batch_size)
 
@@ -184,7 +185,7 @@ def convert_particle_stacks_from_cryosparc(
         downsample_type=downsample_type,
         flag_plots=flag_plots
     )
-    converter.prepare_indexed_cryosparc(file_cs=file_cs, folder_cryosparc=folder_cryosparc)
+    converter.prepare_indexed_file(src_file=file_cs, filetype='cryosparc', mrc_folder=folder_cryosparc)
     converter.convert_stacks(batch_size=batch_size)
 
 

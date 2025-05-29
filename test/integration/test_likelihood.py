@@ -8,7 +8,7 @@ from cryolike.grids import PolarGrid
 from cryolike.stacks import Templates
 from cryolike.microscopy import CTF
 from cryolike.metadata import LensDescriptor, ViewingAngles
-from cryolike.util import (AtomShape, AtomicModel, CrossCorrelationReturnType, Precision, to_torch)
+from cryolike.util import (AtomShape, AtomicModel, CrossCorrelationReturnType, Precision, to_torch, get_device)
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood, OptimalPoseReturn, OptimizedDisplacementAndRotationReturn
 from cryolike.likelihood import calc_likelihood_optimal_pose, calc_fourier_likelihood_images_given_optimal_pose#, calc_physical_likelihood_images_given_optimal_pose
 
@@ -94,7 +94,7 @@ def test_likelihood():
     )
     image.rotate_images_fourier_discrete(gammas_viewing_true)
     image.apply_ctf(ctf)
-    image.transform_to_spatial(grid=(n_pixels, pixel_size), use_cuda = use_cuda)
+    image.transform_to_spatial(grid=(n_pixels, pixel_size), device = device)
     mean, std = image.center_physical_image_signal()
 
     # _, cross_correlation_optimal_pose = calc_physical_likelihood_images_given_optimal_pose(
@@ -116,14 +116,14 @@ def test_likelihood():
     mean, std = image.center_physical_image_signal()
 
     ## forward and backward FFT to consider bandlimit the physical images according to the polar grid of Fourier space
-    image.transform_to_fourier(polar_grid, use_cuda = use_cuda)
-    image.transform_to_spatial(grid=(n_pixels, pixel_size), use_cuda = use_cuda)
+    image.transform_to_fourier(polar_grid, device = device)
+    image.transform_to_spatial(grid=(n_pixels, pixel_size), device = device)
 
     image_true -= mean
     image_true /= std
     
     noise_variance = torch.sum((image.images_phys - image_true) ** 2, dim = (1, 2)) / n_pixels ** 2
-    loglik_true = - n_pixels ** 2 / 2 - np.log(2 * np.pi * noise_variance) * (n_pixels ** 2 / 2)
+    loglik_true = - n_pixels ** 2 / 2 - np.log(2 * np.pi * noise_variance.cpu()) * (n_pixels ** 2 / 2)
 
     # likelihood_optimal_pose, cross_correlation_optimal_pose = calc_physical_likelihood_images_given_optimal_pose(
     #     images=image,

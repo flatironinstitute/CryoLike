@@ -2,7 +2,15 @@ import numpy as np
 from typing import Any, NamedTuple, Literal
 from pydantic import BaseModel, ConfigDict
 
-from cryolike.util import FloatArrayType, IntArrayType, to_float_flatten_np_array, extract_unique_float
+from cryolike.util import (
+    FloatArrayType,
+    IntArrayType,
+    to_float_flatten_np_array,
+    extract_unique_float,
+    ensure_positive,
+    project_descriptor,
+    TargetType
+)
 from .star_file import read_star_file
 
 
@@ -122,7 +130,7 @@ class LensDescriptor():
         angleRotation: FloatArrayType | None = None,
         angleTilt: FloatArrayType | None = None,
         anglePsi: FloatArrayType | None = None,
-        ref_pixel_size: FloatArrayType | None = None,
+        ref_pixel_size: FloatArrayType | float | None = None,
         defocusAngle_degree: bool = True,
         phaseShift_degree: bool = True,
         files: np.ndarray | None = None,
@@ -147,7 +155,7 @@ class LensDescriptor():
             angleRotation (FloatArrayType | None): Optional per-image rotational angle
             angleTilt (FloatArrayType | None): Optional per-image rotational angle
             anglePsi (FloatArrayType | None): Optional per-image rotational angle
-            ref_pixel_size: (FloatArrayType | None, optional): If set, indicates the pixel
+            ref_pixel_size: (FloatArrayType | float | None, optional): If set, indicates the pixel
                 size recorded from a cryosparc descriptor file.
             defocusAngle_degree (bool, optional): If True (the default), defocus angle is
                 presumed to be in degrees; if False, defocus angle is treated as radians.
@@ -185,6 +193,9 @@ class LensDescriptor():
         self.angleRotation = angleRotation
         self.angleTilt = angleTilt
         self.anglePsi = anglePsi
+        if ref_pixel_size is not None:
+            ensure_positive(ref_pixel_size, "pixel size")
+            ref_pixel_size = project_descriptor(ref_pixel_size, "pixel size", 2, TargetType.FLOAT)
         self.ref_pixel_size = ref_pixel_size
         self.files = files
         self.idxs = idxs

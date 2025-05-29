@@ -1,4 +1,4 @@
-from cryolike.convert_particle_stacks import convert_particle_stacks_from_star_files
+from cryolike.file_conversions import convert_particle_stacks_from_star_files
 
 pixel_size = 1.346
 dataset_name = "apoferritin"

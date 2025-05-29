@@ -11,7 +11,7 @@ for i_template in range(2):
         skip_exist = False,
         n_templates_per_batch = 16,
         n_images_per_batch = 128,
-        search_batch_size = True,
+        estimate_batch_size = True,
         max_displacement_pixels = 8.0,
         n_displacements_x = 16,
         n_displacements_y = 16,

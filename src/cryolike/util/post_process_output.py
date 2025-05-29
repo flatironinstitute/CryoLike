@@ -5,6 +5,11 @@ from multiprocessing import Pool, cpu_count
 import os
 
 
+# TODO: Currently unused internally & API is not documented.
+# Needs review.
+# If kept, convert os. to pathlib &
+# try to centralize file-naming operations in the file mgr directory.
+
 def _torch_load_weights_only_true(file_path):
     return torch.load(file_path, map_location='cpu', weights_only=True)
 

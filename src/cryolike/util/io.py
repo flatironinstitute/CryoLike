@@ -1,12 +1,13 @@
 from typing import Any
+from pathlib import Path
 import numpy as np
-import os
 from functools import reduce
 
-def load_file(file: str) -> dict:
+def load_file(file: str | Path) -> dict:
     if file == '':
         raise FileNotFoundError("Loading from file requires a file name.")
-    _, ext = os.path.splitext(file)
+    filepath = Path(file)
+    ext = filepath.suffix
     if ext != '.npz':
         raise ValueError("Can only load from .npz files.")
     
@@ -50,7 +51,8 @@ def save_descriptors(filename: str, *args, **kwargs): # type: ignore
     """
     if len(args) == 0:
         return
-    if os.path.exists(filename) and not kwargs.get('overwrite', False):
+    filepath = Path(filename)
+    if filepath.exists() and not kwargs.get('overwrite', False):
         raise ValueError(f"Requested filename {filename} already exists. Aborting to avoid overwrite.")
     all_keys_count = sum([len(x) for x in args])
     def merge(x, y):

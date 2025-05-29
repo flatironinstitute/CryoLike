@@ -67,8 +67,7 @@ def write_star_file(
     return
 
 
-# pragma: no cover
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     import sys
     filename = sys.argv[1]
     dataList, paramsList = read_star_file(filename)

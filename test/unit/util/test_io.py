@@ -73,17 +73,16 @@ def test_save_descriptors(save: Mock):
     assert call_dict['d'] == 4
 
 
-@patch(f"{PKG}.os.path.exists")
-def test_save_descriptors_raises_on_existing_file(exists: Mock):
-    my_name = "file.npz"
-    exists.return_value = True
+def test_save_descriptors_raises_on_existing_file(tmp_path):
+    my_name = tmp_path / "file.npz"
+    my_name.write_text("")
     with raises(ValueError, match="already exists"):
-        save_descriptors(str(my_name), {'key': 'value'})
+        save_descriptors(str(my_name), {'key': 'value'}, overwrite=False)
 
-@patch(f"{PKG}.os.path.exists")
-def test_save_descriptors_no_raises_on_existing_file_overwrite(exists: Mock):
-    my_name = "file.npz"
-    exists.return_value = True
+
+def test_save_descriptors_no_raises_on_existing_file_overwrite(tmp_path):
+    my_name = tmp_path / "file.npz"
+    my_name.write_text("")
     save_descriptors(str(my_name), {'key': 'value'}, overwrite=True)
 
 
