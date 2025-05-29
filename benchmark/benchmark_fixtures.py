@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from unittest.mock import Mock
+import pickle
 
 from scipy.special import jv
 from torch import Tensor
@@ -14,7 +15,7 @@ from cryolike.microscopy import CTF
 from cryolike.util import Precision, to_torch
 
 
-class parameters():
+class Parameters:
 
     device: str
     n_pixels: int
@@ -26,6 +27,8 @@ class parameters():
 
     n_shells: int
     n_inplanes: int
+
+    t_ms : float | None
 
     def __init__(
         self,
@@ -46,6 +49,7 @@ class parameters():
         self.n_templates_per_batch = n_templates_per_batch
         self.n_images_per_batch = n_images_per_batch
         self.precision = precision
+        self.t_ms = None
 
 
     def duplicate(self, *,
@@ -58,7 +62,7 @@ class parameters():
         n_displacements_y: int | None = None,
         precision: Precision | None = None
     ):
-        return parameters(
+        return Parameters(
             device=device if device is not None else self.device,
             n_pixels=n_pixels if n_pixels is not None else self.n_pixels,
             n_templates=n_templates if n_templates is not None else self.n_templates,
@@ -72,22 +76,32 @@ class parameters():
 
     @staticmethod
     def default():
-        return parameters(
+        return Parameters(
             device='cuda',
-            n_pixels=64,
+            n_pixels=64,#128,
             n_templates=1024,
             n_displacements_x=8,
             n_displacements_y=8,
-            n_templates_per_batch=256,
-            n_images_per_batch=256,
+            n_templates_per_batch=128,
+            n_images_per_batch=128,
             precision=Precision.SINGLE,
         )
 
+
+    def save(self, filename: str):
+        with open(filename, 'wb') as f:
+            pickle.dump(self, f)
+
+    
+    @staticmethod
+    def load(filename: str):
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
     
 
 
-def make_batch_size_params() -> list[parameters]:
-    params = [parameters.default()]
+def make_batch_size_params() -> list[Parameters]:
+    params = [Parameters.default()]
     with_image_batch_sizes = [x.duplicate(n_images_per_batch=i) for i in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024] for x in params]
     params.extend(with_image_batch_sizes)
     with_template_batch_sizes = [x.duplicate(n_templates_per_batch=i) for i in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024] for x in params]
@@ -95,15 +109,15 @@ def make_batch_size_params() -> list[parameters]:
     return params
 
 
-def make_n_pixels_params() -> list[parameters]:
-    params = [parameters.default()]
+def make_n_pixels_params() -> list[Parameters]:
+    params = [Parameters.default()]
     with_n_pixels = [x.duplicate(n_pixels=i) for i in [64, 128, 256, 512, 1024] for x in params]
     params.extend(with_n_pixels)
     return params
 
 
-def make_n_displacements_params() -> list[parameters]:
-    params = [parameters.default()]
+def make_n_displacements_params() -> list[Parameters]:
+    params = [Parameters.default()]
     with_n_displacements = [x.duplicate(n_displacements_x=i,n_displacements_y=i) for i in [4, 8, 16, 32] for x in params]
     params.extend(with_n_displacements)
     return params
@@ -155,6 +169,6 @@ def make_mock_templates(polar_grid: PolarGrid, viewing_angles: ViewingAngles, pr
         viewing_angles=viewing_angles,
         polar_grid=polar_grid,
         precision=precision,
-        use_cuda=True
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
     return templates
