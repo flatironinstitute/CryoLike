@@ -104,9 +104,7 @@ def make_batch_size_params() -> list[Parameters]:
     params = [Parameters.default()]
     with_image_batch_sizes = [x.duplicate(n_images_per_batch=i) for i in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024] for x in params]
     params.extend(with_image_batch_sizes)
-    # TODO CHANGE BACK
-    # with_template_batch_sizes = [x.duplicate(n_templates_per_batch=i) for i in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024] for x in params]
-    with_template_batch_sizes = [x.duplicate(n_templates_per_batch=i) for i in [1, 2, 4, 8, 16, 32, 64] for x in params]
+    with_template_batch_sizes = [x.duplicate(n_templates_per_batch=i) for i in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024] for x in params]
     params.extend(with_template_batch_sizes)
     return params
 

@@ -1,6 +1,6 @@
 import torch
 import torch.profiler as profiler
-import time, os
+import time
 from pathlib import Path
 
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
@@ -38,7 +38,6 @@ def benchmark_cross_correlation(params: Parameters):
     print(f"  device: {params.device}")
     
     try:
-        ####
         _t_start = time.time()
         cc = CrossCorrelationLikelihood(
             templates = templates,
@@ -70,13 +69,15 @@ def benchmark_cross_correlation(params: Parameters):
                 return_integrated_likelihood=False,
             )
         ## save profiler trace
-        prof.export_chrome_trace(os.path.join(logdir_profiler, "trace.json"))
+        tracefile = logdir_profiler / "trace.json"
+        prof.export_chrome_trace(str(tracefile))
         print(prof.key_averages(group_by_input_shape=True).table(sort_by="cuda_memory_usage", row_limit=20))
         ####
         exit()
-        _t_end = time.time()
-        _t_ms = (_t_end - _t_start) * 1000
-        print(f"  Time taken: {_t_ms:.2f} ms")
+        ## NOTE: THIS CODE IS UNREACHABLE. Is this intended?
+        # # # _t_end = time.time()
+        # # # _t_ms = (_t_end - _t_start) * 1000
+        # # # print(f"  Time taken: {_t_ms:.2f} ms")
     except RuntimeError as e:
         if "CUDA out of memory" in str(e):
             print(f"CUDA out of memory error: {e}")

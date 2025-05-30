@@ -10,11 +10,11 @@ class TargetType(Enum):
     FLOAT = 2
 
 
-def project_scalar(scalar: int | float | np.int_ | np.float_, dims: int) -> IntArrayType | FloatArrayType:
+def project_scalar(scalar: int | float | np.int_ | np.float64 | np.float32, dims: int) -> IntArrayType | FloatArrayType:
     """Returns a numpy array of appropriate dtype and dimension from a scalar input.
 
     Args:
-        scalar (int | float | np.int_ | np.float_): The value to project to an array
+        scalar (int | float | np.int_ | np.float64 | np.float32): The value to project to an array
         dims (int): Dimension (1d) of the desired array
 
     Returns:
