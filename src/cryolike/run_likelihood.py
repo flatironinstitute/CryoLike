@@ -2,13 +2,13 @@ from torch import cuda, device, dtype, Tensor, cuda
 from math import ceil
 from typing import Callable, Literal
 
-from EMPM.file_mgmt import LikelihoodFileManager, LikelihoodOutputDataSources
-from EMPM.stacks import Templates, Images
-from EMPM.microscopy import CTF
-from EMPM.cross_correlation_likelihood import CrossCorrelationLikelihood, OptimalPoseReturn
-from EMPM.likelihood import calc_likelihood_optimal_pose
-from EMPM.metadata import ImageDescriptor
-from EMPM.util import CrossCorrelationReturnType, OutputConfiguration
+from cryolike.file_mgmt import LikelihoodFileManager, LikelihoodOutputDataSources
+from cryolike.stacks import Templates, Images
+from cryolike.microscopy import CTF
+from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood, OptimalPoseReturn
+from cryolike.likelihood import calc_likelihood_optimal_pose
+from cryolike.metadata import ImageDescriptor
+from cryolike.util import CrossCorrelationReturnType, OutputConfiguration
 
 ## TODO: implement functionality: optimized_inplane_rotation, optimized_displacement, optimized_viewing_angle
 
