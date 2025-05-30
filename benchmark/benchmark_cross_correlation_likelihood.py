@@ -1,13 +1,11 @@
-from numpy import pi
 import torch
-# from torch.testing import assert_close
 import torch.profiler as profiler
 import time, os
+from pathlib import Path
 
-from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood, conform_ctf
+from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
 from cryolike.util import (
     CrossCorrelationReturnType,
-    Precision,
 )
 
 from benchmark_fixtures import (
@@ -15,20 +13,18 @@ from benchmark_fixtures import (
     make_batch_size_params,
     make_n_pixels_params,
     make_n_displacements_params,
-    make_mock_polar_grid,
-    make_mock_viewing_angles,
-    make_mock_ctf,
-    make_mock_templates
+    make_default_polar_grid,
+    make_default_viewing_angles,
+    make_default_ctf,
+    make_default_templates
 )
 
 
 def benchmark_cross_correlation(params: Parameters):
-    
-    (torch_float_type, _, _) = params.precision.get_dtypes(default=Precision.SINGLE)
-    polar_grid = make_mock_polar_grid(params.n_pixels)
-    viewing_angles = make_mock_viewing_angles(params.n_templates, params.precision)
-    ctf = make_mock_ctf(polar_grid, True, params.precision)
-    templates = make_mock_templates(polar_grid, viewing_angles, params.precision)
+    polar_grid = make_default_polar_grid(params.n_pixels)
+    viewing_angles = make_default_viewing_angles(params.n_templates, params.precision)
+    ctf = make_default_ctf(polar_grid, True, params.precision)
+    templates = make_default_templates(polar_grid, viewing_angles, params.precision)
     images = templates.to_images()
 
     print(f"Running benchmark with case: ")
@@ -43,6 +39,7 @@ def benchmark_cross_correlation(params: Parameters):
     
     try:
         ####
+        _t_start = time.time()
         cc = CrossCorrelationLikelihood(
             templates = templates,
             max_displacement = 1.0,
@@ -52,10 +49,8 @@ def benchmark_cross_correlation(params: Parameters):
             device = params.device,
             verbose = False
         )
-        _t_start = time.time()
-        logdir_profiler = "./profiler_output/"
-        if not os.path.exists(logdir_profiler):
-            os.makedirs(logdir_profiler)
+        logdir_profiler = Path.cwd() / "profiler_output/"
+        Path.mkdir(logdir_profiler, exist_ok=True)
         with profiler.profile(
             activities=[
                 profiler.ProfilerActivity.CPU,
@@ -99,20 +94,19 @@ if __name__ == "__main__":
         print("CUDA is not available. Exiting.")
         exit(1)
 
-    folder = "./benchmark_output/"
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+    folder = Path.cwd() / "./benchmark_output/"
+    Path.mkdir(folder, exist_ok=True)
 
     params_default = Parameters.default()
     torch.cuda.empty_cache()
     params_default.t_ms = benchmark_cross_correlation(params_default)
-    params_default.save(os.path.join(folder, "benchmark_default.pkl"))
+    params_default.save(folder / "benchmark_default.pkl")
 
     params_batch_size : list[Parameters] = make_batch_size_params()
     for params in params_batch_size:
         torch.cuda.empty_cache()
         params.t_ms = benchmark_cross_correlation(params)
-        params.save(os.path.join(folder, "benchmark_batch_size_%d_%d.pkl" % (params.n_images_per_batch, params.n_templates_per_batch)))
+        params.save(folder / f"benchmark_batch_size_{params.n_images_per_batch}_{params.n_templates_per_batch}.pkl")
         # print(f"  n_images_per_batch: {params.n_images_per_batch}")
         # print(f"  n_templates_per_batch: {params.n_templates_per_batch}")
 
@@ -120,11 +114,11 @@ if __name__ == "__main__":
     for params in params_n_pixels:
         torch.cuda.empty_cache()
         params.t_ms = benchmark_cross_correlation(params)
-        params.save(os.path.join(folder, "benchmark_n_pixels_%d.pkl" % (params.n_pixels)))
+        params.save(folder / f"benchmark_n_pixels_{params.n_pixels}.pkl" )
         # print(f"  n_pixels: {params.n_pixels}")
 
     params_n_displacements : list[Parameters] = make_n_displacements_params()
     for params in params_n_displacements:
         torch.cuda.empty_cache()
         params.t_ms = benchmark_cross_correlation(params)
-        params.save(os.path.join(folder, "benchmark_n_displacements_%d.pkl" % (params.n_displacements_x * params.n_displacements_y)))
+        params.save(folder / f"benchmark_n_displacements_{(params.n_displacements_x * params.n_displacements_y)}.pkl")

@@ -46,7 +46,7 @@ class Precision(Enum):
 
         Returns:
             tuple[dtype, dtype, dtype]: Torch float-type, complex-type, and int-type
-        for the requested precision.
+                for the requested precision.
         """
         if default == Precision.DEFAULT:
             raise ValueError("The 'default' parameter cannot also be Default: you must say what the default is.")
