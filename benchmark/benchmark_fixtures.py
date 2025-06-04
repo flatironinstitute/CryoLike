@@ -1,13 +1,13 @@
 import torch
 import numpy as np
-from unittest.mock import Mock
 import pickle
+from pathlib import Path
 
-from scipy.special import jv
 from torch import Tensor
+import numpy as np
 from numpy import pi
 
-from cryolike.grids import PolarGrid, CartesianGrid2D
+from cryolike.grids import PolarGrid
 from cryolike.stacks import Templates
 from cryolike.metadata import ViewingAngles
 from cryolike.microscopy import CTF
@@ -88,7 +88,7 @@ class Parameters:
         )
 
 
-    def save(self, filename: str):
+    def save(self, filename: Path):
         with open(filename, 'wb') as f:
             pickle.dump(self, f)
 
@@ -124,7 +124,7 @@ def make_n_displacements_params() -> list[Parameters]:
 
 
 
-def make_mock_polar_grid(n_pixels: int) -> PolarGrid:
+def make_default_polar_grid(n_pixels: int) -> PolarGrid:
     radius_max = n_pixels / (2.0 * pi) * pi / 2.0
     dist_radii = 0.5 / (2.0 * pi) * pi / 2.0
     n_inplanes = n_pixels * 4
@@ -138,7 +138,7 @@ def make_mock_polar_grid(n_pixels: int) -> PolarGrid:
     return polar_grid
 
 
-def make_mock_viewing_angles(n_im: int, precision: Precision = Precision.SINGLE) -> ViewingAngles:
+def make_default_viewing_angles(n_im: int, precision: Precision = Precision.SINGLE) -> ViewingAngles:
     (torch_float_type, _, _) = precision.get_dtypes(default=Precision.SINGLE)
     azimus = torch.linspace(0, 2 * np.pi, n_im, dtype=torch_float_type)
     polars = torch.linspace(0, np.pi, n_im, dtype=torch_float_type)
@@ -146,7 +146,7 @@ def make_mock_viewing_angles(n_im: int, precision: Precision = Precision.SINGLE)
     return ViewingAngles(azimus, polars, gammas)
 
 
-def make_mock_ctf(polar_grid: PolarGrid, anisotropy: bool = False, precision: Precision = Precision.SINGLE) -> CTF:
+def make_default_ctf(polar_grid: PolarGrid, anisotropy: bool = False, precision: Precision = Precision.SINGLE) -> CTF:
     _radius_shells = to_torch(polar_grid.radius_shells, precision, "cuda")
     _ctf_tensor = _radius_shells.unsqueeze(0)
     if anisotropy:
@@ -161,11 +161,11 @@ def make_mock_ctf(polar_grid: PolarGrid, anisotropy: bool = False, precision: Pr
     return ctf
 
 
-def make_mock_templates(polar_grid: PolarGrid, viewing_angles: ViewingAngles, precision: Precision = Precision.SINGLE) -> Templates:
-    def _mock_function(x: Tensor) -> Tensor:
+def make_default_templates(polar_grid: PolarGrid, viewing_angles: ViewingAngles, precision: Precision = Precision.SINGLE) -> Templates:
+    def _generator_function(x: Tensor) -> Tensor:
         return torch.amax(x, dim=-1) + torch.amin(x, dim=-1) * 1j
     templates = Templates.generate_from_function(
-        function=_mock_function,
+        function=_generator_function,
         viewing_angles=viewing_angles,
         polar_grid=polar_grid,
         precision=precision,
