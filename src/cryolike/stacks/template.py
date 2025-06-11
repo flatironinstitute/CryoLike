@@ -487,3 +487,16 @@ class Templates(Images):
             fourier_data = None
 
         return Images(phys_data, fourier_data, self.box_size, self.viewing_angles)
+    
+
+    def clone(self) -> "Templates":
+        """Returns a copy of the current templates object."""
+        phys_data = PhysicalImages(self.images_phys.clone(), pixel_size=self.phys_grid.pixel_size) if self.has_physical_images() else None
+        fourier_data = FourierImages(self.images_fourier.clone(), self.polar_grid) if self.has_fourier_images() else None
+        return Templates(
+            phys_data=phys_data,
+            fourier_data=fourier_data,
+            box_size=self.box_size,
+            viewing_angles=self.viewing_angles,
+            ctf=self.ctf
+        )

@@ -582,7 +582,7 @@ class Images:
     
     def normalize_images_phys(
         self,
-        ord: int = 1,
+        ord: int = 2,
         use_max: bool = False
     ):
         """Normalize the Cartesian-space images in the collection.
@@ -609,7 +609,7 @@ class Images:
 
     def normalize_images_fourier(
         self,
-        ord: int = 1,
+        ord: int = 2,
         use_max: bool = False,
     ):
         """Normalize the Fourier-space images in the collection.
@@ -782,3 +782,26 @@ class Images:
         self.phys_grid = CartesianGrid2D(_n_pixels_downsampled, _pixel_size_downsampled)
         self.box_size = self.phys_grid.box_size
         return self.images_phys
+
+
+    def clone(self) -> 'Images':
+        """Create a copy of this Images object.
+
+        Returns:
+            Images: A new Images object with the same properties and data.
+        """
+        new_images = Images(
+            phys_data=PhysicalImages(
+                images_phys=self.images_phys.clone(),
+                pixel_size=self.phys_grid.pixel_size.copy()
+            ),
+            fourier_data=FourierImages(
+                images_fourier=self.images_fourier.clone(),
+                polar_grid=self.polar_grid
+            ),
+            ctf=self.ctf,
+            viewing_angles=self.viewing_angles.clone(),
+            box_size=self.box_size.copy()
+        )
+        new_images.filename = self.filename
+        return new_images
