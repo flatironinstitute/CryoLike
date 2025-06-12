@@ -1,10 +1,29 @@
 from torch import Tensor, tensor, zeros_like, ones_like, float32, concatenate, rand, arccos
 from numpy import pi
+from pydantic import BaseModel, ConfigDict
 
 from cryolike.grids import SphereShell
 from cryolike.util import FloatArrayType, SamplingStrategy
 
 _Viewing_angle_type = FloatArrayType | Tensor
+
+class SerializedViewingAngles(BaseModel):
+    """Serialized version of ViewingAngles for use in serialization/deserialization."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    azimus: _Viewing_angle_type
+    polars: _Viewing_angle_type
+    gammas: _Viewing_angle_type | None = None
+    weights: _Viewing_angle_type | None = None
+
+    def deserialize(self) -> "ViewingAngles":
+        """Converts the serialized data back to a ViewingAngles object."""
+        return ViewingAngles(
+            azimus=self.azimus,
+            polars=self.polars,
+            gammas=self.gammas,
+            weights=self.weights
+        )
 
 class ViewingAngles:
     """Class storing the viewing angles, with weights, for a particular template/image stack.
@@ -29,11 +48,16 @@ class ViewingAngles:
     azimus: Tensor
     polars: Tensor
     gammas: Tensor
-    weights_viewing: Tensor
+    weights: Tensor
     n_angles: int
 
 
-    def __init__(self, azimus: _Viewing_angle_type, polars: _Viewing_angle_type, gammas: _Viewing_angle_type | None):
+    def __init__(self, 
+        azimus: _Viewing_angle_type, 
+        polars: _Viewing_angle_type, 
+        gammas: _Viewing_angle_type | None = None,
+        weights: _Viewing_angle_type | None = None
+    ):
         """Constructor for stack of viewing angles.
 
         Args:
@@ -59,7 +83,13 @@ class ViewingAngles:
         self.n_angles = len(self.azimus)
         if len(self.polars) != self.n_angles or len(self.gammas) != self.n_angles:
             raise ValueError("Azimus, Polars, and Gammas viewing angle tensors should be of the same length.")
-        self.weights_viewing = ones_like(self.azimus) / self.n_angles
+        
+        if weights is not None:
+            self.weights = weights if isinstance(weights, Tensor) else tensor(weights, dtype=float32)
+            if len(self.weights) != self.n_angles:
+                raise ValueError("Weights viewing angle tensor should be of the same length as azimus, polars, and gammas.")
+        else:
+            self.weights = ones_like(self.azimus) / self.n_angles
 
 
     @classmethod
@@ -74,7 +104,7 @@ class ViewingAngles:
         """
         viewing_shell = SphereShell(radius=1.0, dist_eq=viewing_distance, azimuthal_sampling=SamplingStrategy.ADAPTIVE, compute_cartesian=False)
         obj = cls(azimus=viewing_shell.azimu_points, polars=viewing_shell.polar_points, gammas=None)
-        obj.weights_viewing = tensor(viewing_shell.weight_points)
+        obj.weights = tensor(viewing_shell.weight_points)
         return obj
 
     
@@ -117,7 +147,21 @@ class ViewingAngles:
         azimus = concatenate([self.azimus, other.azimus], dim=0)
         polars = concatenate([self.polars, other.polars], dim=0)
         gammas = concatenate([self.gammas, other.gammas], dim=0)
-        weights_viewing = concatenate([self.weights_viewing, other.weights_viewing], dim=0)
+        weights_viewing = concatenate([self.weights, other.weights], dim=0)
         viewing_angles = ViewingAngles(azimus=azimus, polars=polars, gammas=gammas)
-        viewing_angles.weights_viewing = weights_viewing
+        viewing_angles.weights = weights_viewing
         return viewing_angles
+
+
+    def serialize(self) -> SerializedViewingAngles:
+        """Serializes the ViewingAngles object for storage or transmission.
+
+        Returns:
+            SerializedViewingAngles: A serialized version of the ViewingAngles object
+        """
+        return SerializedViewingAngles(
+            azimus=self.azimus,
+            polars=self.polars,
+            gammas=self.gammas,
+            weights=self.weights
+        )

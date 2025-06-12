@@ -15,7 +15,7 @@ from cryolike.util import (
     extract_unique_str
 )
 from cryolike.grids import CartesianGrid2D, PolarGrid
-from .viewing_angles import ViewingAngles
+from .viewing_angles import ViewingAngles, SerializedViewingAngles
 
 
 # TODO: Support for non-uniform grids and viewing angle sets
@@ -28,6 +28,7 @@ class SerializedImageDescriptor(BaseModel):
     n_inplanes: int
     precision: Precision
     viewing_distance: float | None
+    viewing_angles: SerializedViewingAngles | None
     atom_radii: float | FloatArrayType | None
     atom_selection: str | np.ndarray | None
     use_protein_residue_model: bool
@@ -141,6 +142,7 @@ class ImageDescriptor():
             n_inplanes=self.polar_grid.n_inplanes,
             precision=self.precision,
             viewing_distance=self.viewing_distance,
+            viewing_angles=self.viewing_angles.serialize() if self.viewing_angles is not None else None,
             atom_radii=self.atom_radii,
             atom_selection=self.atom_selection,
             use_protein_residue_model=self.use_protein_residue_model,
@@ -293,7 +295,7 @@ class ImageDescriptor():
             precision,
             _cartesian_grid,
             _polar_grid,
-            viewing_angles=None,
+            viewing_angles=_data.viewing_angles.deserialize() if _data.viewing_angles is not None else None,
             viewing_distance=_data.viewing_distance,
             atom_radii=_data.atom_radii,
             atom_selection=_data.atom_selection,
