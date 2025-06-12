@@ -351,7 +351,7 @@ def _get_integration_weights_points(templates: Templates, precision: Precision):
 
 
 def _get_log_weights_viewing(templates: Templates, precision: Precision, device: torch.device):
-    weights = templates.viewing_angles.weights_viewing
+    weights = templates.viewing_angles.weights
     weights_viewing = to_torch(weights, precision, device)
     weights_viewing /= weights_viewing.sum()
     return torch.log(weights_viewing).unsqueeze(0)
