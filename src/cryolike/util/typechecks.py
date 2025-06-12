@@ -1,11 +1,12 @@
 from math import isfinite
-from cryolike.util.types import FloatArrayType, IntArrayType
 from torch import Tensor, is_floating_point, is_complex, any
 import numpy as np
 
+from cryolike.util.types import FloatArrayType, IntArrayType
+
 
 def ensure_positive(x: float | int |  FloatArrayType | IntArrayType | Tensor, desc: str):
-    if type(x) in ['float', 'int']:
+    if type(x) in [float, int]:
         if (x <= 0.0):
             raise ValueError(f'Invalid value for {desc} (positive value required, received {x})')
     else:

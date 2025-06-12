@@ -8,12 +8,7 @@ from .typechecks import is_integral_torch_tensor
 from .types import FloatArrayType, ComplexArrayType
 
 
-def to_torch(array: torch.Tensor | np.ndarray, precision: Precision = Precision.DEFAULT, device = None):
-    # ## test if device is available
-    # if device is None:
-    #     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # elif not torch.cuda.is_available():
-    #     device = torch.device("cpu")
+def to_torch(array: torch.Tensor | np.ndarray, precision: Precision = Precision.DEFAULT, device: str | torch.device | None = None):
     device = get_device(device)
     if isinstance(array, torch.Tensor):
         current_precision = Precision.SINGLE if array.dtype in [torch.float32, torch.complex64, torch.int32] else Precision.DOUBLE

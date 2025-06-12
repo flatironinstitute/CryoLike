@@ -46,7 +46,7 @@ class Precision(Enum):
 
         Returns:
             tuple[dtype, dtype, dtype]: Torch float-type, complex-type, and int-type
-        for the requested precision.
+                for the requested precision.
         """
         if default == Precision.DEFAULT:
             raise ValueError("The 'default' parameter cannot also be Default: you must say what the default is.")
@@ -105,6 +105,13 @@ class CrossCorrelationReturnType(Enum):
     OPTIMAL_DISPLACEMENT = 3
     OPTIMAL_ROTATION = 4
     FULL_TENSOR = 10
+
+
+
+class InputFileType(Enum):
+    MRC = 1
+    PDB = 2
+    MEM = 3
 
 
 class AtomShape(Enum):

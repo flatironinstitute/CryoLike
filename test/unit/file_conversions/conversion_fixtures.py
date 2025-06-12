@@ -1,14 +1,14 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from typing import Literal
 import torch
 import numpy as np
-from os import path
+from pathlib import Path
 
 from cryolike.metadata import ImageDescriptor
 from cryolike.util import Precision
 from cryolike.metadata.lens_descriptor import LensDescriptor
-from cryolike.convert_particle_stacks.particle_stacks_pathing import OutputFilenames
-from cryolike.convert_particle_stacks.particle_stacks_converter import (
+from cryolike.file_mgmt import make_dir
+from cryolike.file_conversions.particle_stacks_converter import (
     ParticleStackConverter,
     DataSource,
     StarfileInput,
@@ -25,10 +25,10 @@ FIX_IMG_DESC = ImageDescriptor.from_individual_values(
     n_inplanes = 5,
 )
 
-FIX_OUTPUT_DIR = "my/output/"
+FIX_OUTPUT_DIR = "YOU_SHOULD_NOT_SEE_THIS/output/"
 
 
-def get_base_converter(**kwargs) -> ParticleStackConverter:
+def get_base_converter(tmp_path: Path, seed_files: list[str] = [], **kwargs) -> ParticleStackConverter:
     """Wrapper for the ParticleStackConverter constructor that prevents
     actually creating the output directories.
 
@@ -42,32 +42,13 @@ def get_base_converter(**kwargs) -> ParticleStackConverter:
         ParticleStackConverter: A ParticleStackConverter object ready for
             testing.
     """
-    # This is a somewhat hacky bit of mocking: we need to patch the OutputDirs ctor
-    # in creating the ParticleStackConverter, in order to avoid actually creating
-    # a bunch of directories.
-    # One option would be to use the built-in temp directory fixtures, but then
-    # that would need to be added to the parameter list and passed in to this function
-    # from every test that uses this function. Bleh.
-    # So instead I've opted to create a mock of the OutputFolders object and copy
-    # over the definitions from the real one, and make sure that the folder stubs
-    # are set up the way they are in the actual implementation.
-    # There is probably a more elegant way to do this, and we can expect it to start
-    # failing once we get around to centralizing our directory structure stuff.
-    # But for now, the test pass without touching the filesystem, so I'm calling it.
-    def get_output_fns(mock, i_stack):
-        phys_stack = path.join(mock.folder_output_particles_phys, f"particles_phys_stack_{i_stack:06}.pt")
-        fourier_base = path.join(mock.folder_output_particles_fft, f"particles_fourier_stack_{i_stack:06}")
-        fourier_stack = fourier_base + ".pt"
-        params_fn = fourier_base + ".npz"
-        return OutputFilenames(phys_stack, fourier_stack, params_fn)
-    
-    with patch("cryolike.convert_particle_stacks.particle_stacks_converter.OutputFolders") as mock:
-        mock.folder_output_plots = path.join(FIX_OUTPUT_DIR, 'plots')
-        mock.folder_output_particles_fft = path.join(FIX_OUTPUT_DIR, "fft")
-        mock.folder_output_particles_phys = path.join(FIX_OUTPUT_DIR, "phys")
-        mock.get_output_filenames = lambda x, y: get_output_fns(x, y)
+    f_out = tmp_path / FIX_OUTPUT_DIR
+    make_dir(f_out, '')
+    for x in seed_files:
+        p = f_out / x
+        p.write_text("")
 
-        return ParticleStackConverter(FIX_IMG_DESC, FIX_OUTPUT_DIR, **kwargs)
+    return ParticleStackConverter(FIX_IMG_DESC, str(f_out), **kwargs)
 
 
 def make_mock_imagestack(length: int = 10) -> Mock:
@@ -146,7 +127,7 @@ def make_datasource(
             selected_img_indices=np.arange(selection_count),
             selected_lensdesc_indices=np.arange(selection_count)
         )
-        return (type, rec)
+        return ('indexed', rec)
     elif type == 'sequential_cryosparc':
         rec = SequentialCryosparc(mrc_file=f"{base_data}.mrc")
         return (type, rec)
@@ -156,31 +137,4 @@ def make_datasource(
             selected_img_indices=np.arange(selection_count) + 16,
             selected_lensdesc_indices=np.arange(selection_count)
         )
-        return (type, rec)
-
-
-def configure_mock_OutputFolders(OutputFolders: Mock) -> Mock:
-    """Given a mock object used to patch the OutputFolders object, this
-    configures that object to return the expected filenames. The purpose
-    is to avoid modifying the actual filesystem, although that has been
-    largely superseded by the get_base_converter function.
-
-    Args:
-        OutputFolders (Mock): Stand-in for the OutputFolders object,
-            for stubbing out the actual object, which modifies the
-            filesystem during its construction.
-
-    Returns:
-        Mock: The input OutputFolders mock, configured for use in testing.
-    """
-    output_filenames = Mock()
-    output_filenames.phys_stack = "phys_stack"
-    output_filenames.fourier_stack = "fourier_stack"
-    output_filenames.params_filename = "params_filename"
-
-    OutputFolders.folder_output_plots = "output_plots"
-    OutputFolders.folder_output_particles_fft = "output_fft"
-    OutputFolders.folder_output_particles_phys = "output_phys"
-    OutputFolders.get_output_filenames = Mock(side_effect=lambda x: output_filenames)
-
-    return OutputFolders
+        return ('indexed', rec)

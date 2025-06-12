@@ -10,11 +10,11 @@ class TargetType(Enum):
     FLOAT = 2
 
 
-def project_scalar(scalar: int | float, dims: int) -> IntArrayType | FloatArrayType:
+def project_scalar(scalar: int | float | np.int_ | np.float64 | np.float32, dims: int) -> IntArrayType | FloatArrayType:
     """Returns a numpy array of appropriate dtype and dimension from a scalar input.
 
     Args:
-        scalar (int | float): The value to project to an array
+        scalar (int | float | np.int_ | np.float64 | np.float32): The value to project to an array
         dims (int): Dimension (1d) of the desired array
 
     Returns:
@@ -66,16 +66,16 @@ descriptor_types = int | float | list[int] | list[float] | IntArrayType | FloatA
 
 @overload
 def project_descriptor(descriptor: descriptor_types, label: str, dims: int, target_type: Literal[TargetType.INT]) -> IntArrayType:
-    ...
+    ... # pragma: no cover
 @overload
 def project_descriptor(descriptor: descriptor_types, label: str, dims: int, target_type: Literal[TargetType.FLOAT]) -> FloatArrayType:
-    ...
+    ... # pragma: no cover
 @overload
 def project_descriptor(descriptor: int_descriptors, label: str, dims: int, target_type: None) -> IntArrayType:
-    ...
+    ... # pragma: no cover
 @overload
 def project_descriptor(descriptor: float_descriptors, label: str, dims: int, target_type: None) -> FloatArrayType:
-    ...
+    ... # pragma: no cover
 def project_descriptor(descriptor: descriptor_types, label: str, dims: int, target_type: TargetType | None) -> IntArrayType | FloatArrayType:
     """Normalizes grid inputs to desired-length 1D vectors, with descriptive error checking.
 
@@ -101,7 +101,7 @@ def project_descriptor(descriptor: descriptor_types, label: str, dims: int, targ
             testval = descriptor
         if isinstance(testval, float):
             target_type = TargetType.FLOAT
-        elif isinstance(testval, int):
+        elif isinstance(testval, int) or isinstance(testval, np.integer):
             target_type = TargetType.INT
         else:
             raise ValueError("Unreachable: test val was neither float nor int")
@@ -141,11 +141,11 @@ def extract_unique_float(x: float | FloatArrayType, desc: str = '') -> float:
 def extract_unique_str(x: str | np.ndarray, desc: str = "") -> str:
     if isinstance(x, str):
         return x
-    v = unbox_unique(x, str, desc)
+    v = _unbox_unique(x, str, desc)
     return cast(str, v)
 
 
-def unbox_unique(x: np.ndarray | Any, target_type: type, desc: str = ""):
+def _unbox_unique(x: np.ndarray | Any, target_type: type, desc: str = ""):
     if not isinstance(x, np.ndarray):
         assert isinstance(x, target_type)
         return x

@@ -1,7 +1,10 @@
+import os
 import numpy as np
+import torch
 from typing import Union
 
 from .types import FloatArrayType
+from .enums import Precision
 
 _ATOMIC_RADIUS_RESNAME = {
     "CYS": 2.75, "PHE": 3.20, "LEU": 3.10, "TRP": 3.40,
@@ -18,15 +21,19 @@ def _random_coordinates(
     n_source: int = 16,
     radius: float = 1.0,
     random_seed: int = 0,
-) -> FloatArrayType:
-    np.random.seed(random_seed)
-    atomic_coordinates = np.random.normal(0, 1, (n_source, 3)) * radius
-    delta_f_ = np.linalg.norm(atomic_coordinates, axis = 1)
+    precision: Precision = Precision.DEFAULT
+) -> torch.Tensor:
+    torch.manual_seed(random_seed)
+    torch_float_type, _, _ = precision.get_dtypes(Precision.SINGLE)
+    atomic_coordinates = torch.randn((n_source, 3), dtype=torch_float_type) * radius
+    delta_f_ = torch.norm(atomic_coordinates, dim=1)
     tmp_r = radius / np.sqrt(2)
     tmp_filter_ = delta_f_ > tmp_r
-    if np.any(tmp_filter_):
-        atomic_coordinates[tmp_filter_, :] = atomic_coordinates[tmp_filter_, :] / delta_f_[tmp_filter_][:,None] * tmp_r
-    return atomic_coordinates
+    if torch.any(tmp_filter_):
+        atomic_coordinates[tmp_filter_, :] /= (
+            delta_f_[tmp_filter_][:, None] * tmp_r
+        )
+    return atomic_coordinates.unsqueeze(0)  # Add a frame dimension
 
 
 class AtomicModel:
@@ -40,17 +47,20 @@ class AtomicModel:
         box_size (float): The side length of the (square) viewing box in which the atoms
             reside.
     """
-    atomic_coordinates: FloatArrayType
-    atom_radii: np.ndarray
-    pdb_file: str
+    atomic_coordinates: torch.Tensor
+    atom_radii: torch.Tensor
+    top_file: str
+    trj_file: str
     box_size: float
-
+    n_frames: int
+    n_atoms: int
 
     def __init__(
         self,
-        atomic_coordinates: FloatArrayType | None = None,
-        atom_radii: Union[np.ndarray, float] = 0.1,
-        box_size: float | None = None
+        atomic_coordinates: torch.Tensor | FloatArrayType | None = None,
+        atom_radii: torch.Tensor | FloatArrayType | float | None = None,
+        box_size: float | None = None,
+        precision: Precision = Precision.DEFAULT,
     ) -> None:
         """Constructor for atomic/protein residue particle model.
 
@@ -65,78 +75,87 @@ class AtomicModel:
             box_size (float | None, optional): Side length of (square) viewing box for the
                 atomic model. Defaults to 2.0.
         """
+        self.torch_float_type, _, _ = precision.get_dtypes(Precision.SINGLE)
+        self.precision = precision
+        self.set_atomic_coordinates(atomic_coordinates)
+        self.set_atom_radii(atom_radii)
+        self.set_box_size(box_size)
+        self.check_inbound()
+
+        self.top_file = ""
+        self.trj_file = ""
+
+
+    def set_atomic_coordinates(self, atomic_coordinates: torch.Tensor | FloatArrayType | None) -> None:
+        if atomic_coordinates is None:
+            print("Atomic coordinates not specified. Using default random set of coordinates.")
+            self.atomic_coordinates = _random_coordinates(radius = self.box_size / 4, precision=self.precision)
+        elif isinstance(atomic_coordinates, torch.Tensor):
+            self.atomic_coordinates = atomic_coordinates
+        else: # assume numpy array
+            self.atomic_coordinates = torch.tensor(atomic_coordinates, dtype=self.torch_float_type)
+        if self.atomic_coordinates.ndim == 2:
+            # If 2D, assume a single frame and add a frame dimension
+            self.atomic_coordinates = self.atomic_coordinates.unsqueeze(0)
+        self.n_frames = self.atomic_coordinates.shape[0]
+        self.n_atoms = self.atomic_coordinates.shape[1]
+        assert isinstance(self.atomic_coordinates, torch.Tensor)
+        assert self.atomic_coordinates.ndim == 3, "Atomic coordinates must be a 3D array with shape (n_frames, n_atoms, 3)."
+        assert self.atomic_coordinates.shape[2] == 3, "Atomic coordinates must have shape (n_frames, n_atoms, 3)."
+
+
+    def set_box_size(self, box_size: float | None) -> None:
         if box_size is None:
             print("Box size not specified. Using default box_size = 2.0.")
             box_size = 2.0
-        # if not np.isscalar(box_size):
-        #     ## not supported yet
-        #     box_size = box_size[0] ## TODO: replace with proper handling
-        self.box_size = float(box_size)
-        if atomic_coordinates is None:
-            # raise ValueError("Atomic coordinates or pdb_file must be specified.")
-            print("Atomic coordinates or pdb_file not specified. Using default random set of coordinates.")
-            atomic_coordinates = _random_coordinates(radius = self.box_size / 4)
-        self.atomic_coordinates = atomic_coordinates
-        self.n_atoms = self.atomic_coordinates.shape[0]
+        assert isinstance(box_size, float) and box_size > 0, "Box size must be a positive float."
+        self.box_size = box_size
 
+
+    def set_atom_radii(self, atom_radii: torch.Tensor | FloatArrayType | float | None) -> None:
         if np.isscalar(atom_radii):
             assert isinstance(atom_radii, float)
-            self.atom_radii = np.ones(self.n_atoms) * float(atom_radii)
-        else:
-            assert isinstance(atom_radii, np.ndarray)
+            self.atom_radii = torch.ones(self.n_atoms) * float(atom_radii)
+        elif isinstance(atom_radii, np.ndarray):
+            self.atom_radii = torch.tensor(atom_radii, dtype=self.torch_float_type)
+        elif isinstance(atom_radii, torch.Tensor):
             self.atom_radii = atom_radii
-        self.pdb_file = ""
-        self.check_model()
-
-    
-    def set_atom_radii(self, atom_radii: np.ndarray) -> None:
-        self.atom_radii = atom_radii
-        if np.issubdtype(type(self.atom_radii), np.integer) or np.issubdtype(type(self.atom_radii), np.floating):
-            self.atom_radii = np.ones(self.n_atoms, dtype=np.float32) * self.atom_radii
-        self.check_model()
+        assert isinstance(self.atom_radii, torch.Tensor)
+        assert self.atom_radii.ndim == 1, "Atomic radii must be an 1D array."
+        assert self.atom_radii.shape[0] == self.n_atoms, "Atomic radii must match number of atoms."
 
 
-    def check_model(self) -> None:
-        if self.atomic_coordinates is None:
-            print("Atomic coordinates not specified. Defaulting to randomly chosen coordinates.")
-            self.atomic_coordinates = _random_coordinates(radius = self.box_size / 4)
-        if len(self.atomic_coordinates.shape) != 2:
-            raise ValueError("Atomic coordinates must be a 2D array.")
-        if self.atomic_coordinates.shape[1] != 3:
-            raise ValueError("atomic_coordinates.shape[1] != 3")
-        self.n_atoms = self.atomic_coordinates.shape[0]
-        ### Add check if atomic coordinates are within the box_size
-        ### ...
-        ###
-        if self.atom_radii is None:
-            # NOTE: This is different from the default in the constructor
-            print("Atomic radii not specified. Using default radii = 3.0.")
-            self.atom_radii = np.ones(self.n_atoms) * 3.0
-        if isinstance(self.atom_radii, np.ndarray):
-            if self.atom_radii.size != self.n_atoms:
-                raise ValueError("Number of atomic radii does not match the number of atomic coordinates.")
-            if np.any(self.atom_radii < 0):
-                raise ValueError("Atomic radii must be greater than 0.")
-        else:
-            if np.issubdtype(type(self.atom_radii), np.integer) or np.issubdtype(type(self.atom_radii), np.floating):
-                self.set_atom_radii(self.atom_radii)
-            else:
-                raise ValueError("Atomic radii must be a numpy array.")
+    def check_inbound(self) -> None:
+        """Check if all atomic coordinates and radii are within the defined box."""
+        assert isinstance(self.atomic_coordinates, torch.Tensor)
+        assert self.atomic_coordinates.ndim == 3, "Atomic coordinates must be a 3D array."
+        assert torch.all(self.atomic_coordinates >= -self.box_size / 2), "Atomic coordinates must be greater than or equal to -box_size/2."
+        assert torch.all(self.atomic_coordinates <= self.box_size / 2), "Atomic coordinates must be less than or equal to box_size/2."
+        assert isinstance(self.atom_radii, torch.Tensor)
+        assert self.atom_radii.ndim == 1, "Atomic radii must be a 1D array."
+        assert self.atom_radii.shape[0] == self.n_atoms, "Atomic radii must match number of atoms."
+        assert torch.all(self.atom_radii > 0), "Atomic radii must be positive."
+        assert torch.all(self.atom_radii < self.box_size / 2), "Atomic radii must be less than box_size/2."
 
 
     @classmethod
-    def read_from_pdb(cls,
-        pdb_file: str,
+    def read_from_traj(cls,
+        top_file: str,
+        trj_file: str = "",
+        stride: int = 1,
+        in_nanometer: bool = True,
         box_size: float | None = None,
-        atom_radii: np.ndarray | float | None = 0.1,
+        atom_radii: torch.Tensor | FloatArrayType | float | None = None,
         atom_selection: str | None = None,
-        centering: bool = True,
+        centering: bool = False,
         use_protein_residue_model: bool = True,
+        precision: Precision = Precision.DEFAULT
     ):
-        """Build an atomic model from a PDB file.
+        """Build an atomic model from a trajectory file.
 
         Args:
-            pdb_file (str): Path to the PDB file to load
+            top_file (str): Path to the topology file (PDB or other) to load
+            trj_file (str): Path to the trajectory file to load
             box_size (float | None, optional): Size of the viewing box. If None (the default),
                 a default box size defined in the AtomicModel constructor will be used.
             atom_radii (Union[np.ndarray, float], optional): Radii of the atoms, either
@@ -153,33 +172,56 @@ class AtomicModel:
         Returns:
             AtomicModel: Instantiated atomic model from the PDB file.
         """
-        if atom_radii is None and not use_protein_residue_model:
-            raise ValueError("Cannot read an atomic model from PDB if atom_radii is unset and use_protein_residue_model is False.")
-        from mdtraj import load_pdb, Trajectory, Topology
-        u: Trajectory = load_pdb(pdb_file, frame=0, no_boxchk=True)
-        assert u.xyz is not None
-        positions = u.xyz[0,:,:] * 10.0 ## convert from nanometer to Angstrom
-        if use_protein_residue_model:
+        torch_float_type, _, _ = precision.get_dtypes(Precision.SINGLE)
+        from mdtraj import load, Trajectory, Topology
+        assert os.path.exists(top_file), f"Topology file {top_file} does not exist."
+        if trj_file == "":
+            u = load(top_file, frame=0, no_boxchk=True)
+            _atomic_coordinates = torch.tensor(u.xyz, dtype=torch_float_type)
+        else:
+            assert os.path.exists(trj_file), f"Trajectory file {trj_file} does not exist."
+            u = load(trj_file, top=top_file, stride=stride, no_boxchk=True)
+            _atomic_coordinates = torch.tensor(u.xyz, dtype=torch_float_type)
+        if _atomic_coordinates.ndim == 2:
+            # If 2D, assume a single frame and add a frame dimension
+            _atomic_coordinates = _atomic_coordinates.unsqueeze(0)
+        if atom_radii is None:
+            assert use_protein_residue_model, "If atom_radii is None, use_protein_residue_model must be True."
             atom_selection = "name CA"
-            assert isinstance(u.topology, Topology)
             res = u.topology.residue
-            atom_radii = np.zeros(u.topology.n_residues, dtype = np.float32)
-            for i in range(u.topology.n_residues):
+            n_residues = u.topology.n_residues
+            assert isinstance(n_residues, int) and n_residues > 0, "Number of residues must be a positive integer."
+            _atom_radii = torch.zeros(n_residues, dtype=torch_float_type)
+            for i in range(n_residues):
                 resname = res(i).name
-                atom_radii[i] = _ATOMIC_RADIUS_RESNAME.get(resname, 3.0)    
-            print("atomic radii = ", atom_radii)
-        assert atom_radii is not None
+                _atom_radii[i] = _ATOMIC_RADIUS_RESNAME.get(resname, 3.0)
+            print("atomic radii = ", _atom_radii)
+        else:
+            _atom_radii = atom_radii
+        assert _atom_radii is not None, "Atomic radii must be specified."
         if atom_selection is not None:
-            assert isinstance(u.topology, Topology)
             indices = u.topology.select(atom_selection)
             if len(indices) == 0:
                 raise ValueError("No atoms selected.")
-            atomic_coordinates = positions[indices,:]
-        else:
-            atomic_coordinates = positions
-        atomic_coordinates = np.array(atomic_coordinates, dtype = np.float32)
+            _atomic_coordinates = _atomic_coordinates[:,indices,:]
+        if in_nanometer:
+            _atomic_coordinates = _atomic_coordinates * 10.0
+        print(f"Atomic coordinates shape: {_atomic_coordinates.shape}")
+        assert _atomic_coordinates.ndim == 3, "Atomic coordinates must be a 3D array with shape (n_frames, n_atoms, 3)."
+
         if centering:
-            atomic_coordinates = atomic_coordinates - np.mean(atomic_coordinates, axis = -2)
-        instance = cls(atomic_coordinates, atom_radii, box_size)
-        instance.pdb_file = pdb_file
-        return instance
+            _atomic_coordinates -= torch.mean(_atomic_coordinates, dim=1, keepdim=True)
+        atomic_model = cls(_atomic_coordinates, _atom_radii, box_size, precision)
+        atomic_model.top_file = top_file
+        atomic_model.trj_file = trj_file
+        return atomic_model
+
+
+    @classmethod
+    def clone(cls, atomic_model):
+        return cls(
+            atomic_coordinates=atomic_model.atomic_coordinates.clone(),
+            atom_radii=atomic_model.atom_radii.clone(),
+            box_size=atomic_model.box_size,
+            precision=atomic_model.precision
+        )

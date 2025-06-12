@@ -5,6 +5,7 @@ from cryolike.stacks import Templates
 from cryolike.metadata import ViewingAngles
 from cryolike.util import Precision, AtomShape, AtomicModel
 
+# TODO: parametrize to test on cpu, cuda
 def test_displacement():
 
     precision = Precision.DOUBLE
@@ -46,7 +47,7 @@ def test_displacement():
     tp = Templates.generate_from_positions(atomic_model=atomic_model, viewing_angles=viewing_angles, polar_grid=polar_grid, box_size=box_size, atom_shape=atom_shape, precision=precision)
     templates = tp.images_fourier
     assert templates is not None
-    templates_phys = tp.transform_to_spatial((n_pixels, pixel_size), use_cuda = True, precision = precision)
+    templates_phys = tp.transform_to_spatial((n_pixels, pixel_size), precision = precision)
     # images = Images.from_templates(templates = tp)
     images = tp.to_images()
     n_images = images.n_images
@@ -57,7 +58,7 @@ def test_displacement():
         y_displacements = y_displacements,
         precision = precision
     )
-    images.transform_to_spatial(grid=(n_pixels, pixel_size), use_cuda = True, precision = precision)
+    images.transform_to_spatial(grid=(n_pixels, pixel_size), precision = precision)
     del atomic_model
     images_phys_moveimage = images.images_phys
 
@@ -65,7 +66,7 @@ def test_displacement():
     atomic_coordinates += np.array([true_displacement_x, true_displacement_y, 0.0])
     atomic_model = AtomicModel(atomic_coordinates = atomic_coordinates, atom_radii = atom_radii)
     templates = Templates.generate_from_positions(atomic_model=atomic_model, viewing_angles=viewing_angles, polar_grid=polar_grid, box_size=box_size, atom_shape=atom_shape, precision=precision)
-    templates_phys = templates.transform_to_spatial((n_pixels, pixel_size), use_cuda = True, precision = precision)
+    templates_phys = templates.transform_to_spatial((n_pixels, pixel_size), precision = precision)
     images_phys_moveatom = templates_phys
     assert images_phys_moveatom is not None
 

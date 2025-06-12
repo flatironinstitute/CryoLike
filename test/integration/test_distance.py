@@ -11,9 +11,12 @@ from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood
 
 from time import time
 
+# NOTE: This consistently runs out of memory for me;
+# let's see if we can make it more efficient
+# (I have switched to running on CPU for now)
 def test_distance():
 
-    use_cuda = True
+    use_cuda = False
     device = torch.device("cuda") if use_cuda else torch.device("cpu")
     precision = Precision.SINGLE
     snr = 0.1
@@ -56,7 +59,7 @@ def test_distance():
 
     file_dir = Path(__file__).resolve()
     atomic_model = AtomicModel.read_from_pdb(pdb_file=str(file_dir.parent.parent.joinpath("data").joinpath("1uao.pdb")), box_size=box_size, use_protein_residue_model=True)
-    tp = Templates.generate_from_positions(atomic_model, viewing_angles, polar_grid, box_size, atom_shape, precision)
+    tp = Templates.generate_from_positions(atomic_model, viewing_angles, polar_grid, box_size, atom_shape=atom_shape, precision=precision)
 
     n_images = tp.n_images
     # defocus = np.random.uniform(300.0, 900.0, n_images)
@@ -91,7 +94,7 @@ def test_distance():
     )
     image.rotate_images_fourier_discrete(true_rotation)
     image.apply_ctf(ctf)
-    image.transform_to_spatial(grid=(n_pixels, pixel_size), use_cuda=use_cuda, precision=precision)
+    image.transform_to_spatial(grid=(n_pixels, pixel_size), device=device, precision=precision)
 
     cross_correlation_true = torch.ones(n_images, dtype = torch_float_type)
     optimal_template_S_true = torch.arange(n_images, dtype = torch.long)

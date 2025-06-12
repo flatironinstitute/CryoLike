@@ -6,7 +6,7 @@ from torch.testing import assert_close
 from pytest import raises, mark
 
 from cryolike.grids import PolarGrid, CartesianGrid2D
-from cryolike.util import Precision, NormType
+from cryolike.util import Precision, NormType, get_device
 
 from cryolike.stacks.image import (
     Images
@@ -97,9 +97,9 @@ def test_ctor_box_size_logic():
 
 def test_ctor_throws_if_no_images_provided():
     mock_polar_grid = Mock()
-    mock_polar_grid.__class__ = PolarGrid
+    mock_polar_grid.__class__ = PolarGrid           # type: ignore
     mock_phys_grid = Mock()
-    mock_phys_grid.__class__ = CartesianGrid2D
+    mock_phys_grid.__class__ = CartesianGrid2D      # type: ignore
 
     with raises(ValueError, match="No images provided"):
         _ = Images()
@@ -200,6 +200,28 @@ def test_has_images():
     sut = Images(fourier_data=make_mock_data_obj(f_imgs, mock_fgrid))
     assert sut.has_fourier_images()
     assert not sut.has_physical_images()
+
+
+def test_get_item_size():
+    n_im = 3
+    p_imgs = make_image_tensor(n_im, 6, 6)
+    mock_cgrid = make_mock_phys_grid(6, 6, 1.)
+    expected_size = (p_imgs.element_size() * p_imgs.nelement()) / n_im
+    sut = Images(phys_data=make_mock_data_obj(p_imgs, mock_cgrid))
+    assert sut.get_item_size('fourier') == 0
+    assert sut.get_item_size('physical') == expected_size
+
+    n_f_im = 12
+    f_imgs = make_image_tensor(n_f_im, 12, 16, target_fourier=True)
+    mock_fgrid = make_mock_polar_grid()
+    expected_size = (f_imgs.element_size() * f_imgs.nelement()) / n_f_im
+    sut = Images(fourier_data=make_mock_data_obj(f_imgs, mock_fgrid))
+    assert sut.get_item_size('physical') == 0
+    assert sut.get_item_size('fourier') == expected_size
+
+    with raises(NotImplementedError):
+        sut.get_item_size('unallowed') # type: ignore
+
 
 
 @patch("builtins.print")
@@ -486,7 +508,7 @@ def test_transform_to_fourier(mock_conv: Mock):
         images_phys = mock_cimg,
         eps = 1e-12,
         precision = Precision.DOUBLE,
-        use_cuda = True
+        device = get_device('cuda')
     )
     assert sut.images_fourier.shape[0] == n_imgs
     assert sut.images_fourier.shape[1] == 10
@@ -517,7 +539,7 @@ def test_transform_to_fourier_with_new_polar_grid(mock_conv: Mock):
         images_phys = mock_cimg,
         eps = 1e-12,
         precision = Precision.SINGLE,
-        use_cuda = True
+        device = get_device('cuda')
     )
     assert sut.polar_grid == mock_fgrid_nonu
     assert sut.images_fourier.shape[1] == mock_fimg_ret.shape[1]
@@ -555,7 +577,7 @@ def test_transform_to_spatial(mock_conv: Mock):
     assert_close(args["image_polar"].flatten(), mock_fimg.flatten())
     assert args["eps"] == 1e-12
     assert args["precision"] == Precision.DOUBLE
-    assert args["use_cuda"] == True
+    assert args["device"] == get_device(sut.images_fourier.device)
     assert sut.images_phys.device == sut.images_fourier.device
 
 
@@ -581,7 +603,7 @@ def test_transform_to_spatial_with_limit(mock_print: Mock, mock_conv: Mock):
     assert_close(args["image_polar"].flatten(), mock_fimg[:transform_limit].flatten())
     assert args["eps"] == 1e-12
     assert args["precision"] == Precision.DOUBLE
-    assert args["use_cuda"] == True
+    assert args["device"] == get_device(sut.images_fourier.device)
 
     mock_print.assert_called_once_with(f"Transforming only the first {transform_limit} images, probably for testing or plotting. Transformed images will be returned but not persisted.")
 
@@ -618,7 +640,7 @@ def test_transform_to_spatial_with_new_phys_grid(mock_conv: Mock, mock_print: Mo
     assert_close(args["image_polar"].flatten(), mock_fimg.flatten())
     assert args["eps"] == 1e-12
     assert args["precision"] == Precision.SINGLE
-    assert args["use_cuda"] == True
+    assert args["device"] == get_device(sut.images_fourier.device)
     assert sut.images_phys.device == sut.images_fourier.device
     mock_print.assert_called_once_with("Precision single provided, overriding the existing precision.")
 

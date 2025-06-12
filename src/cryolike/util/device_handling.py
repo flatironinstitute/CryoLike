@@ -1,13 +1,13 @@
 from torch import device, cuda
 from importlib.util import find_spec
 
-def check_cuda(use_cuda: bool) -> device:
-    if cuda.is_available() and use_cuda:
-        print("CUDA is available, using GPU.")
-        return device("cuda")
-    else:
-        print("CUDA is not available or not requested, using CPU.")
-        return device("cpu")
+# def check_cuda(use_cuda: bool) -> device:
+#     if cuda.is_available() and use_cuda:
+#         print("CUDA is available, using GPU.")
+#         return device("cuda")
+#     else:
+#         print("CUDA is not available or not requested, using CPU.")
+#         return device("cpu")
 
 
 def get_device(dev: str | device | None, verbose: bool = False) -> device:
@@ -49,12 +49,22 @@ def get_device(dev: str | device | None, verbose: bool = False) -> device:
     return device(dev)
 
 
-def check_nufft_status() -> str:
-    spec = find_spec('cufinufft')
-    if spec is not None:
-        if cuda.is_available():
-            return 'cuda'
-    spec = find_spec('finufft')
-    if spec is not None:
-        return 'cpu'
-    raise Exception("cuda is not available, and no (cpu) finufft is installed.")
+def check_nufft_installed(dev: device) -> None:
+    """Check for the availability of NUFFT libraries."""
+    if dev.type == 'cuda':
+        spec = find_spec('cufinufft')
+        if spec is None:
+            raise Exception("CUDA is requested, but cufinufft is not installed.")
+    else:
+        spec = find_spec('finufft')
+        if spec is None:
+            raise Exception("CPU is requested, but finufft is not installed.")
+    pass
+    # spec = find_spec('cufinufft')
+    # if spec is not None:
+    #     if cuda.is_available():
+    #         return device('cuda')
+    # spec = find_spec('finufft')
+    # if spec is not None:
+    #     return device('cpu')
+    # raise Exception("cuda is not available, and no (cpu) finufft is installed.")

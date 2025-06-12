@@ -130,7 +130,7 @@ class LensDescriptor():
         angleRotation: FloatArrayType | None = None,
         angleTilt: FloatArrayType | None = None,
         anglePsi: FloatArrayType | None = None,
-        ref_pixel_size: FloatArrayType | None = None,
+        ref_pixel_size: FloatArrayType | float | None = None,
         defocusAngle_degree: bool = True,
         phaseShift_degree: bool = True,
         files: np.ndarray | None = None,
@@ -155,7 +155,7 @@ class LensDescriptor():
             angleRotation (FloatArrayType | None): Optional per-image rotational angle
             angleTilt (FloatArrayType | None): Optional per-image rotational angle
             anglePsi (FloatArrayType | None): Optional per-image rotational angle
-            ref_pixel_size: (FloatArrayType | None, optional): If set, indicates the pixel
+            ref_pixel_size: (FloatArrayType | float | None, optional): If set, indicates the pixel
                 size recorded from a cryosparc descriptor file.
             defocusAngle_degree (bool, optional): If True (the default), defocus angle is
                 presumed to be in degrees; if False, defocus angle is treated as radians.

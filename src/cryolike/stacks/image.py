@@ -1,7 +1,9 @@
 from typing import Literal, Optional, cast
 import numpy as np
 import mrcfile
+from math import ceil
 import torch
+from torch import device
 
 from cryolike.grids import (
     CartesianGrid2D,
@@ -21,6 +23,7 @@ from cryolike.util import (
     ComplexArrayType,
     FloatArrayType,
     get_imgs_max,
+    get_device,
     IntArrayType,
     NormType,
     Precision,
@@ -45,7 +48,6 @@ def _project_displacements(displacements: torch.Tensor | FloatArrayType | float)
         return displacements
     if isinstance(displacements, np.ndarray):
         return torch.from_numpy(displacements)
-    # return torch.from_numpy(np.array([displacements], dtype = float)[None,:])
     return torch.tensor([[displacements]], dtype = torch.double)
 
 
@@ -194,6 +196,30 @@ class Images:
         return self.images_fourier.shape[0] > 0
 
 
+    def get_item_size(self, space: Literal['fourier'] | Literal['physical'] = 'fourier'):
+        """Returns the size, in bytes, of one image in the stack.
+
+        Args:
+            space ('fourier' | 'physical', optional): Whether to compute the size of the
+                physical or fourier representation. Defaults to 'fourier'.
+
+        Returns:
+            int: Per-image size, in bytes.
+        """
+        if space == 'fourier':
+            if not self.has_fourier_images():
+                return 0
+            imgs = self.images_fourier
+        elif space == 'physical':
+            if not self.has_physical_images():
+                return 0
+            imgs = self.images_phys
+        else:
+            raise NotImplementedError('Impossible branch')
+        total_size = imgs.element_size() * imgs.nelement()
+        return ceil(total_size / self.n_images)
+
+
     @classmethod
     def from_mrc(cls, filename: str, pixel_size: Optional[float | list[float] | FloatArrayType], device: str | torch.device = 'cpu'):
         """Create a new set of physical images from an MRC file.
@@ -322,7 +348,7 @@ class Images:
         polar_grid: Optional[PolarGrid] = None,
         nufft_eps: float = 1e-12,
         precision: Precision = Precision.DEFAULT,
-        use_cuda: bool = True       # TODO: Better to ask for a device
+        device: str | device | None = 'cuda'
     ):
         """Transform the physical images in this collection to Fourier-space representation. Existing
         physical images are kept. The new Fourier-space images will be placed on the same device as the
@@ -348,13 +374,14 @@ class Images:
             raise ValueError("No polar grid found")
         if precision == Precision.DEFAULT:
             precision = Precision.SINGLE if self.images_phys.dtype == torch.float32 else Precision.DOUBLE
+        _device = get_device(device)
         self.images_fourier = cartesian_phys_to_fourier_polar(
             grid_cartesian_phys = self.phys_grid,
             grid_fourier_polar = self.polar_grid,
             images_phys = self.images_phys,
             eps = nufft_eps,
             precision = precision,
-            use_cuda = use_cuda
+            device = _device
         )
         if self.polar_grid.uniform:
             self.images_fourier = self.images_fourier.reshape(self.n_images, self.polar_grid.n_shells, self.polar_grid.n_inplanes)
@@ -366,8 +393,8 @@ class Images:
         grid: CartesianGrid2D | Cartesian_grid_2d_descriptor | None = None,
         nufft_eps: float = 1e-12,
         precision: Precision = Precision.DEFAULT,
-        use_cuda: bool = True,
         max_to_transform: int = -1,
+        device: str | device | None = None
     ) -> torch.Tensor:
         """Transform the Fourier-space images in this collection to a Cartesian-space representation.
         Existing Fourier-space images are kept. The new images will be placed on the same device as the
@@ -398,7 +425,8 @@ class Images:
         if not persist_transformed:
             print(f"Transforming only the first {max_to_transform} images, probably for testing or plotting. Transformed images will be returned but not persisted.")
 
-        device = self.images_fourier.device
+        device = self.images_fourier.device if device is None else device
+        _device = get_device(device)
         images_fourier = self.images_fourier[:max_to_transform]
         images_fourier = images_fourier.reshape(images_fourier.shape[0], -1)
         if precision == Precision.DEFAULT:
@@ -413,7 +441,7 @@ class Images:
             image_polar = images_fourier,
             eps = nufft_eps,
             precision = precision,
-            use_cuda = use_cuda     # TODO: Better to ask for a device
+            device = _device
         ).real
         if persist_transformed:
             self.images_phys = images_phys.to(device)     # TODO: Make this configurable
@@ -554,7 +582,7 @@ class Images:
     
     def normalize_images_phys(
         self,
-        ord: int = 1,
+        ord: int = 2,
         use_max: bool = False
     ):
         """Normalize the Cartesian-space images in the collection.
@@ -581,7 +609,7 @@ class Images:
 
     def normalize_images_fourier(
         self,
-        ord: int = 1,
+        ord: int = 2,
         use_max: bool = False,
     ):
         """Normalize the Fourier-space images in the collection.
@@ -754,3 +782,26 @@ class Images:
         self.phys_grid = CartesianGrid2D(_n_pixels_downsampled, _pixel_size_downsampled)
         self.box_size = self.phys_grid.box_size
         return self.images_phys
+
+
+    def clone(self) -> 'Images':
+        """Create a copy of this Images object.
+
+        Returns:
+            Images: A new Images object with the same properties and data.
+        """
+        new_images = Images(
+            phys_data=PhysicalImages(
+                images_phys=self.images_phys.clone(),
+                pixel_size=self.phys_grid.pixel_size.copy()
+            ),
+            fourier_data=FourierImages(
+                images_fourier=self.images_fourier.clone(),
+                polar_grid=self.polar_grid
+            ),
+            ctf=self.ctf,
+            viewing_angles=self.viewing_angles.clone(),
+            box_size=self.box_size.copy()
+        )
+        new_images.filename = self.filename
+        return new_images

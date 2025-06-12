@@ -4,21 +4,20 @@ import os
 import torch
 import numpy as np
 from torch.testing import assert_close
+from pathlib import Path
 
-from cryolike.util import Precision
-from cryolike.stacks.make_templates_from_inputs_api import (
+from cryolike.util import Precision, InputFileType
+from cryolike.file_conversions.make_templates_from_inputs_api import (
     _make_plotter_fn,
-    _get_input_name,
     _make_templates_from_mrc_file,
     _make_templates_from_pdb_file,
     _make_templates_from_memory_array,
     _make_raw_template,
-    _get_template_output_filename,
+    _make_template_maker_fn,
     make_templates_from_inputs,
-    _set_up_directories,
 )
 
-PKG = "cryolike.stacks.make_templates_from_inputs_api"
+PKG = "cryolike.file_conversions.make_templates_from_inputs_api"
 
 
 def _get_mock_img_desc():
@@ -43,68 +42,32 @@ FLOAT_T = torch.float64
 DEV = torch.device("cpu")
 
 
-@mark.parametrize("with_plots", (True, False))
-def test_set_up_directories(tmp_path, with_plots):
-    out_dir = tmp_path / "my" / "output" / "directory"
-    plot_dir = out_dir / "plots"
-
-    res = _set_up_directories(out_dir, with_plots)
-    assert os.path.exists(out_dir)
-    if with_plots:
-        assert os.path.exists(plot_dir)
-        assert res == str(plot_dir)
-    else:
-        assert not os.path.exists(plot_dir)
-        assert res is None
-
-
 @patch(f"{PKG}.plot_power_spectrum")
 @patch(f"{PKG}.plot_images")
 def test_make_plotter_fn(plot_images: Mock, plot_pspec: Mock):
-    plotter = _make_plotter_fn("output_dir")
-    img_desc = Mock()
-    img_desc.cartesian_grid = Mock()
-    name = 'plotName'
-
+    plotter = _make_plotter_fn(True, _get_mock_img_desc())
     tp = Mock()
     tp.images_fourier = torch.tensor([])
     tp.has_fourier_images = lambda: len(tp.images_fourier) > 0
 
     # if there are no fourier templates, this should be a no-op
-    plotter(tp, img_desc, name)
+    plotter(tp, Mock())
     plot_images.assert_not_called()
 
     # This time we should see some activity
     tp.images_fourier = [1, 2, 3]
-    plotter(tp, img_desc, name)
+    plotter(tp, Mock())
     assert plot_images.call_count == 2
     plot_pspec.assert_called_once()
     n_taken = tp.transform_to_spatial.call_args[1]['max_to_transform']
     assert plot_images.call_args[1]['n_plots'] == n_taken
-    assert plot_pspec.call_args[1]['filename_plot'] == os.path.join("output_dir", f"power_spectrum_{name}.png")
 
 
 @patch(f"{PKG}.plot_images")
 def test_make_plotter_fn_no_op_when_no_output_dir(plot: Mock):
     plot.side_effect = ValueError("If this function is called, the test failed.")
-    plotter = _make_plotter_fn(None)
-    plotter(Mock(), Mock(), "")
-
-
-@patch("builtins.print")
-def test_get_input_name(_print: Mock):
-    file = "myfile.pdb"
-    (name, ext) = _get_input_name(file, 0)
-    assert name == "myfile"
-    assert ext == ".pdb"
-    _print.assert_called_once_with("Processing myfile.pdb...")
-    _print.reset_mock()
-
-    data = [1, 2, 3]
-    (name, ext) = _get_input_name(data, 4) # type: ignore
-    assert name == "tensor_4"
-    assert ext == ''
-    _print.assert_called_once()
+    plotter = _make_plotter_fn(False, _get_mock_img_desc())
+    plotter(Mock(), Mock())
 
 
 ## NOTE: The following tests to the individual make_templates functions
@@ -253,84 +216,90 @@ def test_make_templates_from_memory_array(physvol: Mock, vol: Mock, generate: Mo
 @patch(f"{PKG}._make_templates_from_mrc_file")
 @patch("builtins.print")
 def test_make_raw_template(_print: Mock, _mrc: Mock, _pdb: Mock, _mem: Mock):
-    mrc_inputs = ["mrc1.mrc", "mrc2.mrcs", "mrc3.map"]
-    pdb_inputs = ["pdb.pdb"]
+    mrc_input = (Path("mrc1.mrc"), "foo", InputFileType.MRC)
+    pdb_input = (Path("pdb1.pdb"), "foo", InputFileType.PDB)
     numpy_input = np.arange(3)
     torch_input = torch.arange(6)
-    array_inputs = [numpy_input, torch_input]
-    inputs = []
-    [inputs.extend(x) for x in [mrc_inputs, pdb_inputs, array_inputs]]
+    array_inputs = [(numpy_input, 'foo', InputFileType.MEM), 
+                    (torch_input, 'foo', InputFileType.MEM)]
     desc = _get_mock_img_desc()
     t_float = FLOAT_T
     dev = DEV
     verbose = True
 
-    for i, input in enumerate(inputs):
-        exp_name = os.path.splitext(input)[0] if isinstance(input, str) else f"tensor_{i}"
-        (tp, name) = _make_raw_template(input, i, desc, t_float, dev, verbose)
-        assert name == exp_name
+    _make_raw_template(mrc_input, desc, t_float, dev, verbose)
+    assert _mrc.call_count == 1
 
-    assert _mrc.call_count == len(mrc_inputs)
-    assert _pdb.call_count == len(pdb_inputs)
+    _make_raw_template(pdb_input, desc, t_float, dev, verbose)
+    assert _pdb.call_count == 1
+
+    for x in array_inputs:
+        _make_raw_template(x, desc, t_float, dev, verbose)
     assert _mem.call_count == len(array_inputs)
-    # one for the stated output filename of each input file, plus one for each input
-    assert _print.call_count == len(mrc_inputs) + len(pdb_inputs) + len(inputs)
 
 
-@mark.parametrize("existing_file_count", [0, 3])
-def test_get_template_output_filename(existing_file_count: int):
-    folder_out = "myfolder/"
-    name = "outname"
-    file_hits = [True] * existing_file_count
-    file_hits.append(False)
-    expected_prefix = f"templates_fourier_{name}"
-    expected_ordinal = f"_{existing_file_count}" if existing_file_count > 0 else ""
-    expected_name = f"{expected_prefix}{expected_ordinal}.pt"
-    expected_result = os.path.join(folder_out, expected_name)
-
-    with patch(f"{PKG}.os.path.exists") as exists:
-        exists.side_effect = file_hits
-        result = _get_template_output_filename(folder_out, name)
-        assert result == expected_result
+def test_make_raw_template_throws_on_bad_type():
+    input = ('foo', 'bar', -1)
+    with raises(ValueError, match="Unknown input format"):
+        _make_raw_template(input, Mock(), Mock(), Mock(), False) # type: ignore
 
 
-@patch(f"{PKG}.np.save")
-@patch(f"{PKG}.torch.save")
-@patch(f"{PKG}._make_plotter_fn")
-@patch(f"{PKG}._set_up_directories")
-def test_make_templates_from_inputs(setup_dirs: Mock, make_plotter: Mock, t_save: Mock, np_save: Mock):
+@patch(f"{PKG}._make_raw_template")
+def test_make_template_maker(_make_raw: Mock):
+    _tp = Mock()
+    _make_raw.return_value = _tp
+    
     desc = _get_mock_img_desc()
-    plots_dir = 'my-plots-dir'
-    setup_dirs.side_effect = lambda x, y: None if not y else plots_dir
+    t_float = torch.float64
+    device = torch.device('cpu')
+    verbose = True
+    input = ('foo', 'bar', 'baz')
+
+    sut = _make_template_maker_fn(desc, t_float, device, verbose)
+    returned_template = sut(input) # type: ignore
+    _make_raw.assert_called_once_with(input, desc, t_float, device, verbose)
+    assert returned_template == _tp
+    _tp.normalize_images_fourier.assert_called_once()
+
+
+@patch(f"{PKG}.TemplateFileManager")
+@patch(f"{PKG}._make_plotter_fn")
+@patch(f"{PKG}._make_template_maker_fn")
+def test_make_templates_from_inputs(make_reader: Mock, make_plotter: Mock, mgr_ctor: Mock):
+    desc = _get_mock_img_desc()
+    output_dir = 'my-plots-dir'
     plotter_fn = Mock()
     make_plotter.return_value = plotter_fn
+    reader_fn = Mock()
+    make_reader.return_value = reader_fn
     inputs = ['f1', 'f2']
+
+    filemgr = Mock()
+    filemgr.inputs_include_pdb_files = Mock(return_value=False)
+    mgr_ctor.return_value = filemgr
 
     with patch(f"{PKG}.ImageDescriptor.load") as load:
         load.return_value = desc
-        with patch(f"{PKG}._make_raw_template") as make_tp:
-            mock_templates = Mock()
-            make_tp.side_effect = lambda input, a, b, c, d, e: (mock_templates, input)
-
-            make_templates_from_inputs(inputs, 'params')
-
-            n_iter = len(inputs)
-            assert t_save.call_count == n_iter
-            assert isinstance(mock_templates.normalize_images_fourier, Mock )
-            mock_templates.normalize_images_fourier.assert_called_with(ord=2, use_max=False)
-            assert mock_templates.normalize_images_fourier.call_count == 2
-            assert np_save.call_count == 1
-
-
-@patch(f"{PKG}.check_cuda")
-def test_make_templates_from_inputs_no_op_on_empty_input_list(check_cuda: Mock):
-    inputs = []
-    make_templates_from_inputs(inputs, 'some filename')
-    check_cuda.assert_not_called()
+        make_templates_from_inputs(inputs, 'params', False, output_dir)
+    mgr_ctor.assert_called_once()
+    calls = mgr_ctor.call_args[0]
+    assert calls[0] == output_dir
+    assert calls[1] == False
+    assert calls[2] == inputs
+    assert calls[3] == reader_fn
+    assert calls[4] == plotter_fn
+    
+    filemgr.process_inputs.assert_called_once()
+    filemgr.save_file_list.assert_called_once()
 
 
-def test_make_templates_from_inputs_throws_on_unprocessable_pdb():
+@patch(f"{PKG}.TemplateFileManager")
+def test_make_templates_from_inputs_throws_on_unprocessable_pdb(mgr_ctor: Mock):
     inputs = ['some_pdb_file.pdb']
+    mgr = Mock()
+    mgr.inputs_include_pdb_files = Mock(return_value=True)
+    mgr_ctor.return_value = mgr
+
     descriptor = _get_mock_img_desc()
     descriptor.is_compatible_with_pdb = Mock(return_value=False)
 
@@ -338,17 +307,6 @@ def test_make_templates_from_inputs_throws_on_unprocessable_pdb():
         load.return_value = descriptor
         with raises(ValueError, match="To process PDB files"):
             make_templates_from_inputs(inputs, 'some filename')
-
-
-@mark.parametrize("inputlist", [["file.txt"], [-6.]])
-@patch(f"{PKG}._set_up_directories")
-def test_make_templates_from_inputs_throws_on_unknown_type(setup_dirs, inputlist):
-    descriptor = _get_mock_img_desc()
-    with patch(f"{PKG}.ImageDescriptor.load") as load:
-        load.return_value = descriptor
-        with raises(ValueError, match="Unknown input format"):
-            make_templates_from_inputs(list(inputlist), 'descriptor fn', output_plots=False)
-        load.assert_called_once_with('descriptor fn')
 
 
 @patch(f"{PKG}.ImageDescriptor")
@@ -362,24 +320,4 @@ def test_make_templates_from_inputs_no_ops_on_empty_input_list(img_desc: Mock):
     )
     img_desc.load.assert_not_called()
     assert no_op_result is None
-
-
-@patch(f"{PKG}.ImageDescriptor")
-def test_make_templates_from_inputs_throws_on_bad_input_types(img_desc: Mock):
-    bad_file = "input.xml"
-    descriptor = _get_mock_img_desc()
-    img_desc.load = Mock(return_value=descriptor)
-
-    with raises(ValueError, match="Unknown input format"):
-        _ = make_templates_from_inputs(
-            list_of_inputs=[bad_file],
-            image_parameters_file="filename.npz"
-        )
-    
-    obviously_not_data = 5.0
-    with raises(ValueError, match="Unknown input format"):
-        _ = make_templates_from_inputs(
-            list_of_inputs=[obviously_not_data], # type: ignore
-            image_parameters_file="filename.npz"
-    )
 

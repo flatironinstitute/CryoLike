@@ -1,65 +1,35 @@
-from typing import Sequence
+from __future__ import annotations
+
+from typing import Sequence, TYPE_CHECKING
 import torch
 import numpy as np
-import os
+from pathlib import Path
 
-from .template import Templates
-from cryolike.util import Precision, AtomicModel, check_cuda
+if TYPE_CHECKING: # pragma: no cover
+    from cryolike.file_mgmt import TEMPLATE_INPUT_DESC, TemplateOutputFiles
+
+from cryolike.stacks.template import Templates
+from cryolike.metadata import ImageDescriptor
+from cryolike.util import Precision, AtomicModel, get_device, InputFileType
+from cryolike.file_mgmt import TemplateFileManager
 from cryolike.grids import Volume, PhysicalVolume
 from cryolike.plot import plot_images, plot_power_spectrum
-from cryolike.metadata import ImageDescriptor
-
-MRC_EXTENSIONS = ['.mrc', '.mrcs', '.map']
-PDB_EXTENSIONS = ['.pdb']
 
 
-def _set_up_directories(folder_output: str, output_plots: bool) -> str | None:
-    """Safely create the requested output directory and, optionally,
-    the directory for storing plots. If outputting plots wasn't requested,
-    return None as the plot output directory, which is a signal elsewhere
-    that plots aren't requested.
-
-    Args:
-        folder_output (str): Target for the output templates
-        output_plots (bool): Whether plots were requested, in which case
-            a child directory will be created for them and returned.
-
-    Returns:
-        (str | None): None, if no plots requested; else, the directory
-            where plots should be written.
-    """
-
-    os.makedirs(folder_output, exist_ok = True)
-    if output_plots:
-        folder_output_plots = os.path.join(folder_output, 'plots')
-        os.makedirs(folder_output_plots, exist_ok = True)
-    return folder_output_plots if output_plots else None
-
-
-def _make_plotter_fn(plot_output_dir: str | None):
-    def _no_op(tp: Templates, params: ImageDescriptor, name: str):
+def _make_plotter_fn(output_plots: bool, params: ImageDescriptor):
+    def _no_op(tp: Templates, names: TemplateOutputFiles):
         ...  # "function body intentionally left blank"
-    if plot_output_dir is None:
+    if not output_plots:
         return _no_op
-    def _generate_plots(tp: Templates, params: ImageDescriptor, name: str):
+    def _generate_plots(tp: Templates, names: TemplateOutputFiles):
         if not tp.has_fourier_images():
             return
-        plot_images(tp.images_fourier, grid=tp.polar_grid, n_plots=16, filename=os.path.join(plot_output_dir, "templates_fourier_%s.png" % name), show=False)
-        plot_power_spectrum(source=tp, filename_plot=os.path.join(plot_output_dir, "power_spectrum_%s.png" % name), show=False)
+        
+        plot_images(tp.images_fourier, grid=tp.polar_grid, n_plots=16, filename=str(names.fourier_images_plot_file.absolute()), show=False)
+        plot_power_spectrum(source=tp, filename_plot=str(names.power_plot_file.absolute()), show=False)
         templates_phys = tp.transform_to_spatial(grid=params.cartesian_grid, max_to_transform=16)
-        plot_images(templates_phys, grid=params.cartesian_grid, n_plots=16, filename=os.path.join(plot_output_dir, "templates_phys_%s.png" % name), show=False)
+        plot_images(templates_phys, grid=params.cartesian_grid, n_plots=16, filename=str(names.physical_images_plot_file.absolute()), show=False)
     return _generate_plots
-
-
-def _get_input_name(input: str | torch.Tensor | np.ndarray, iteration_count: int) -> tuple[str, str]:
-    # TODO: optional verbosity flag to avoid print statements
-    if isinstance(input, str):
-        print(f"Processing {input}...")
-        return os.path.splitext(os.path.basename(input))
-    else: # input must be in-memory array
-        print(f"Processing numpy array or torch tensor [input {iteration_count}]...")
-        name = f"tensor_{iteration_count}"
-        return (name, '')
 
 
 def _make_templates_from_mrc_file(
@@ -136,49 +106,42 @@ def _make_templates_from_memory_array(
     )
 
 
-def _inputs_include_pdb_files(inputs: Sequence):
-    for x in inputs:
-        if not isinstance(x, str):
-            continue
-        (_, ext) = os.path.splitext(os.path.basename(x))
-        if ext in PDB_EXTENSIONS:
-            return True
-    return False
-
-
 def _make_raw_template(
-    input: str | np.ndarray | torch.Tensor,
-    iteration_cnt: int,
+    input: TEMPLATE_INPUT_DESC,
     descriptor: ImageDescriptor,
     t_float: torch.dtype,
     device: torch.device,
     verbose: bool
 ):
-    (name, extension) = _get_input_name(input, iteration_cnt)
-    if isinstance(input, str):
-        # TODO: it might be better to do a more reliable test
-        if extension in MRC_EXTENSIONS:
-            print("mrc_name:", name)
-            tp = _make_templates_from_mrc_file(input, descriptor, t_float, device, verbose)
-        elif extension in PDB_EXTENSIONS:
-            print(f"pdb_name: {name}")
-            tp = _make_templates_from_pdb_file(input, descriptor, verbose)
-        else:
-            raise ValueError("Unknown input format")
-    elif isinstance(input, np.ndarray) or isinstance(input, torch.Tensor):
-        tp = _make_templates_from_memory_array(input, descriptor, t_float, device, verbose)
+    (src, _, ftype) = input
+    if ftype == InputFileType.MRC:
+        assert isinstance(src, Path)
+        src_fn = str(src.absolute())
+        tp = _make_templates_from_mrc_file(src_fn, descriptor, t_float, device, verbose)
+    elif ftype == InputFileType.PDB:
+        assert isinstance(src, Path)
+        src_fn = str(src.absolute())
+        tp = _make_templates_from_pdb_file(src_fn, descriptor, verbose)
+    elif ftype == InputFileType.MEM:
+        assert isinstance(src, torch.Tensor) or isinstance(src, np.ndarray)
+        tp = _make_templates_from_memory_array(src, descriptor, t_float, device, verbose)
     else:
         raise ValueError("Unknown input format")
-    return (tp, name)
+
+    return tp
 
 
-def _get_template_output_filename(folder_output: str, name: str) -> str:
-    template_file = os.path.join(folder_output, f"templates_fourier_{name}.pt")
-    same_name_count = 0
-    while (os.path.exists(template_file)):
-        same_name_count += 1
-        template_file = os.path.join(folder_output, f"templates_fourier_{name}_{same_name_count}.pt")
-    return template_file
+def _make_template_maker_fn(
+        descriptor: ImageDescriptor,
+        t_float: torch.dtype,
+        device: torch.device,
+        verbose: bool = False
+):
+    def maker(input: TEMPLATE_INPUT_DESC) -> Templates:
+        tp = _make_raw_template(input, descriptor, t_float, device, verbose)
+        tp.normalize_images_fourier(ord=2, use_max=False)
+        return tp
+    return maker
 
 
 # TODO: expose parameters for template normalization
@@ -213,20 +176,14 @@ def make_templates_from_inputs(
     descriptor = ImageDescriptor.load(image_parameters_file)
     precision = Precision.from_str(descriptor.precision)
     (t_float, _, _) = precision.get_dtypes(default=Precision.SINGLE)
-    device = check_cuda(True)
+    device = get_device(None)
+    reader_fn = _make_template_maker_fn(descriptor, t_float, device, verbose)
+    plotter_fn = _make_plotter_fn(output_plots, descriptor)
+    
+    filemgr = TemplateFileManager(folder_output, output_plots, list_of_inputs, reader_fn, plotter_fn, verbose)
 
-    if _inputs_include_pdb_files(list_of_inputs) and not descriptor.is_compatible_with_pdb():
+    if filemgr.inputs_include_pdb_files() and not descriptor.is_compatible_with_pdb():
         raise ValueError("To process PDB files, you must either set an atom_radii or set use_protein_residue_model=True.")
 
-    plots_output_dir = _set_up_directories(folder_output, output_plots)
-    plotter_fn = _make_plotter_fn(plots_output_dir)
-    template_file_list = []
-    for i, input in enumerate(list_of_inputs):
-        (tp, name) = _make_raw_template(input, i, descriptor, t_float, device, verbose)
-        tp.normalize_images_fourier(ord=2, use_max=False)
-        plotter_fn(tp, descriptor, name)
-        template_file = _get_template_output_filename(folder_output, name)
-        torch.save(tp.images_fourier, template_file)
-        template_file_list.append(template_file)
-
-    np.save(os.path.join(folder_output, 'template_file_list.npy'), template_file_list)
+    filemgr.process_inputs()
+    filemgr.save_file_list()

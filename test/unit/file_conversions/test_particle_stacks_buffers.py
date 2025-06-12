@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import torch.testing as tt
 import torch
 
-from cryolike.convert_particle_stacks.particle_stacks_buffers import (
+from cryolike.file_conversions.particle_stacks_buffers import (
     ImgBuffer
 )
 

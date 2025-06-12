@@ -5,3 +5,4 @@ from .particle_stacks_wrappers import (
     convert_particle_stacks_from_star_files,
     convert_particle_stacks_from_indexed_star_files
 )
+from .make_templates_from_inputs_api import make_templates_from_inputs

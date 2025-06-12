@@ -12,8 +12,7 @@ from .array import (
 from .atomic_model import AtomicModel
 
 from .device_handling import (
-    check_cuda,
-    check_nufft_status,
+    check_nufft_installed,
     get_device
 )
 
@@ -21,6 +20,7 @@ from .enums import (
     AtomShape,
     Basis,
     CrossCorrelationReturnType,
+    InputFileType,
     NormType,
     Precision,
     QuadratureType,
@@ -55,7 +55,8 @@ from .types import (
     Voxel_size_type,
     Voxels_count_type,
 
-    Cartesian_grid_2d_descriptor
+    Cartesian_grid_2d_descriptor,
+    OutputConfiguration
 )
 
 from .post_process_output import (

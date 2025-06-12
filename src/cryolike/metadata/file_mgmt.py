@@ -1,7 +1,16 @@
+from pathlib import Path
+
 from cryolike.util import save_descriptors, load_file
 from .lens_descriptor import LensDescriptor
 from .image_descriptor import ImageDescriptor
 
+
+# NOTE:
+# This file belongs in metadata instead of util or filemgmt
+# because it needs to import the descriptors. Since the descriptors
+# also need to import the basic file management functionality,
+# putting this file alongside basic file management would create
+# a circular import situation, even if it would be perhaps more logical
 
 
 def save_combined_params(
@@ -25,7 +34,7 @@ def save_combined_params(
                      overwrite=overwrite)
 
 
-def load_combined_params(fn: str):
+def load_combined_params(fn: str | Path):
     data = load_file(fn)
     img_desc = ImageDescriptor.from_dict(data)
     lens_desc = LensDescriptor.from_dict(data)

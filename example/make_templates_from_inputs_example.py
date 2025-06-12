@@ -1,6 +1,6 @@
 import os
 
-from cryolike.stacks import make_templates_from_inputs
+from cryolike.file_conversions import make_templates_from_inputs
 
 # Assume you have already run set_image_parameters_example with the same
 # value of folder_output.
