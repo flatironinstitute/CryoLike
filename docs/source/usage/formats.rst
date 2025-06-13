@@ -1,7 +1,7 @@
 File formats for image conversion
 ##########################################
 
-Image conversion (from captured particle files) requires both an
+Image conversion (from mrc or cryoSPARC particle files) requires both an
 :doc:`image descriptor</usage/imageSettings>` and capture apparatus
 metadata. The image descriptor defines the grids and scales to use
 to interpret the image and is usually constructed from base values.
@@ -11,9 +11,8 @@ in either Starfile or CryoSparc format. Since these file formats
 are potentially quite loosely defined, here we discuss the exact
 formats currently supported.
 
-Note that, regardless of format, we always expect that there will
-be either a single CTF (applied to all images) or one CTF per
-image in the stack. Additionally, defocus information (and
+Note that, regardless of format, we always expect that there will one CTF per
+image in the stack. Therefore, defocus information (and
 phase shift information, if present) need to be available for
 each captured image.
 

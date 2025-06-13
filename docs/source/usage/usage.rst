@@ -31,9 +31,9 @@ Overview
 ------------------------
 
 The purpose of the CryoLike package is to allow users to compare 2D images
-(captured through CryoEM) with potential 3D structures from reference sources,
-in order to determine the likelihood of each fit under a given set of
-possible alignments and transpositions of the imaged particles.
+(captured through Cryo-EM) with potential 3D structures from reference sources,
+in order to determine the likelihood of each image under a given set of
+possible rotations and translations of projections of the 3D structure (templates).
 
 Data files
 ##########
@@ -41,14 +41,16 @@ Data files
 The two data types--known structures and experimental images--give rise to two
 types of data files:
 
-- *Templates*, which are sets of 2D projections of 3D pose configurations; and
-- *Images*, or stacks of experimentally-captured cryo-em radiographs
+- *Templates*, which are sets of 2D projections of a 3D structure or map at known viewing directions (poses) and
+- *Images*, or stacks of experimentally-captured cryoEM particle stacks
 
-To make comparisons, the user must first *generate the Templates* (by
-projecting the pose configurations into 2D space in several different configurations),
-and *convert the radiographs* into the representation that CryoLike can handle.
+The user should begin by setting the imaging and cryoLike parameters [TODO: explain and reference]
 
-The output of these processes are the Image and Template stacks used in running the likelihood
+Then, the user must *generate the Templates* by
+projecting the 3D structres into 2D images space,
+and *convert the particles* into the representation that CryoLike can handle.
+
+The output of these processes are the parameter files, and the Image and Template stacks used to running the likelihood
 comparison. These are stored as `.pt` (Pytorch Tensor) files.
 
 In addition to the Images and Templates files, CryoLike also stores *metadata* files that describe
@@ -56,22 +58,24 @@ how to interpret them. This includes:
 
 - Data that is relevant to both file types (such as the
   Cartesian-space and Fourier-space discretization grids used to interpret the 2D representations),
-- Data that is specific to Templates (such as how atomic structures were interpreted), and
-- Data that is specific to captured Images (such as the capture device properties,
+- Data that is specific to Templates (such as how the atomic structures were interpreted), and
+- Data that is specific to Images (such as the microscope properties,
   contrast transfer function, etc.)
 
 A meaningful comparison between Images and Templates depends on compatible metadata. Thus,
 CryoLike's likelihood computation checks metadata compatibility for every Image and Template stack.
 
 
-Creating image settings
+Creating parameter settings
 ------------------------
 
 CryoLike's representations of images depend upon two grids: one in two-dimensional Cartesian space,
-and one in Fourier space (with polar coordinates). These grids, along with a precision (single or double),
+and one in Fourier space with polar coordinates. These grids, along with a precision (single or double),
 make up the required fields of the ``ImageDescriptor`` object. The object also has optional fields which
 control how CryoLike makes Templates from reference structures; the optional fields are not used when
 creating or interpreting Images.
+
+[TODO: I THINK THIS CHANGED]
 
 The first step to a CryoLike run is to create an image descriptor file. Once this file is present,
 you can proceed with Templates creation and Images conversion. These may be done in parallel, if you
@@ -106,8 +110,8 @@ details about the available parameters, supported formats, and links to the rele
 Converting images
 ------------------------
 
-CryoLike currently supports reading CryoSparc and Starfile image sources (where the images
-proper are stored in ``.mrc`` format). Several input formats are supported. The conversion
+CryoLike currently supports reading CryoSparc and Starfile image sources and images
+stored in ``.mrc`` format. The conversion
 process also handles restacking Images into standard sizes.
 
 Converted Images stacks will be stored in a standard directory structure. Each stack will have
@@ -121,10 +125,10 @@ For more details about the available options for Image conversion, see the
 details about the available parameters, supported formats, and links to relevant API calls.
 
 
-Running Likelihood
+Running the Likelihood computation
 ------------------------
 
-CryoLike supports a rich variety of likelihood data, with several options for which
+CryoLike outputs a variety of optimal pose and likelihood data, with several options for which
 degrees of freedom to consider and how to aggregate the likelihoods.
 
 For a basic example of running likelihood, see the

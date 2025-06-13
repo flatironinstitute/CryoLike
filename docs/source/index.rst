@@ -17,9 +17,11 @@ Welcome to CryoLike's documentation!
    :titlesonly:
    :caption: Documentation Contents:
 
+   about
    installation
    first-steps
    usage/usage
-   examples/example
+   examples/
+   tutorial/
 .. 
    pythonapi/modules

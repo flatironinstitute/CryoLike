@@ -1,8 +1,8 @@
-Match Likelihood Computation
+Image-to-Structure Likelihood Computation
 ##########################################
 
-The main output of CryoLike is the likelihood of a match between the input ``Images``
-and ``Templates``.
+The main output of CryoLike is the likelihood of between each input ``Images``
+and ``Templates`` created from 3D structures.
 
 .. contents:: Table of Contents
 
@@ -10,12 +10,12 @@ Overview
 ==========
 
 At its heart, CryoLike offers a way to compute the likelihood of a given
-observed 2D image corresponding to a particular estimated 3D structure.
+observed 2D image corresponding to a particular 3D structure.
 
 CryoLike likelihood comparisons are based on comparing a stack of
-images with one or more template image sets.
+images with one or more templates sets.
 
-:doc:`Template image sets</usage/templateCreation>` are usually one 3D
+:doc:`Templates sets</usage/templateCreation>` are images of one 3D
 molecule projected onto the image space from a number of
 different viewing angles. Images will be compared against these templates
 at a number of different rotations and displacements, and the results
@@ -28,17 +28,27 @@ can be returned with several different means of aggregation.
     set of images to loop over.
 
 
-Possible Return Types
+Possible Outputs
 =========================
 
-CryoLike can return the following aggregation levels of the data.
+CryoLike can return the following aggregation levels of the computations.
 
 Note that these correspond to the ``NamedTuple`` return-type classes defined in
 ``cross_correlation_likelihood.py``. For more detail, see [TODO: ACTUAL API XREF].
 
+
+Integrated Log Likelihood
+******************************
+
+In addition to the possible aggregation settings above, the user can select
+whether or not to 
+include the integrated log likelihood of each pairing as
+an additional member of the return. If so, TODO: EXPLAIN MORE
+
+
 .. _optimal_pose:
 
-Optimal Pose
+Optimal Pose Outputs
 ***************
 
 This will return 5 1-dimensional Tensors, indexed by the image sequence index:
@@ -148,14 +158,6 @@ The Tensor is ``cross_correlation_SMdw``.
 TODO: SAY SOMETHING ABOUT THE FACT WE USE ONLY A SINGLE INDEX FOR DISPLACEMENT
 
 
-Integrated Log Likelihood
-******************************
-
-In addition to the possible aggregation settings above, the user can select
-whether or not to 
-include the integrated log likelihood of each pairing as
-an additional member of the return. If so, TODO: EXPLAIN MORE
-
 
 Interface
 ==============
@@ -189,7 +191,6 @@ The ``run_likelihood`` function takes the following parameters:
  - Flags to configure which output files are written
  
    - ``return_likelihood_integrated_pose_fourier``
-   - ``return_likelihood_optimal_pose_physical``
    - ``return_likelihood_optimal_pose_fourier``
    - ``return_optimal_pose``
    - ``optimized_inplane_rotation``
@@ -217,8 +218,6 @@ to be located under the directory specified by ``folder_particles``. Specificall
    - ``NUMBER`` here is a six-digit 0-padded increment starting from 0
    - Every image file should have a correspondingly-named metadata file with an ``.npz`` extension
  
- - If ``return_likelihood_optimal_pose_physical`` is requested, there must also exist corresponding
-   image stacks in physical space under ``folder_particles/phys/particles_phys_stack_NUMBER.pt``
 
 It is anticipated that users may wish to run these comparisons in parallel, especially when a cluster
 environment is available; hence the need for the ``i_template`` parameter.
@@ -251,9 +250,6 @@ be written.
 If true, we will additionally write a Tensor with the integrated log likelihood of the
 Fourier-space cross correlation TODO: ACTUALLY EXPLAIN THIS
 
-   - ``return_likelihood_optimal_pose_physical``
-
-If true, we will additionally write a Tensor with TODO
 
    - ``return_likelihood_optimal_pose_fourier``
 
@@ -269,39 +265,6 @@ If this is set to true, the remaining three options will be ignored.
 The remaining three options can be set individually, but the output will
 depend on the chosen combination.
 
-.. admonition:: Note:
-
-  The following are not yet implemented.
-
-    - ``optimized_inplane_rotation``
-
-  If true and ``optimized_displacement`` is false, we will
-  output the Tensors described under
-  :ref:`the Optimized Rotation section<optimized_rotation>` above.
-
-
-    - ``optimized_displacement``
-
-  If true and ``optimized_rotation`` is false, we will
-  output the Tensors described under
-  :ref:`the Optimized Displacement section<optimized_displacement>` above.
-
-
-   - ``optimized_inplane_rotation`` AND ``optimized_displacement``
-
-  If both flags are True, we will output the Tensors described under
-  :ref:`the Optimized Displacement and Rotations section<optimal_displacement_rotations>`
-  section above.
-
-
-    - ``optimized_viewing_angle``
-
-  TODO: I'm honestly not sure what's intended here.
-
-    - ``optimized_displacement`` and ``optimized_inplane_rotation`` and ``optimized_viewing_angle``
-
-  If all three flags are set to true, we will return the Tensors described
-  under :ref:`the Complete Disaggregated section<complete_disagg>` above.
 
 
 
