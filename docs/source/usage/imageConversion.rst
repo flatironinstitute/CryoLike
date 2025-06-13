@@ -2,7 +2,7 @@ Image Conversion
 ##############################
 
 In CryoLike, "Images" (or an ``Images`` object) are stacks of experimentally-captured cryo-EM
-images. In practice, we operate extensively on a Fourier-space representation of the images.
+particle images. In practice, we operate extensively on Fourier-polar or Fourier-Bessel spaces representation of the images.
 
 Internally, these images are represented as paired multi-dimensional arrays--PyTorch
 Tensors--along with metadata values that describe how to interpret the arrays, and
@@ -46,7 +46,7 @@ of the images. For more detail on this, see the
 and the TODO: XREF-API documentation, 
 
 In addition, image conversion needs data describing the image capture apparatus--most notably
-defocus and phase shift information. This metadata is expected to come from the Star file or
+defocus and phase shift information. This metadata is expected to come from the Starfile or
 CryoSparc file. A full description of the expected file formats can be found in the
 :doc:`file formats documentation</usage/formats>`
 
@@ -63,8 +63,6 @@ These wrapper functions are discussed below.
 
 For a basic example of converting ``Images`` from a set of Star files and particle files,
 see the :doc:`image conversion example </examples/convert_particle_stacks>`.
-
-OTHER EXAMPLES TK
 
 For complete documentation of the API, see the API DOCUMENTATION
 (IF WE HAVEN'T LINKED TO THAT ENOUGH ALREADY)
@@ -91,9 +89,8 @@ Common Parameters
 Output
 ****************
 
-All functions described here produce three (or four) kinds of output:
+All functions described here produce two (or three) kinds of output:
 
- #. Stacks of physical images, as Torch tensor (``.pt`` file)
  #. Stacks of Fourier-space images, as Torch tensor (``.pt`` file)
  #. A metadata file that records both the grids for the images and the capture apparatus metadata
  #. A set of plots, if requested
@@ -104,7 +101,6 @@ files will use the following naming conventions, where ``OUT`` is the user-speci
 of the output directory and ``COUNTER`` is a 6-digit 0-padded count of the number of stacks
 exported so far:
 
- #. Physical images: ``OUT/phys/particles_phys_stack_COUNTER.pt``
  #. Fourier images: ``OUT/fft/particles_fourier_stack_COUNTER.pt``
  #. Metadata file: ``OUT/fft/particles_fourier_stack_COUNTER.npz``
  #. Plots (if requested): ``OUT/plots/PlOT_NAME``, where ``PLOT_NAME`` matches the stack
@@ -128,28 +124,27 @@ TODO: API XREF HERE for more information.
 
 .. admonition:: Example
 
-  Suppose we have ``ONE.mrc``, ``TWO.mrc``, and ``THREE.mrc``, which have 7, 2, and 6 images,
+  Suppose we have ``A.mrc``, ``B.mrc``, and ``C.mrc``, which have 7, 2, and 6 images,
   respectively. We call the wrapper with ``batch_size`` set to 10 and ``folder_output`` set to
   ``output``, with no plots.
 
   Most functions would produce the following files:
     
-  - ``output/phys/particles_phys_stack_000000.pt`` (containing all 7 images from ``ONE.mrc``,
-    both images from ``TWO.mrc``, and one image from ``THREE.mrc``)
-  - ``output/phys/particles_phys_stack_000001.pt`` (containing the remaining 5 images from ``THREE.mrc``)
-  - ``output/fft/particles_fourier_stack_000000.pt`` and ``..._000001.pt`` (containing Fourier-space
-    representations of the same image stacks as above)
-  - ``output/fft/particles_fourier_stack_000000.npz`` and ``..._000001.npz`` (containing metadata
+  - ``output/fft/particles_fourier_stack_000000.pt`` (containing Fourier-space
+    representations  of all 7 images from ``A.mrc``,
+    both images from ``B.mrc``, and one image from ``C.mrc``)
+  - ``output/fft/particles_fourier_stack_000000.npz`` (containing Fourier-space
+    representations  of the remaining 5 images from ``C.mrc``)
+  - ``output/`` and ``..._000001.npz`` (containing metadata
     for the above stacks)
     
   The ``convert_particle_stacks_from_star_files()`` wrapper function would produce:
 
-  - ``output/phys/particles_phys_stack_000000.pt`` (with only the 7 images from ``ONE.mrc``)
-  - ``..._000001.pt`` (with only the 2 images from ``TWO.mrc``)
-  - ``..._000003.pt`` (with only the 6 images from ``THREE.mrc``)
-  - and so on for the Fourier-space and metadata file outputs.
+  - ``output/fft/particles_fourier_stack_000000.pt`` (with only the 7 images from ``A.mrc``)
+  - ``..._000001.pt`` (with only the 2 images from ``B.mrc``)
+  - ``..._000002.pt`` (with only the 6 images from ``C.mrc``)
   - If the ``batch_size`` were set to 5 instead,
-    this function would emit 5 physical and 5 Fourier stacks, since ``ONE.mrc`` and ``THREE.mrc`` would be split
+    this function would emit 5 Fourier stacks, since ``A.mrc`` and ``C.mrc`` would be split
     so as not to exceed the batch size.
 
 .. admonition:: Common Pitfalls
@@ -204,7 +199,7 @@ be relative to the current directory.
 ****************************************************************
 
 This function is designed to convert images stored in a series of MRC files, described
-by a single CryoSparc file that refers to the images individually.
+by a single CryoSparc file (``.cs``) that refers to the images individually.
 
 API XREF LINK
 
@@ -231,7 +226,7 @@ files in the job directory, in order, until the sequence of MRC files is broken.
 
 API XREF LINK
 
-Instead of looking at explicitly specified MRC files, as in the "``indexed``" wrappers
+Instead of looking explicitly at the specified MRC files, as in the "``indexed``" wrappers
 above, this function attempts to process all MRC files that follow a certain naming
 convention that reside within the same job directory. They are assumed to be all described
 by the same CryoSparc file, which is expected to reside within the job directory. (The

@@ -54,12 +54,11 @@ They are saved as part of the metadata file for future reference.
 
  - A set of ``ViewingAngles`` TODO: XREF TO API
  - A `viewing distance` (in Angstroms)
- - The `radii` (in Angstroms) of the atoms in the model
- - A string identifying the `selected atoms` to take from the model
+ - The `resolution_factor` in [0,1]
+ - The `radii` (in Angstroms) of the atoms in the model 
+ - A string identifying the `selected atoms` to take from the structure if ``PDB`` format is used.
  - Whether to use the `default protein residue model` atomic sizes
- - The `shape` of the atoms (i.e. whether to interpret them as hard spheres
-   or Gaussian probability clouds)
-
+ - The `shape` of the atoms (i.e. whether to interpret them as hard spheres or Gaussian probability clouds with a given width defined by `radii`)
 These values are all potentially used for Templates creation.
 
 The ``ViewingAngles`` determines the different orientations of the
@@ -67,6 +66,10 @@ device lens which will be considered in projecting the 3D model
 onto a 2D plane. These could be set manually, but in current actual
 usage they are computed automatically from the
 `viewing distance`. [TODO: Give the exact formula?]
+
+The `resolution_factor` determines the maximum frequency up to 
+which the computations will be performed. `resolution_factor=1` goes up to Nqst, 
+[TODO: Explain]
 
 Note that, since each Template is the 2D projection from a
 specific angle, the number of viewing angles should match the number
@@ -83,7 +86,7 @@ Compatibility
 
 Image Descriptors can describe the images in Images stacks or in
 Templates. Two Image Descriptors are considered compatible if they
-use the same 2D Cartesian grid and (Fourier-space) polar grid.
+use the same 2D Cartesian grid and Fourier-space polar grid.
 
 All other fields are ignored for the purposes of compatibility.
 So there is no issue with running a comparison between the
@@ -115,12 +118,12 @@ The following parameters are accepted:
  - For setting the polar grid:
 
    - number of points per shell (``n_inplanes``)
-   - resolution factor for converting Cartesian pixels to polar points
+   - ``resolution_factor`` for converting Cartesian pixels to polar points
 
-     - Higher values mean lower resolution
+     - Higher values mean higher resolution
      - Formula is (half pi) TODO
 
-   - If not specified, a resolution of 1 will be used, resulting in EXPLAIN
+   - If not specified, a ``resolution_factor`` of 1 will be used, resulting in EXPLAIN
 
  - For Template generation:
   

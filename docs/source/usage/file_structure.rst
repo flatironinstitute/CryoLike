@@ -17,7 +17,7 @@ See also :doc:`/examples/make_templates`
 Inputs
 ------
 
-No particular patterns. Users are expected to pass a full
+Templates are generated from 3D structures in either ``PDB`` or ``mrc`` formats. Users are expected to pass a full
 valid path to any input files as part of the input list.
 
 
@@ -61,8 +61,8 @@ See also :doc:`/examples/convert_particle_stacks`
 Inputs
 ------
 
-Depends on the wrapper function being used. Refer to the documentation
-for the individual wrapper functions.
+Cryo-EM images required in ``mrcs`` or ``mrc`` formats. Microscope parameters depends on the wrapper function being used (either ``STAR`` or ``cs`` from cryoSPARC). 
+Refer to the individual wrapper functions documentation.
 
 In general, "indexed" wraqppers expect the metadata file to contain either
 a valid relative path to the MRC files, or expect the MRC file path basenames
@@ -78,7 +78,6 @@ Prefix set by the ``folder_output`` parameter.
 Assume ``folder_output`` = ``OUT`` and ``COUNTER`` is a 6-digit 0-padded count
 of the total number of stacks converted so far. Then:
 
- - ``OUT/phys/particles_phys_stack_COUNTER.pt`` for physical image stacks
  - ``OUT/fft/particles_fourier_stack_COUNTER.pt`` for Fourier-space image stacks
  - ``OUT/fft/particles_fourier_stack_COUNTER.npz`` for image metadata
    (stored alongside the Fourier-space image stack)
@@ -87,7 +86,7 @@ of the total number of stacks converted so far. Then:
 
 
 
-Likelihood Output Patterns
+Likelihood Patterns
 ==========================
 
 See also :doc:`/usage/likelihoodComputation`
@@ -103,9 +102,6 @@ For Images: We expect to look at the Fourier-space image stacks stored following
 the output conventions of the image conversion process. Specifically,
 ``FP/fft/particles_fourier_stack_NUMBER.pt``, where ``FP`` is the value of
 the ``folder_particles`` parameter and ``NUMBER`` is a 6-digit 0-padded increment.
-
-If the physical image stack is required (for reporting optimal pose likelihood against
-physical poses), ``FP/phys/particles_phys_stack_NUMBER.pt``.
 
 
 Outputs

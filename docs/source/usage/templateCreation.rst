@@ -2,8 +2,8 @@ Template Creation
 ##############################
 
 In CryoLike, "Templates" (or a ``Templates`` object) are stacks of
-images, with each image representing the 2D planar projection of some
-base 3D model with a particular orientation ("viewing angle") relative
+images, with each image representing the 2D projection of a
+base 3D structure or 3D map with a particular orientation ("viewing angle") relative
 to the capture device.
 
 Overview
@@ -11,11 +11,6 @@ Overview
 
 CryoLike can convert models in several formats:
  - Files (PDB or MRC)
- - In-memory volume representations
- - A function representation
-
-Most users will want to load from file; full details on other methods
-can be found at the API documentation. [TODO: XREF. Also, do we want to bother giving examples?]
 
 The ``Templates`` object itself is virtually identical to the ``Images`` object: it consists
 of a stack of images. The main functional difference is that the ``Templates`` requires that
@@ -26,9 +21,9 @@ Templates Metadata
 ------------------
 
 As described in more detail in the :doc:`image settings documentation</usage/imageSettings>`
-and the XREF-API documentation, there are some image descriptor metadata fields that apply
-to ``Templates`` during the conversion process. Other than viewing distance and/or
-sets of viewing angles, these are only required or used for converting PDB files.
+and the XREF-API documentation, there are some image descriptor metadata fields that apply only
+to ``Templates`` during the conversion process. Other than viewing distance, 
+these are only required or used for converting PDB files. 
 
 
 Interfaces
@@ -39,8 +34,6 @@ wrapper function.
 
 For a basic example of generating ``Templates`` from PDB files, see the
 :doc:`template generation example </examples/make_templates>`.
-
-OTHER EXAMPLES TK
 
 For complete documentation of the API, see the API DOCUMENTATION NOTE: XREF to
 both the make_templates_from_inputs_api file and the template.py
@@ -115,5 +108,5 @@ Additional methods
 Most users are expected to use the wrapper function described above. However, the
 ``Tenmplates`` class also exposes some functions that can generate a stack of templates
 from a function, as well as the underlying calls to create templates from physical volumes
-or from atom positions. For full details, see API CROSS-REFERENCE.
+or from atom positions. 
 
