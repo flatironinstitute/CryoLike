@@ -132,8 +132,8 @@ class ImageDescriptor():
 
 
     def serialize(self) -> SerializedImageDescriptor:
-        if self.viewing_distance is None:
-            raise NotImplementedError("Image descriptor with no explicit viewing distance cannot be serialized.")
+        # if self.viewing_distance is None:
+        #     raise NotImplementedError("Image descriptor with no explicit viewing distance cannot be serialized.")
         return SerializedImageDescriptor(
             n_pixels=self.cartesian_grid.n_pixels,
             pixel_size=self.cartesian_grid.pixel_size,

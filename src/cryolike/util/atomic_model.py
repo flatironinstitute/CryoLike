@@ -176,11 +176,11 @@ class AtomicModel:
         from mdtraj import load, Trajectory, Topology
         assert os.path.exists(top_file), f"Topology file {top_file} does not exist."
         if trj_file == "":
-            u = load(top_file, frame=0, no_boxchk=True)
+            u = load(top_file, frame=0)
             _atomic_coordinates = torch.tensor(u.xyz, dtype=torch_float_type)
         else:
             assert os.path.exists(trj_file), f"Trajectory file {trj_file} does not exist."
-            u = load(trj_file, top=top_file, stride=stride, no_boxchk=True)
+            u = load(trj_file, top=top_file, stride=stride)
             _atomic_coordinates = torch.tensor(u.xyz, dtype=torch_float_type)
         if _atomic_coordinates.ndim == 2:
             # If 2D, assume a single frame and add a frame dimension
@@ -224,4 +224,24 @@ class AtomicModel:
             atom_radii=atomic_model.atom_radii.clone(),
             box_size=atomic_model.box_size,
             precision=atomic_model.precision
+        )
+    
+
+    def repeat_frames(self, n_frames: int) -> "AtomicModel":
+        """Repeat the atomic model frames to create a new model with n_frames.
+
+        Args:
+            n_frames (int): Number of frames to repeat.
+
+        Returns:
+            AtomicModel: New atomic model with repeated frames.
+        """
+        if n_frames <= 0:
+            raise ValueError("n_frames must be a positive integer.")
+        new_atomic_coordinates = self.atomic_coordinates.repeat(n_frames, 1, 1)
+        return AtomicModel(
+            atomic_coordinates=new_atomic_coordinates,
+            atom_radii=self.atom_radii.clone(),
+            box_size=self.box_size,
+            precision=self.precision
         )

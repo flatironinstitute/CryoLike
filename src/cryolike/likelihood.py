@@ -4,7 +4,7 @@ from scipy.special import gammaln as lgamma
 from typing import Literal, overload, Callable
 
 from cryolike.microscopy import CTF, translation_kernel_fourier, fourier_polar_to_cartesian_phys
-from cryolike.stacks import Images, Templates
+from cryolike.stacks import Images, Templates, TemplateGenerator
 from cryolike.grids import PolarGrid
 from cryolike.util import Precision, to_torch, absq, complex_mul_real
 
@@ -105,7 +105,7 @@ class LikelihoodFourierModel:
     box_size: float
     model: Volume | AtomicModel | Callable[[torch.Tensor], torch.Tensor] | Templates
     viewing_angles: ViewingAngles
-    atom_shape: AtomShape
+    atom_shape: AtomShape | None
     precision: Precision
     device: torch.device
     float_type: torch.dtype
@@ -120,7 +120,7 @@ class LikelihoodFourierModel:
         box_size: float,
         n_pixels: int,
         viewing_angles: ViewingAngles | None = None,
-        atom_shape: AtomShape = AtomShape.GAUSSIAN,
+        atom_shape: AtomShape | None = None,
         precision: Precision = Precision.SINGLE,
         device: torch.device = torch.device('cpu'),
         identity_kernel: Callable[[PolarGrid, Precision], torch.Tensor] | None = None,
@@ -179,7 +179,7 @@ class LikelihoodFourierModel:
                 viewing_angles=self.viewing_angles,
                 precision=self.precision,
                 atom_shape=self.atom_shape,
-                device=self.device,
+                compute_device=self.device,
                 output_device=self.device,
                 verbose=verbose
             )
@@ -242,42 +242,44 @@ def _make_templates_from_model(
     box_size: float,
     viewing_angles: ViewingAngles,
     precision: Precision,
-    atom_shape: AtomShape = AtomShape.GAUSSIAN,
-    device: torch.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'),
+    atom_shape: AtomShape | None = None,
+    compute_device: torch.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'),
     output_device: torch.device = torch.device('cpu'),
     verbose: bool = False
-) -> Templates:
+) -> torch.Tensor:
     if isinstance(model, Volume):
         return Templates.generate_from_physical_volume(
             volume=model,
             polar_grid=polar_grid,
             viewing_angles=viewing_angles,
             precision=precision,
-            device=device,
+            compute_device=compute_device,
             output_device=output_device,
             verbose=verbose
-        )
+        ).images_fourier
     elif isinstance(model, AtomicModel):
-        return Templates.generate_from_positions(
+        assert atom_shape is not None, "atom_shape must be provided if model is an AtomicModel."
+        return TemplateGenerator(
             atomic_model=model,
             viewing_angles=viewing_angles,
             polar_grid=polar_grid,
             box_size=box_size,
+            fix_atomic_coordinates=True,
+            fix_viewing_angles=True,
+            storage_device=output_device,
+            compute_device=compute_device,
             atom_shape=atom_shape,
-            device=device,
-            output_device=output_device,
-            precision=precision,
-            verbose=verbose
-        )
+            precision=precision
+        ).generator()
     elif callable(model):
         return Templates.generate_from_function(
             function=model,
             viewing_angles=viewing_angles,
             polar_grid=polar_grid,
             precision=precision,
-            device=device,
+            compute_device=compute_device,
             output_device=output_device
-        )
+        ).images_fourier
     raise ValueError("Model must be an instance of Volume of AtomicModel")
 
 

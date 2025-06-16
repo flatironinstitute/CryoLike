@@ -55,7 +55,8 @@ def _make_templates_from_mrc_file(
 def _make_templates_from_pdb_file(
     pdb_file: str,
     descriptor: ImageDescriptor,
-    verbose: bool
+    centering: bool = True,
+    verbose: bool = True,
 ) -> Templates:
     if not descriptor.is_compatible_with_pdb():
         raise ValueError("Attempting to read templates from PDB file, but the atom_radii parameter or use_protein_residue_model=True is not set.")
@@ -63,11 +64,12 @@ def _make_templates_from_pdb_file(
     if len(np.unique(box_size)) != 1:
         raise ValueError("Reading an atomic model from a PDB file with a non-square box size is not yet supported.")
     _box_edge_length: float = box_size[0]
-    atomic_model = AtomicModel.read_from_pdb(
-        pdb_file = pdb_file,
+    atomic_model = AtomicModel.read_from_traj(
+        top_file = pdb_file,
         atom_selection = descriptor.atom_selection,
         atom_radii = descriptor.atom_radii,
         box_size = _box_edge_length,
+        centering = centering,
         use_protein_residue_model = descriptor.use_protein_residue_model
     )
     return Templates.generate_from_positions(

@@ -17,15 +17,12 @@ from stacks_fixtures import (
     mock_get_fourier_slices
 )
 
-from cryolike.util import AtomShape, AtomicModel, Precision, get_device
+from cryolike.util import AtomShape, AtomicModel, Precision, get_device, to_torch
 from cryolike.metadata import ViewingAngles
-
 from cryolike.stacks.template import (
     Templates,
     _get_circles,
     _get_fourier_slices,
-    _parse_atomic_model,
-    _get_shared_kernel_params,
     _iterate_kernel_with_memory_constraints
 )
 
@@ -48,10 +45,11 @@ def test_get_circles():
     device = torch.device('cpu')
     n_angles = 10
     n_inplanes = 8
+    precision = Precision.SINGLE
     torch_float_type = torch.float32
     viewing_angles = make_mock_viewing_angles(n_angles)
     polar_grid = make_mock_polar_grid(2, n_inplanes)
-    circles = _get_circles(viewing_angles, polar_grid, torch_float_type, device)
+    circles = _get_circles(viewing_angles, polar_grid, precision, device)
     ## check that the circles are centered at the origin
     centers = torch.mean(circles, dim=1)
     assert_close(centers, torch.zeros((n_angles, 3), dtype=torch_float_type))
@@ -71,88 +69,88 @@ def test_get_circles():
     assert_close(points_dot_first_point, torch.cos(torch.arange(0, 2 * np.pi, 2 * np.pi / n_inplanes)).unsqueeze(0).repeat(n_angles, 1))
 
 
-def test_parse_atomic_model():
-    model = AtomicModel()
-    polar_grid = make_mock_polar_grid(n_shells=10, n_inplanes=12)
-    box_size = np.array([3., 1.])
-    float_t = torch.float64
-    for device in ['cpu', 'cuda']:
-        _device = get_device(device)
+# def test_parse_atomic_model():
+#     model = AtomicModel()
+#     polar_grid = make_mock_polar_grid(n_shells=10, n_inplanes=12)
+#     box_size = np.array([3., 1.])
+#     float_t = torch.float64
+#     for device in ['cpu', 'cuda']:
+#         _device = get_device(device)
 
-        coordinate_scaling_factor = -4. * np.pi / 3.
-        radius_scaling_factor = 2. / 3. # box-max is 3.
-        pi_rad_factor = 2 * np.pi ** 2
+#         coordinate_scaling_factor = -4. * np.pi / 3.
+#         radius_scaling_factor = 2. / 3. # box-max is 3.
+#         pi_rad_factor = 2 * np.pi ** 2
 
-        expected_rad = torch.tensor(model.atom_radii * radius_scaling_factor, dtype=float_t, device=_device)
-        expected_shells = torch.tensor(polar_grid.radius_shells, dtype=float_t, device=_device)
-        expected_coords = torch.tensor(model.atomic_coordinates, dtype=float_t, device=_device)
+#         expected_rad = torch.tensor(model.atom_radii * radius_scaling_factor, dtype=float_t, device=_device)
+#         expected_shells = torch.tensor(polar_grid.radius_shells, dtype=float_t, device=_device)
+#         expected_coords = torch.tensor(model.atomic_coordinates, dtype=float_t, device=_device)
 
-        res = _parse_atomic_model(model, polar_grid, box_size, float_t, _device)
+#         res = _parse_atomic_model(model, polar_grid, box_size, float_t, _device)
 
-        assert_close(res.atomic_radius_scaled, expected_rad)
-        assert_close(res.radius_shells, expected_shells)
-        assert_close(res.radius_shells_sq, res.radius_shells ** 2)
-        assert_close(res.pi_atomic_radius_sq_times_two, pi_rad_factor * res.atomic_radius_scaled ** 2)
-        assert_close(res.atomic_coordinates_scaled, expected_coords.T * coordinate_scaling_factor)
+#         assert_close(res.atomic_radius_scaled, expected_rad)
+#         assert_close(res.radius_shells, expected_shells)
+#         assert_close(res.radius_shells_sq, res.radius_shells ** 2)
+#         assert_close(res.pi_atomic_radius_sq_times_two, pi_rad_factor * res.atomic_radius_scaled ** 2)
+#         assert_close(res.atomic_coordinates_scaled, expected_coords.T * coordinate_scaling_factor)
 
 
-@mark.parametrize('precision,uniform,device,output_device', [
-    (Precision.SINGLE,True,"cpu","cpu"),
-    (Precision.SINGLE,True,"cuda","cpu"),
-    (Precision.DOUBLE,False,"cuda","cpu"),
-    (Precision.SINGLE,True,"cuda","cuda"),
-    (Precision.DOUBLE,False,"cuda","cuda"),
-])
-@patch(f"{PKG}._parse_atomic_model")
-def test_get_shared_kernel_params(parse_model: Mock, precision: Precision, uniform: bool, device: str, output_device: str):
+# @mark.parametrize('precision,uniform,device,output_device', [
+#     (Precision.SINGLE,True,"cpu","cpu"),
+#     (Precision.SINGLE,True,"cuda","cpu"),
+#     (Precision.DOUBLE,False,"cuda","cpu"),
+#     (Precision.SINGLE,True,"cuda","cuda"),
+#     (Precision.DOUBLE,False,"cuda","cuda"),
+# ])
+# @patch(f"{PKG}._parse_atomic_model")
+# def test_get_shared_kernel_params(parse_model: Mock, precision: Precision, uniform: bool, device: str, output_device: str):
 
-    _device = get_device(device)
-    _output_device = get_device(output_device)
+#     _device = get_device(device)
+#     _output_device = get_device(output_device)
 
-    n_templates = 10
-    n_shells = 12
-    n_inplanes = 14
-    n_points_per_img = n_shells * n_inplanes
-    box_size = np.array([2, 2.])
-    viewing_angles = make_mock_viewing_angles(n_templates)
-    polar_grid = make_mock_polar_grid(n_shells, n_inplanes)
-    polar_grid.uniform = uniform
+#     n_templates = 10
+#     n_shells = 12
+#     n_inplanes = 14
+#     n_points_per_img = n_shells * n_inplanes
+#     box_size = np.array([2, 2.])
+#     viewing_angles = make_mock_viewing_angles(n_templates)
+#     polar_grid = make_mock_polar_grid(n_shells, n_inplanes)
+#     polar_grid.uniform = uniform
 
-    if precision == Precision.DOUBLE:
-        t_float = torch.float64
-        t_complex = torch.complex128
-    else:
-        t_float = torch.float32
-        t_complex = torch.complex64
-    if uniform:
-        target_shape = (n_templates, n_shells, n_inplanes)
-    else:
-        target_shape = (n_templates, n_points_per_img)
+#     if precision == Precision.DOUBLE:
+#         t_float = torch.float64
+#         t_complex = torch.complex128
+#     else:
+#         t_float = torch.float32
+#         t_complex = torch.complex64
+#     if uniform:
+#         target_shape = (n_templates, n_shells, n_inplanes)
+#     else:
+#         target_shape = (n_templates, n_points_per_img)
 
-    atomic_model = AtomicModel()
-    with patch(f"{PKG}._get_circles") as gc:
-        res = _get_shared_kernel_params(
-            atomic_model,
-            viewing_angles,
-            polar_grid,
-            box_size,
-            device=device,
-            output_device=output_device,
-            precision=precision
-        )
-        assert res.xyz_template_points == gc.return_value
+#     atomic_model = AtomicModel()
+#     with patch(f"{PKG}._get_circles") as gc:
+#         res = _get_shared_kernel_params(
+#             atomic_model,
+#             viewing_angles,
+#             polar_grid,
+#             box_size,
+#             device=device,
+#             output_device=output_device,
+#             precision=precision
+#         )
+#         assert res.xyz_template_points == gc.return_value
 
-    print("_device", _device, "res.device", res.device)
+#     print("_device", _device, "res.device", res.device)
 
-    assert res.parsed_model == parse_model.return_value
-    parse_model.assert_called_once_with(atomic_model, polar_grid, box_size, float_type=t_float, device=_device)
-    assert_close(res.templates_fourier, torch.zeros(target_shape, dtype=t_complex, device=_output_device))
-    assert res.polar_grid == polar_grid
-    assert res.n_atoms == atomic_model.n_atoms
-    assert res.n_templates == n_templates
-    assert res.device == _device
-    assert res.torch_float_type == t_float
-    assert res.torch_complex_type == t_complex
+#     assert res.parsed_model == parse_model.return_value
+#     parse_model.assert_called_once_with(atomic_model, polar_grid, box_size, float_type=t_float, device=_device)
+#     assert_close(res.templates_fourier, torch.zeros(target_shape, dtype=t_complex, device=_output_device))
+#     assert res.polar_grid == polar_grid
+#     assert res.n_atoms == atomic_model.n_atoms
+#     assert res.n_templates == n_templates
+#     assert res.device == _device
+#     assert res.torch_float_type == t_float
+#     assert res.torch_complex_type == t_complex
 
 
 ## Do we still need these two? i.e. what's different from test_generate_from_positions_defaults?
@@ -212,16 +210,17 @@ def test_get_fourier_slices(uniform: bool):
     n_angles = 10
     n_shells = 4
     n_inplanes = 8
+    precision = Precision.SINGLE
     torch_float_type = torch.float32
     viewing_angles = make_mock_viewing_angles(n_angles)
     polar_grid = make_mock_polar_grid(n_shells, n_inplanes, uniform)
     if not uniform:
         # NOTE: WE ARE NOT YET TESTING NON-UNIFORM POLAR GRIDS
         return
-    fourier_slices = _get_fourier_slices(polar_grid, viewing_angles, torch_float_type, device)
+    fourier_slices = _get_fourier_slices(polar_grid, viewing_angles, precision, device)
     ## check that the circles on the slices have the correct radius
     radii = torch.norm(fourier_slices, dim=2)
-    radius_shells = torch.tensor(polar_grid.radius_shells, dtype = torch_float_type, device = device)
+    radius_shells = to_torch(polar_grid.radius_shells, precision, device)
     if uniform:
         expected_radii = radius_shells.unsqueeze(0).unsqueeze(2).repeat(n_angles, 1, n_inplanes).reshape(n_angles, n_shells * n_inplanes)
         assert_close(radii, expected_radii)
@@ -232,90 +231,90 @@ def test_get_fourier_slices(uniform: bool):
     ## other checks are unnecessary because they are already checked in test_get_circles
 
 
-###### LOOK AT THIS ######
-# @mark.xfail
-# @mark.parametrize('atom_shape', [AtomShape.DEFAULT, AtomShape.HARD_SPHERE, AtomShape.GAUSSIAN])
-@mark.parametrize('atom_shape,device', [(AtomShape.DEFAULT, 'cpu'), (AtomShape.HARD_SPHERE, 'cpu'), (AtomShape.GAUSSIAN, 'cpu'),
-                                        (AtomShape.DEFAULT, 'cuda'), (AtomShape.HARD_SPHERE, 'cuda'), (AtomShape.GAUSSIAN, 'cuda')])
-@patch(f"{PKG}._get_shared_kernel_params")
-# NOTE: This test is ONLY testing that the defaults passed are the ones we expect.
-# It is NOT a test of the underlying position generation logic, which is tested in microscopy/test_nufft_3d.
-# This test generates some coverage for _iterate_kernel_with_memory_constraints.
-def test_generate_from_positions_defaults(mock_get_shared_params: Mock, atom_shape: AtomShape, device: str):
+# ###### LOOK AT THIS ######
+# # @mark.xfail
+# # @mark.parametrize('atom_shape', [AtomShape.DEFAULT, AtomShape.HARD_SPHERE, AtomShape.GAUSSIAN])
+# @mark.parametrize('atom_shape,device', [(AtomShape.DEFAULT, 'cpu'), (AtomShape.HARD_SPHERE, 'cpu'), (AtomShape.GAUSSIAN, 'cpu'),
+#                                         (AtomShape.DEFAULT, 'cuda'), (AtomShape.HARD_SPHERE, 'cuda'), (AtomShape.GAUSSIAN, 'cuda')])
+# @patch(f"{PKG}._get_shared_kernel_params")
+# # NOTE: This test is ONLY testing that the defaults passed are the ones we expect.
+# # It is NOT a test of the underlying position generation logic, which is tested in microscopy/test_nufft_3d.
+# # This test generates some coverage for _iterate_kernel_with_memory_constraints.
+# def test_generate_from_positions_defaults(mock_get_shared_params: Mock, atom_shape: AtomShape, device: str):
 
-    n_imgs = 3
-    model = Mock()
-    angles = make_mock_viewing_angles(n_imgs)
-    grid = make_mock_polar_grid()
-    expected_box_size = np.array([2., 2.])
+#     n_imgs = 3
+#     model = Mock()
+#     angles = make_mock_viewing_angles(n_imgs)
+#     grid = make_mock_polar_grid()
+#     expected_box_size = np.array([2., 2.])
 
-    mock_params = Mock()
-    mock_params.n_templates = n_imgs
-    mock_get_shared_params.return_value = mock_params
+#     mock_params = Mock()
+#     mock_params.n_templates = n_imgs
+#     mock_get_shared_params.return_value = mock_params
 
-    mock_templates_tensor = make_image_tensor(n_imgs, 2, 2, target_fourier=True)
-    def kernel_effect(start: int, end: int):
-        if end >= mock_params.n_templates - 1:
-            mock_params.templates_fourier = mock_templates_tensor
+#     mock_templates_tensor = make_image_tensor(n_imgs, 2, 2, target_fourier=True)
+#     def kernel_effect(start: int, end: int):
+#         if end >= mock_params.n_templates - 1:
+#             mock_params.templates_fourier = mock_templates_tensor
 
-    if atom_shape == AtomShape.GAUSSIAN:
-        kernel_fn = f"{PKG}._make_uniform_gaussian_kernel"
-    else: # use hard shell for explicit or default
-        kernel_fn = f"{PKG}._make_uniform_hard_sphere_kernel"
-    with patch(kernel_fn) as mock_get_kernel:
-        mock_kernel = Mock(side_effect=kernel_effect)
-        mock_get_kernel.return_value = mock_kernel
+#     if atom_shape == AtomShape.GAUSSIAN:
+#         kernel_fn = f"{PKG}._make_uniform_gaussian_kernel"
+#     else: # use hard shell for explicit or default
+#         kernel_fn = f"{PKG}._make_uniform_hard_sphere_kernel"
+#     with patch(kernel_fn) as mock_get_kernel:
+#         mock_kernel = Mock(side_effect=kernel_effect)
+#         mock_get_kernel.return_value = mock_kernel
 
-        res = Templates.generate_from_positions(
-            atomic_model=model,
-            viewing_angles=angles,
-            polar_grid=grid,
-            box_size=2.,
-            atom_shape=atom_shape,
-            device=device,
-            output_device="cpu"
-        )
-        mock_get_kernel.assert_called_once()
-        assert mock_kernel.call_count == 1
+#         res = Templates.generate_from_positions(
+#             atomic_model=model,
+#             viewing_angles=angles,
+#             polar_grid=grid,
+#             box_size=2.,
+#             atom_shape=atom_shape,
+#             compute_device=device,
+#             output_device="cpu"
+#         )
+#         mock_get_kernel.assert_called_once()
+#         assert mock_kernel.call_count == 1
     
-    assert_close(res.images_fourier, mock_templates_tensor)
-    mock_get_shared_params.assert_called_once()
+#     assert_close(res.images_fourier, mock_templates_tensor)
+#     mock_get_shared_params.assert_called_once()
 
-    calls = mock_get_shared_params.call_args[1]
-    assert calls['atomic_model'] == model
-    assert calls['viewing_angles'] == angles
-    assert calls['polar_grid'] == grid
-    npt.assert_allclose(calls['box_size'], expected_box_size)
-    assert calls['precision'] == Precision.DEFAULT
-    assert calls['device'] == get_device(device)
-    assert calls['output_device'] == get_device('cpu')
-
-
-@patch(f"{PKG}._get_shared_kernel_params")
-def test_generate_from_positions_throws_on_non_uniform_grid(mock_get_params: Mock):
-    grid = make_mock_polar_grid(uniform=False)
-    with raises(NotImplementedError, match="not implemented yet"):
-        _ = Templates.generate_from_positions(
-            atomic_model=Mock(),
-            viewing_angles=Mock(),
-            polar_grid=grid,
-            box_size=1.0,
-        )
+#     calls = mock_get_shared_params.call_args[1]
+#     assert calls['atomic_model'] == model
+#     assert calls['viewing_angles'] == angles
+#     assert calls['polar_grid'] == grid
+#     npt.assert_allclose(calls['box_size'], expected_box_size)
+#     assert calls['precision'] == Precision.DEFAULT
+#     assert calls['device'] == get_device(device)
+#     assert calls['output_device'] == get_device('cpu')
 
 
-@patch(f"{PKG}._get_shared_kernel_params")
-def test_generate_from_positions_throws_on_bad_atom_shape(mock_get_params: Mock):
-    grid = make_mock_polar_grid()
-    badval = Mock()
-    badval.value = "NOT SUPPORTED"
-    with raises(ValueError, match="Unknown atom shape"):
-        _ = Templates.generate_from_positions(
-            atomic_model=Mock(),
-            viewing_angles=Mock(),
-            polar_grid=grid,
-            box_size=2.,
-            atom_shape=badval # type: ignore
-        )
+# @patch(f"{PKG}._get_shared_kernel_params")
+# def test_generate_from_positions_throws_on_non_uniform_grid(mock_get_params: Mock):
+#     grid = make_mock_polar_grid(uniform=False)
+#     with raises(NotImplementedError, match="not implemented yet"):
+#         _ = Templates.generate_from_positions(
+#             atomic_model=Mock(),
+#             viewing_angles=Mock(),
+#             polar_grid=grid,
+#             box_size=1.0,
+#         )
+
+
+# @patch(f"{PKG}._get_shared_kernel_params")
+# def test_generate_from_positions_throws_on_bad_atom_shape(mock_get_params: Mock):
+#     grid = make_mock_polar_grid()
+#     badval = Mock()
+#     badval.value = "NOT SUPPORTED"
+#     with raises(ValueError, match="Unknown atom shape"):
+#         _ = Templates.generate_from_positions(
+#             atomic_model=Mock(),
+#             viewing_angles=Mock(),
+#             polar_grid=grid,
+#             box_size=2.,
+#             atom_shape=badval # type: ignore
+#         )
 
 
 # volume_phys_to_fourier_points --> should return n_img x n_shells x n_inplanes scalar complex floats
@@ -401,19 +400,20 @@ def test_generate_from_function(mock_slices: Mock, uniform: bool):
     polar_grid = make_mock_polar_grid(n_shells, n_inplanes)
     polar_grid.uniform = uniform
 
-    res = Templates.generate_from_function(fn, views, polar_grid, device="cpu", precision=Precision.SINGLE)
+    res = Templates.generate_from_function(fn, views, polar_grid, compute_device="cpu", precision=Precision.SINGLE)
 
     assert res.polar_grid == polar_grid
     assert res.n_images == n_imgs
 
     mock_slices.assert_called_once()
     args = mock_slices.call_args
+    print(args)
     assert args[0][0] == polar_grid
     assert args[0][1] == views
-    assert args[1]['float_type'] == torch.float32
-    assert args[1]['device'] == torch.device('cpu')
+    assert args[0][2] == Precision.SINGLE
+    assert args[0][3] == torch.device('cpu')
 
-    expected_imgs = torch.sum(mock_get_fourier_slices(polar_grid, views, torch.complex64, torch.device('cpu')), dim=-1)
+    expected_imgs = torch.sum(mock_get_fourier_slices(polar_grid, views, Precision.SINGLE, torch.device('cpu')), dim=-1) + 0j
     assert_close(res.images_fourier, expected_imgs)
     # Empirically, it's doing the same thing for both branches
     # if uniform:

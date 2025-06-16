@@ -6,7 +6,7 @@ from cryolike.grids import CartesianGrid2D, PolarGrid
 from cryolike.metadata import ViewingAngles
 
 from cryolike.stacks import Templates
-from cryolike.util import QuadratureType
+from cryolike.util import QuadratureType, to_torch, Precision
 
 def make_image_tensor(n_im: int, d1: int, d2: int, target_fourier: bool = False):
     t = torch.arange(n_im * d1 * d2, dtype=torch.float64)
@@ -105,8 +105,8 @@ def make_basic_Templates(
     return Templates(phys_data=phys_data, fourier_data=four_data, viewing_angles=views)
 
 
-def mock_get_fourier_slices(polar_grid: PolarGrid, viewing_angles: ViewingAngles, float_type: torch.dtype, device: torch.device):
-    x = torch.tensor(polar_grid.x_points, device=device, dtype=float_type)
-    y = torch.tensor(polar_grid.y_points, device=device, dtype=float_type)
+def mock_get_fourier_slices(polar_grid: PolarGrid, viewing_angles: ViewingAngles, precision: Precision, device: torch.device):
+    x = to_torch(polar_grid.x_points, precision, device)
+    y = to_torch(polar_grid.y_points, precision, device)
     n_imgs = viewing_angles.n_angles
     return torch.stack((x, y, torch.zeros_like(x)), dim=1).unsqueeze(0).repeat(n_imgs, 1, 1).reshape(n_imgs, polar_grid.n_shells, polar_grid.n_inplanes, 3)
