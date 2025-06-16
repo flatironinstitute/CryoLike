@@ -284,26 +284,28 @@ class TemplateGenerator:
                 exponent = torch.exp(1j * kdotr_batch) * kernelAtoms[None,:,None,:] ## (n_templates, n_shells, n_inplanes, n_atoms)
                 templates_fourier_batch = torch.sum(exponent, dim = 3) ## (n_templates, n_shells, n_inplanes)
                 _templates_fourier[start_frame:end_frame,:,:] = templates_fourier_batch.to(self.storage_device)
+        assert isinstance(_iterate_kernel_with_memory_constraints, Callable), \
+            "Memory constraint iteration function is not callable. Please check the implementation."
         _iterate_kernel_with_memory_constraints(self.n_frames, self.n_images_per_frame, _batch_kernel)
         return _templates_fourier
 
 
-def _iterate_kernel_with_memory_constraints(n_frames: int, n_images_per_frame: int, kernel: Callable[[int, int, int, int], None], verbose: bool = False):
+def _iterate_kernel_with_memory_constraints(n_frames: int, n_images_per_frame: int, kernel: Callable[[int, int, int, int], None]):
     batch_size_frame = n_frames
     success = False
     while not success and batch_size_frame > 1:
         n_batches = ceil(n_frames / batch_size_frame)
         try:
             # TODO: Check if performance issue from exponent being in the kernel function scope now
-            if verbose:
-                print(f"Batch size frames: {batch_size_frame}")
-                from tqdm import trange
-                tmp = trange(n_batches)
-            else:
-                tmp = range(n_batches)
+            # if verbose:
+            #     print(f"Batch size frames: {batch_size_frame}")
+            #     from tqdm import trange
+            #     tmp = trange(n_batches)
+            # else:
+            #     tmp = range(n_batches)
             start_frame = 0
             end_frame = batch_size_frame
-            for _ in tmp:
+            for _ in range(n_batches):
                 end_frame = min(end_frame, n_frames)
                 kernel(start_frame, end_frame, 0, n_images_per_frame)
                 start_frame += batch_size_frame
@@ -317,17 +319,17 @@ def _iterate_kernel_with_memory_constraints(n_frames: int, n_images_per_frame: i
     while not success and batch_size_image > 0:
         n_batches = ceil(n_images_per_frame / batch_size_image)
         try:
-            if verbose:
-                print(f"Batch size images: {batch_size_image}")
-                from tqdm import trange
-                tmp = trange(n_batches)
-            else:
-                tmp = range(n_batches)
+            # if verbose:
+            #     print(f"Batch size images: {batch_size_image}")
+            #     from tqdm import trange
+            #     tmp = trange(n_batches)
+            # else:
+            #     tmp = range(n_batches)
             for frame in range(n_frames):
                 print(f"Processing frame {frame + 1}/{n_frames}.")
                 start = 0
                 end = batch_size_image
-                for _ in tmp:
+                for _ in range(n_batches):
                     print(f"Processing frame {frame + 1}/{n_frames}, images {start + 1} to {end}.")
                     end = min(end, n_images_per_frame)
                     kernel(frame, frame + 1, start, end)
