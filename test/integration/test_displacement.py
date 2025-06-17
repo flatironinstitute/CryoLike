@@ -85,10 +85,6 @@ def test_displacement():
     images_phys_moveatom = templates_phys
     assert images_phys_moveatom is not None
 
-    from cryolike.plot import plot_images
-    plot_images(images_phys_moveimage, cartesian_grid, n_plots=1, show=False, filename="images_phys_moveimage.png")
-    plot_images(images_phys_moveatom, cartesian_grid, n_plots=1, show=False, filename="images_phys_moveatom.png")
-
     ## Calculate cross-correlation
     cross_correlation = torch.sum(images_phys_moveimage * images_phys_moveatom).real / torch.sqrt(torch.sum(images_phys_moveimage.abs() ** 2) * torch.sum(images_phys_moveatom.abs() ** 2))
     print(f"Cross-correlation: {cross_correlation:.4f}")
