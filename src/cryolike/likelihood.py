@@ -5,7 +5,7 @@ from typing import Literal, overload, Callable
 
 from cryolike.microscopy import CTF, translation_kernel_fourier, fourier_polar_to_cartesian_phys
 from cryolike.stacks import Images, Templates, AtomicTemplateGenerator
-from cryolike.grids import PolarGrid
+from cryolike.grids import PolarGrid, FourierImages
 from cryolike.util import Precision, to_torch, absq, complex_mul_real
 
 from cryolike.grids import Volume
@@ -113,6 +113,9 @@ class LikelihoodFourierModel:
     identity_kernel: Callable[[PolarGrid, Precision], torch.Tensor]
     likelihood: LikelihoodFourier
 
+    on_the_fly_template_projection: bool = True
+    templates: Templates | None = None
+
     def __init__(
         self,
         model: Volume | AtomicModel | Callable[[torch.Tensor], torch.Tensor] | Templates,
@@ -124,6 +127,7 @@ class LikelihoodFourierModel:
         precision: Precision = Precision.SINGLE,
         device: torch.device = torch.device('cpu'),
         identity_kernel: Callable[[PolarGrid, Precision], torch.Tensor] | None = None,
+        on_the_fly_template_projection: bool = True,
         verbose: bool = False
     ):
         self.device = device
@@ -133,10 +137,33 @@ class LikelihoodFourierModel:
         self.box_size = box_size
         self.precision = precision
         self.float_type, self.complex_type, _ = precision.get_dtypes(default=Precision.SINGLE)
-        self.viewing_angles = _ensure_viewing_angles(
-            va=viewing_angles,
-            torch_float_type=self.float_type
-        )
+
+        self.on_the_fly_template_projection = on_the_fly_template_projection and not isinstance(model, Templates)
+        if isinstance(model, Templates):
+            print("Using provided templates from model.")
+            self.model = model
+            self.templates = model
+        elif not on_the_fly_template_projection:
+            print("Pre-generating templates from model, checking viewing angles...")
+            if viewing_angles is None:
+                raise ValueError("viewing_angles must be provided if not projecting templates on the fly.")
+            self.viewing_angles = _ensure_viewing_angles(
+                va=viewing_angles,
+                torch_float_type=self.float_type
+            )
+            assert not isinstance(self.model, Templates)
+            self.templates = _make_templates_from_model(
+                model=self.model,
+                polar_grid=self.polar_grid,
+                box_size=self.box_size,
+                viewing_angles=self.viewing_angles,
+                precision=self.precision,
+                atom_shape=atom_shape,
+                compute_device=self.device,
+                output_device=self.device,
+                verbose=verbose
+            )
+
         self.atom_shape = atom_shape
         self.likelihood = LikelihoodFourier(
             polar_grid=self.polar_grid,
@@ -150,10 +177,10 @@ class LikelihoodFourierModel:
     def __call__(
         self,
         images: Images,
+        viewing_angles: ViewingAngles | None = None,
         template_indices: torch.Tensor | None = None,
         x_displacements: torch.Tensor | FloatArrayType | None = None,
         y_displacements: torch.Tensor | FloatArrayType | None = None,
-        gammas: torch.Tensor | FloatArrayType | None = None,
         ctf: CTF | None = None,
         verbose: bool = False
     ) -> torch.Tensor:
@@ -169,10 +196,20 @@ class LikelihoodFourierModel:
             torch.Tensor: The likelihood of the images given the model.
         """
 
-        if isinstance(self.model, Templates):
-            templates = self.model.clone()
-        else:
-            templates = _make_templates_from_model(
+        gammas = None
+        if viewing_angles is not None:
+            self.viewing_angles = _ensure_viewing_angles(
+                va=viewing_angles,
+                torch_float_type=self.float_type
+            )
+            if viewing_angles.gammas is not None:
+                gammas = viewing_angles.gammas.to(self.float_type).to(self.device)
+
+        if self.templates is not None:
+            _templates = self.templates.clone()
+        elif self.on_the_fly_template_projection:
+            assert not isinstance(self.model, Templates)
+            _templates = _make_templates_from_model(
                 model=self.model,
                 polar_grid=self.polar_grid,
                 box_size=self.box_size,
@@ -183,21 +220,24 @@ class LikelihoodFourierModel:
                 output_device=self.device,
                 verbose=verbose
             )
+        else:
+            raise ValueError("Templates must be provided or on_the_fly_template_projection must be True.")
+
         if template_indices is not None:
-            templates.select_images(template_indices)
+            _templates.select_images(template_indices)
         x_disps, y_disps = _validate_displacements(x_displacements, y_displacements, search_displacments=False)
-        templates.displace_images_fourier(
+        _templates.displace_images_fourier(
             x_displacements=x_disps,
             y_displacements=y_disps
         )
         if gammas is not None:
-            templates.rotate_images_fourier_discrete(gammas)
+            _templates.rotate_images_fourier_discrete(gammas)
         if ctf is not None:
-            templates.apply_ctf(ctf)
-        # templates.normalize_images_fourier(ord=2, use_max=False)
+            _templates.apply_ctf(ctf)
+        _templates.normalize_images_fourier(ord=2, use_max=False)
         images_fourier = images.images_fourier.to(self.complex_type).to(self.device)
         log_likelihood = self.likelihood(
-            templates_fourier=templates.images_fourier,
+            templates_fourier=_templates.images_fourier,
             images_fourier=images_fourier
         )
         return log_likelihood
@@ -246,7 +286,7 @@ def _make_templates_from_model(
     compute_device: torch.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'),
     output_device: torch.device = torch.device('cpu'),
     verbose: bool = False
-) -> torch.Tensor:
+) -> Templates:
     if isinstance(model, Volume):
         return Templates.generate_from_physical_volume(
             volume=model,
@@ -256,7 +296,7 @@ def _make_templates_from_model(
             compute_device=compute_device,
             output_device=output_device,
             verbose=verbose
-        ).images_fourier
+        )
     elif isinstance(model, AtomicModel):
         assert atom_shape is not None, "atom_shape must be provided if model is an AtomicModel."
         generator = AtomicTemplateGenerator(
@@ -268,7 +308,15 @@ def _make_templates_from_model(
             precision=precision
         )
         _templates_fourier = generator.generator(model.atomic_coordinates, viewing_angles)
-        return _templates_fourier
+        fourier_data = FourierImages(
+            images_fourier=_templates_fourier,
+            polar_grid=polar_grid
+        )
+        return Templates(
+            fourier_data=fourier_data,
+            box_size=box_size,
+            viewing_angles=viewing_angles,
+        ) 
     elif callable(model):
         return Templates.generate_from_function(
             function=model,
@@ -277,7 +325,7 @@ def _make_templates_from_model(
             precision=precision,
             compute_device=compute_device,
             output_device=output_device
-        ).images_fourier
+        )
     raise ValueError("Model must be an instance of Volume of AtomicModel")
 
 
