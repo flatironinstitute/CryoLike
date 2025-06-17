@@ -6,7 +6,7 @@ import numpy as np
 from torch.testing import assert_close
 from pathlib import Path
 
-from cryolike.util import Precision, InputFileType
+from cryolike.util import Precision, InputFileType, get_device
 from cryolike.file_conversions.make_templates_from_inputs_api import (
     _make_plotter_fn,
     _make_templates_from_mrc_file,
@@ -113,29 +113,34 @@ def test_make_templates_from_mrc_file(vol: Mock, templates: Mock):
 
 @patch(f"{PKG}.Templates")
 @patch(f"{PKG}.AtomicModel")
-def test_make_templates_from_pdb_file(atomicModel: Mock, templates: Mock):
+@mark.parametrize("centering", [True, False])
+def test_make_templates_from_pdb_file(atomicModel: Mock, templates: Mock, centering: bool):
     descriptor = _get_mock_img_desc()
     expected_edge_length = descriptor.cartesian_grid.box_size[0]
     expected_filename = 'file.pdb'
     verbose = True
     _atomic_model = Mock()
-    atomicModel.read_from_pdb = Mock(return_value = _atomic_model)
+    atomicModel.read_from_traj = Mock(return_value = _atomic_model)
 
-    _ = _make_templates_from_pdb_file(expected_filename, descriptor, verbose)
+    _ = _make_templates_from_pdb_file(expected_filename, descriptor, centering, DEV, verbose)
 
-    atomicModel.read_from_pdb.assert_called_once_with(
-        pdb_file = expected_filename,
+    atomicModel.read_from_traj.assert_called_once_with(
+        top_file = expected_filename,
         atom_selection = descriptor.atom_selection,
         atom_radii = descriptor.atom_radii,
         box_size = expected_edge_length,
+        centering = centering,
         use_protein_residue_model = descriptor.use_protein_residue_model
     )
+
     templates.generate_from_positions.assert_called_once_with(
         atomic_model = _atomic_model,
         viewing_angles = descriptor.viewing_angles,
         polar_grid = descriptor.polar_grid,
         box_size = descriptor.cartesian_grid.box_size,
         atom_shape = descriptor.atom_shape,
+        compute_device = DEV,
+        output_device = get_device("cpu"),
         precision = descriptor.precision,
         verbose = verbose
     )

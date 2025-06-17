@@ -245,3 +245,11 @@ class AtomicModel:
             box_size=self.box_size,
             precision=self.precision
         )
+
+
+    def toggle_gradients_coordinates(self, enable: bool = True) -> None:
+        """Enable or disable gradients for atomic coordinates."""
+        assert self.atomic_coordinates is not None, "Atomic coordinates must be set before toggling gradients."
+        assert isinstance(self.atomic_coordinates, torch.Tensor), "Atomic coordinates must be a torch.Tensor."
+        self.atomic_coordinates.requires_grad = enable
+        
