@@ -4,7 +4,7 @@ from scipy.special import gammaln as lgamma
 from typing import Literal, overload, Callable
 
 from cryolike.microscopy import CTF, translation_kernel_fourier, fourier_polar_to_cartesian_phys
-from cryolike.stacks import Images, Templates, TemplateGenerator
+from cryolike.stacks import Images, Templates, AtomicTemplateGenerator
 from cryolike.grids import PolarGrid
 from cryolike.util import Precision, to_torch, absq, complex_mul_real
 
@@ -259,18 +259,16 @@ def _make_templates_from_model(
         ).images_fourier
     elif isinstance(model, AtomicModel):
         assert atom_shape is not None, "atom_shape must be provided if model is an AtomicModel."
-        return TemplateGenerator(
-            atomic_model=model,
-            viewing_angles=viewing_angles,
+        generator = AtomicTemplateGenerator(
             polar_grid=polar_grid,
             box_size=box_size,
-            fix_atomic_coordinates=True,
-            fix_viewing_angles=True,
-            storage_device=output_device,
-            compute_device=compute_device,
+            atom_radii=model.atom_radii,
             atom_shape=atom_shape,
+            device=compute_device,
             precision=precision
-        ).generator()
+        )
+        _templates_fourier = generator.generator(model.atomic_coordinates, viewing_angles)
+        return _templates_fourier
     elif callable(model):
         return Templates.generate_from_function(
             function=model,

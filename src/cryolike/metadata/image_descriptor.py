@@ -46,7 +46,7 @@ class ImageDescriptor():
     precision: Precision
     cartesian_grid: CartesianGrid2D
     polar_grid: PolarGrid
-    viewing_angles: ViewingAngles
+    viewing_angles: ViewingAngles | None
     viewing_distance: float | None
     atom_radii: float | None
     atom_selection: str | None
@@ -69,14 +69,14 @@ class ImageDescriptor():
         self.precision = Precision.from_str(precision)
         self.cartesian_grid = cartesian_grid
         self.polar_grid = polar_grid
-        if (viewing_angles is None):
-            if (viewing_distance is None):
-                raise ValueError("One of viewing angles and viewing distance must be set.")
-            self.viewing_angles = ViewingAngles.from_viewing_distance(viewing_distance)
-            self.viewing_distance = viewing_distance
-        else:
+        if viewing_distance is None:
             self.viewing_angles = viewing_angles
             self.viewing_distance = None
+        else:
+            if viewing_angles is not None:
+                print("Warning: viewing angles are being set from viewing distance, ignoring provided viewing angles.")
+            self.viewing_angles = ViewingAngles.from_viewing_distance(viewing_distance)
+            self.viewing_distance = viewing_distance
         self.atom_radii = None if atom_radii is None else extract_unique_float(atom_radii, "atom radii")
         self.atom_selection = None if atom_selection is None else extract_unique_str(atom_selection, "atom selection")
         self.use_protein_residue_model = use_protein_residue_model
@@ -203,6 +203,7 @@ class ImageDescriptor():
         pixel_size: float,
         precision: Literal['single'] | Literal['double'] | Precision = Precision.SINGLE,
         resolution_factor: float = 1.0,
+        viewing_angles: ViewingAngles | None = None,
         viewing_distance: float | None = None,
         n_inplanes: int | None = None,
         atom_radii: float | None = None,
@@ -251,15 +252,15 @@ class ImageDescriptor():
             n_inplanes=_n_inplanes,
             uniform=True
         )
-
-        view_dist = 1.0 / (4.0 * np.pi) / resolution_factor if viewing_distance is None else viewing_distance
+        if viewing_angles is None:
+            viewing_distance = 1.0 / (4.0 * np.pi) / resolution_factor
         
         return cls(
             Precision.from_str(precision),
             _cartesian_grid,
             _polar_grid,
-            viewing_angles=None,
-            viewing_distance=view_dist,
+            viewing_angles=viewing_angles,
+            viewing_distance=viewing_distance,
             atom_radii=atom_radii,
             atom_selection=atom_selection,
             use_protein_residue_model=use_protein_residue_model,

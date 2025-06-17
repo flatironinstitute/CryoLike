@@ -88,7 +88,7 @@ def absq(
 def complex_mul_real(
     array1 : torch.Tensor,
     array2 : torch.Tensor
-):
+) -> torch.Tensor:
     ## array1 is complex and array2 is real
     if torch.is_complex(array1) and torch.is_complex(array2):
         return (array1.real * array2.real - array1.imag * array2.imag)
@@ -96,8 +96,9 @@ def complex_mul_real(
         return (array1.real * array2)
     elif torch.is_floating_point(array1) and torch.is_complex(array2):
         return (array1 * array2.real)
-    elif torch.is_floating_point(array1) and torch.is_floating_point(array2):
-        return (array1 * array2)
+    # elif torch.is_floating_point(array1) and torch.is_floating_point(array2):
+    #     return (array1 * array2)
+    return (array1 * array2)
 
 
 def fourier_bessel_transform(image_fourier_: torch.Tensor, axis = -1, norm = "ortho") -> torch.Tensor:

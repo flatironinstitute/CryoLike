@@ -36,7 +36,8 @@ img_complete = {
     'atom_radii': 1.1,
     'atom_selection': "my selection",
     'use_protein_residue_model': False,
-    'atom_shape': "hard-sphere"
+    'atom_shape': "hard-sphere",
+    'viewing_distance': 100.
 }
 
 img_with_nones = {
@@ -44,6 +45,7 @@ img_with_nones = {
     'n_pixels': 4,
     'pixel_size': 2.,
     'n_inplanes': 12,
+    'viewing_distance': None
 }
 
 
@@ -54,7 +56,13 @@ def _assert_img_desc_equality(a: ImageDescriptor, b: ImageDescriptor):
     assert a.polar_grid.dist_radii == b.polar_grid.dist_radii
     assert a.polar_grid.radius_max == b.polar_grid.radius_max
     assert a.polar_grid.n_inplanes == b.polar_grid.n_inplanes
-    assert a.viewing_distance == b.viewing_distance
+    if a.viewing_distance is None:
+        assert b.viewing_distance is None
+    else:
+        assert isinstance(a.viewing_distance, float)
+        assert b.viewing_distance is not None
+        assert isinstance(b.viewing_distance, float)
+        assert a.viewing_distance == b.viewing_distance
     if a.atom_radii is None:
         assert b.atom_radii is None
     else:
