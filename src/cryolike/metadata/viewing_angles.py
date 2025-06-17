@@ -123,7 +123,7 @@ class ViewingAngles:
         Returns:
             ViewingAngles: The set of random viewing angles
         """
-        float_type, _, _ = precision.get_dtypes(default=Precision.DEFAULT)
+        float_type, _, _ = precision.get_dtypes(default=Precision.SINGLE)
         _azimus = torch.rand(n_angles, dtype=float_type) * 2 * pi
         _cos_polars = torch.rand(n_angles, dtype=float_type) * 2 - 1
         _polars = torch.arccos(_cos_polars)
