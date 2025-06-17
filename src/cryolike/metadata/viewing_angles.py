@@ -238,3 +238,28 @@ class ViewingAngles:
             gammas=_gammas,
             weights=_weights
         )
+
+
+    def repeat(self, n_repeats: int) -> "ViewingAngles":
+        """Repeats the ViewingAngles object n_repeats times.
+
+        Args:
+            n_repeats (int): The number of times to repeat the angles
+
+        Returns:
+            ViewingAngles: A new ViewingAngles object with repeated angles
+        """
+        _azimus = self.azimus.repeat(n_repeats)
+        _polars = self.polars.repeat(n_repeats)
+        _gammas = None
+        if self.gammas is not None:
+            _gammas = self.gammas.repeat(n_repeats)
+        _weights = None
+        if self.weights is not None:
+            _weights = self.weights.repeat(n_repeats)
+        return ViewingAngles(
+            azimus=_azimus,
+            polars=_polars,
+            gammas=_gammas,
+            weights=_weights
+        )

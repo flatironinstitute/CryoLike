@@ -364,11 +364,24 @@ class Templates(Images):
             device=compute_device,
             precision=precision
         )
-        templates_fourier = torch.zeros(
-            (n_frames, n_angles, polar_grid.n_shells, polar_grid.n_inplanes),
-            dtype=generator.complex_type,
-            device=get_device(output_device)
-        )
+        try:
+            templates_fourier = torch.zeros(
+                (n_frames, n_angles, polar_grid.n_shells, polar_grid.n_inplanes),
+                dtype=generator.complex_type,
+                device=get_device(output_device)
+            )
+        except torch.OutOfMemoryError:
+            if output_device == "cpu":
+                raise MemoryError("Templates cannot even fit in CPU memory! Consider using a smaller polar grid or fewer frames.")
+            else:
+                print("Out of memory on output device, trying to allocate on CPU memory instead.")
+                ## try again with CPU memory
+                output_device = torch.device("cpu")
+                templates_fourier = torch.zeros(
+                    (n_frames, n_angles, polar_grid.n_shells, polar_grid.n_inplanes),
+                    dtype=generator.complex_type,
+                    device=output_device
+                )
         def _kernel(start_frame: int, end_frame: int, start_image: int, end_image: int):
             _atomic_coordinates = atomic_model.atomic_coordinates[start_frame:end_frame, :, :].to(compute_device)
             _viewing_angles = viewing_angles.get_slice(start_image, end_image).to(device=compute_device)
@@ -378,6 +391,7 @@ class Templates(Images):
         _iterate_kernel_with_memory_constraints(n_frames, n_angles, _kernel)
         templates_fourier = templates_fourier.view(n_frames * n_angles, polar_grid.n_shells, polar_grid.n_inplanes)
         data = FourierImages(templates_fourier, polar_grid=polar_grid)
+        viewing_angles = viewing_angles.repeat(n_frames)
         return cls(fourier_data=data, viewing_angles=viewing_angles, box_size=box_size)
 
 
