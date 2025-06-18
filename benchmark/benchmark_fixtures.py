@@ -169,6 +169,6 @@ def make_default_templates(polar_grid: PolarGrid, viewing_angles: ViewingAngles,
         viewing_angles=viewing_angles,
         polar_grid=polar_grid,
         precision=precision,
-        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        compute_device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
     return templates

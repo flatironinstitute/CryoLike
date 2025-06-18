@@ -6,9 +6,9 @@ from cryolike.file_mgmt import LikelihoodFileManager, LikelihoodOutputDataSource
 from cryolike.stacks import Templates, Images
 from cryolike.microscopy import CTF
 from cryolike.cross_correlation_likelihood import CrossCorrelationLikelihood, OptimalPoseReturn
-from cryolike.likelihood import calc_likelihood_optimal_pose
+from cryolike.likelihood import LikelihoodFourierModel
 from cryolike.metadata import ImageDescriptor
-from cryolike.util import CrossCorrelationReturnType, OutputConfiguration
+from cryolike.util import CrossCorrelationReturnType, OutputConfiguration, Precision
 
 ## TODO: implement functionality: optimized_inplane_rotation, optimized_displacement, optimized_viewing_angle
 
@@ -195,19 +195,25 @@ def _get_optimal_pose_log_likelihood_partial(tp: Templates, image_desc: ImageDes
         mode: Literal['phys'] | Literal['fourier'] = 'fourier'
     ) -> Tensor:
         # TODO: This can be revised once calc_likelihood_etc is cleaned up
-        res =  calc_likelihood_optimal_pose(
-            template = tp,
-            image = im,
-            ctf = ctf,
-            mode = mode,
+        likelihood_fourier_model =  LikelihoodFourierModel(
+            model = tp,
+            polar_grid = tp.polar_grid,
+            box_size = tp.box_size,
+            n_pixels = im.phys_grid.n_pixels[0] ** 2,
+            viewing_angles = None,
+            atom_shape = None,
+            precision = Precision.SINGLE,
+            device = device('cuda'),
+            verbose = False
+        )
+        res = likelihood_fourier_model(
+            images = im,
             template_indices = optimal_pose.optimal_template_S,
-            displacements_x = optimal_pose.optimal_displacement_x_S,
-            displacements_y = optimal_pose.optimal_displacement_y_S,
-            inplane_rotations = optimal_pose.optimal_inplane_rotation_S,
-            return_distance = False,
-            return_likelihood = True,
-            precision = image_desc.precision,
-            use_cuda = True
+            x_displacements = optimal_pose.optimal_displacement_x_S,
+            y_displacements = optimal_pose.optimal_displacement_y_S,
+            gammas = optimal_pose.optimal_inplane_rotation_S,
+            ctf = ctf,
+            verbose = False
         )
         assert isinstance(res, Tensor)
         return res

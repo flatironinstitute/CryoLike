@@ -43,6 +43,7 @@ def _make_templates_from_mrc_file(
     if volume.density_physical is None:
         raise ValueError(f"Can't happen: parsing mrc file {mrc_file} did not generate a physical density.")
     volume.density_physical = volume.density_physical.to(torch_float_type).to(device)
+    assert descriptor.viewing_angles is not None, "Viewing angles must be set in the ImageDescriptor to generate templates."
     return Templates.generate_from_physical_volume(
         volume=volume,
         polar_grid=descriptor.polar_grid,
@@ -55,7 +56,9 @@ def _make_templates_from_mrc_file(
 def _make_templates_from_pdb_file(
     pdb_file: str,
     descriptor: ImageDescriptor,
-    verbose: bool
+    centering: bool = True,
+    device: torch.device | None = None,
+    verbose: bool = True,
 ) -> Templates:
     if not descriptor.is_compatible_with_pdb():
         raise ValueError("Attempting to read templates from PDB file, but the atom_radii parameter or use_protein_residue_model=True is not set.")
@@ -63,19 +66,23 @@ def _make_templates_from_pdb_file(
     if len(np.unique(box_size)) != 1:
         raise ValueError("Reading an atomic model from a PDB file with a non-square box size is not yet supported.")
     _box_edge_length: float = box_size[0]
-    atomic_model = AtomicModel.read_from_pdb(
-        pdb_file = pdb_file,
+    atomic_model = AtomicModel.read_from_traj(
+        top_file = pdb_file,
         atom_selection = descriptor.atom_selection,
         atom_radii = descriptor.atom_radii,
         box_size = _box_edge_length,
+        centering = centering,
         use_protein_residue_model = descriptor.use_protein_residue_model
     )
+    assert descriptor.viewing_angles is not None, "Viewing angles must be set in the ImageDescriptor to generate templates."
     return Templates.generate_from_positions(
         atomic_model=atomic_model,
         viewing_angles=descriptor.viewing_angles,
         polar_grid=descriptor.polar_grid,
         box_size=box_size,
         atom_shape=descriptor.atom_shape,
+        compute_device=get_device(device),
+        output_device=get_device("cpu"),
         precision=descriptor.precision,
         verbose = verbose
     )
@@ -97,6 +104,7 @@ def _make_templates_from_memory_array(
     if (volume.density_physical is None):
         raise ValueError("Unreachable: creating a volume with explicit physical density did not preserve physical density.")
     volume.density_physical = volume.density_physical.to(torch_float_type).to(device)
+    assert descriptor.viewing_angles is not None, "Viewing angles must be set in the ImageDescriptor to generate templates."
     return Templates.generate_from_physical_volume(
         volume,
         descriptor.polar_grid,
@@ -121,7 +129,7 @@ def _make_raw_template(
     elif ftype == InputFileType.PDB:
         assert isinstance(src, Path)
         src_fn = str(src.absolute())
-        tp = _make_templates_from_pdb_file(src_fn, descriptor, verbose)
+        tp = _make_templates_from_pdb_file(src_fn, descriptor, device=device, verbose=verbose)
     elif ftype == InputFileType.MEM:
         assert isinstance(src, torch.Tensor) or isinstance(src, np.ndarray)
         tp = _make_templates_from_memory_array(src, descriptor, t_float, device, verbose)
@@ -176,7 +184,7 @@ def make_templates_from_inputs(
     descriptor = ImageDescriptor.load(image_parameters_file)
     precision = Precision.from_str(descriptor.precision)
     (t_float, _, _) = precision.get_dtypes(default=Precision.SINGLE)
-    device = get_device(None)
+    device = get_device("cuda")#None)
     reader_fn = _make_template_maker_fn(descriptor, t_float, device, verbose)
     plotter_fn = _make_plotter_fn(output_plots, descriptor)
     

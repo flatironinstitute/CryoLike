@@ -57,8 +57,8 @@ n_images = log_likelihood_ratio_integrated.shape[0]
 # cumhist_phys = np.cumsum(hist) * (bin_centers[1] - bin_centers[0])
 
 ## optimal pose fourier
-log_likelihood_fourier_P0 = torch.load(os.path.join(folder_output_log_likelihood_0, "log_likelihood_optimal_fourier_stack_000000.pt"), weights_only=True).detach().numpy()
-log_likelihood_fourier_P1 = torch.load(os.path.join(folder_output_log_likelihood_1, "log_likelihood_optimal_fourier_stack_000000.pt"), weights_only=True).detach().numpy()
+log_likelihood_fourier_P0 = torch.load(os.path.join(folder_output_log_likelihood_0, "log_likelihood_optimal_fourier_stack_000000.pt"), weights_only=True).detach().cpu().numpy()
+log_likelihood_fourier_P1 = torch.load(os.path.join(folder_output_log_likelihood_1, "log_likelihood_optimal_fourier_stack_000000.pt"), weights_only=True).detach().cpu().numpy()
 log_likelihood_ratio_fourier = log_likelihood_fourier_P1 - log_likelihood_fourier_P0
 log_likelihood_ratio_fourier = np.sort(log_likelihood_ratio_fourier)
 hist, bin_edges = np.histogram(log_likelihood_ratio_fourier, bins=bins, density=True)

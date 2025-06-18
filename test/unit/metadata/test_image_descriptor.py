@@ -16,7 +16,6 @@ def test_ctor(va: Mock):
     cgrid = Mock()
     pgrid = Mock()
     angles = Mock()
-    distance = 10.
     radii = None
     selection = "my selection"
     shape = AtomShape.HARD_SPHERE
@@ -26,7 +25,7 @@ def test_ctor(va: Mock):
         cartesian_grid=cgrid,
         polar_grid=pgrid,
         viewing_angles=angles,
-        viewing_distance=distance,
+        viewing_distance=None,
         atom_radii=radii,
         atom_selection=selection,
         use_protein_residue_model=True,
@@ -42,6 +41,7 @@ def test_ctor(va: Mock):
     assert res.use_protein_residue_model
     assert res.atom_shape == shape
 
+    distance = 10.
     res2 = ImageDescriptor(
         precision=prec,
         cartesian_grid=cgrid,
@@ -59,19 +59,19 @@ def test_ctor(va: Mock):
     assert res2.viewing_angles != angles
 
 
-def test_ctor_throws_on_no_viewing_data():
-    prec = Precision.SINGLE
-    cgrid = Mock()
-    pgrid = Mock()
+# def test_ctor_throws_on_no_viewing_data():
+#     prec = Precision.SINGLE
+#     cgrid = Mock()
+#     pgrid = Mock()
 
-    with raises(ValueError, match="viewing distance must be set"):
-        _ = ImageDescriptor(
-            precision=prec,
-            cartesian_grid=cgrid,
-            polar_grid=pgrid,
-            viewing_angles=None,
-            viewing_distance=None
-        )
+#     with raises(ValueError, match="viewing distance must be set"):
+#         _ = ImageDescriptor(
+#             precision=prec,
+#             cartesian_grid=cgrid,
+#             polar_grid=pgrid,
+#             viewing_angles=None,
+#             viewing_distance=None
+#         )
 
 
 def test_get_3d_box_size():
@@ -177,12 +177,12 @@ def test_is_compatible_with_pdb():
     assert sut.is_compatible_with_pdb()
 
 
-def test_serialization_throws_on_no_viewing_distance():
-    sut = ImageDescriptor(
-        Precision.SINGLE, Mock(), Mock(), viewing_angles=Mock(), viewing_distance=None
-    )
-    with raises(NotImplementedError, match="no explicit viewing distance"):
-        _ = sut.serialize()
+# def test_serialization_throws_on_no_viewing_distance():
+#     sut = ImageDescriptor(
+#         Precision.SINGLE, Mock(), Mock(), viewing_angles=Mock(), viewing_distance=None
+#     )
+#     with raises(NotImplementedError, match="no explicit viewing distance"):
+#         _ = sut.serialize()
 
 
 def test_serialization_roundtrip():

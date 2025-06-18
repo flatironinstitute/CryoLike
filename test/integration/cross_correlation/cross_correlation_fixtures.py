@@ -144,7 +144,7 @@ def make_planewave_templates(
         return torch.exp(2 * pi * 1j * torch.matmul(fs, wavevector_planewave)).to(complex_type)
     templates = Templates.generate_from_function(
             wavevector_function, viewing_angles, polar_grid,
-            device=device, output_device="cpu", precision=precision
+            compute_device=device, output_device="cpu", precision=precision
         )
     return templates
 
@@ -254,7 +254,6 @@ def viewing_angles_to_cartesian_displacements(
     Rz_azi = _rotate_about_plus_z_axis(-1. * viewing_angles.azimus)
 
     rotation = torch.matmul(Rz_gam, torch.matmul(Ry, Rz_azi)) # n_angles x 3 x 3
-    print(f'rotation {rotation.shape}')
     # below: n x 2
     rotated_wavevector: torch.Tensor = torch.tensordot(rotation, wave_vector_delta_a.to(device), dims=([2], [0]))[:, 0:2] # type: ignore
     return rotated_wavevector

@@ -16,14 +16,11 @@ from time import time
 # (I have switched to running on CPU for now)
 def test_distance():
 
-    use_cuda = False
+    use_cuda = True #False
     device = torch.device("cuda") if use_cuda else torch.device("cpu")
     precision = Precision.SINGLE
     snr = 0.1
-    if precision == Precision.SINGLE:
-        torch_float_type = torch.float32
-    elif precision == Precision.DOUBLE:
-        torch_float_type = torch.float64
+    torch_float_type, _, _ = precision.get_dtypes(default=Precision.SINGLE)
 
     nufft_eps = 1e-12
     box_size = 32.0
@@ -58,7 +55,7 @@ def test_distance():
     radius = polar_grid.radius_shells
 
     file_dir = Path(__file__).resolve()
-    atomic_model = AtomicModel.read_from_pdb(pdb_file=str(file_dir.parent.parent.joinpath("data").joinpath("1uao.pdb")), box_size=box_size, use_protein_residue_model=True)
+    atomic_model = AtomicModel.read_from_traj(top_file=str(file_dir.parent.parent.joinpath("data").joinpath("1uao.pdb")), box_size=box_size, use_protein_residue_model=True)
     tp = Templates.generate_from_positions(atomic_model, viewing_angles, polar_grid, box_size, atom_shape=atom_shape, precision=precision)
 
     n_images = tp.n_images
