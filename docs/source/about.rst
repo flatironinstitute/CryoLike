@@ -16,7 +16,7 @@ all optimized for modern GPUs.
 
 
 Mathematical Framework
-======================
+----------------------
 
 Given a cryo-EM image, and a 3D structure or map, cryoLike computes the image-to-structure likelihood. 
 Representing the image and templates (2D projections of the 3D structure) in a Fourier-Bessel basis set, 
@@ -26,7 +26,7 @@ CryoLike then approximates the image-to-structure likelihood by using the image-
 evaluated at the optimal pose obtained by finding the best cross-correlation. 
 
 Cross-Correlation in Fourier Space
-==================================
+################################
 
 At its core, the cross-correlation :math:`\mathcal{C}(\theta; f, g)` between two functions :math:`f(\psi)` and :math:`g(\psi)` is defined as:
 
@@ -53,7 +53,7 @@ then applying an inverse transform to obtain the final cross-correlation with re
 
 
 Image-to-Template Likelihood
-----------------
+################################
 
 This section outlines a simplified formulation of the main cryoLike output: the image-to-template likelihood.
 For the sake of simplicity, we formulate it in physical space but it can be easily extended to Fourier space. 
