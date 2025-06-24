@@ -88,6 +88,9 @@ The parameters are as follows:
       None
    
    Example usage:
+
+
+  python3 plot_example.py [LINK TO EXAMPLES]
    
    .. code-block:: python
    

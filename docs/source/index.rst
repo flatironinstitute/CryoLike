@@ -21,7 +21,7 @@ Welcome to CryoLike's documentation!
    installation
    first-steps
    usage/usage
-   examples/
-   tutorial/
+   examples/examples
+   tutorial/tutorials
 .. 
    pythonapi/modules
