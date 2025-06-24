@@ -1,4 +1,4 @@
-About the Code
+Mathematical Framework
 ======================
 
 CryoLike is a GPU-accelerated software package for efficiently computing 
@@ -15,7 +15,7 @@ cross-correlation computation, and log-likelihood evaluation,
 all optimized for modern GPUs. 
 
 
-Mathematical Framework
+Main objective
 ----------------------
 
 Given a cryo-EM image, and a 3D structure or map, cryoLike computes the image-to-structure likelihood. 

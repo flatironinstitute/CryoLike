@@ -1,7 +1,7 @@
-Starting from MRC and STAR file formats
+Converting particles from MRCs with corresponding STAR files
 ========================================================
 
-In this tutorial, we will show how to read cryo-EM data from STAR files and MRC files into CryoLike.
+In this example, we will show how to read cryo-EM data from STAR files and MRC files into CryoLike.
 
 .. What is our format? 
 
