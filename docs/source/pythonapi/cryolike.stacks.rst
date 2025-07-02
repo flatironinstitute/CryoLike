@@ -1,37 +1,23 @@
-cryolike.stacks package
+cryolike.stacks
 =======================
 
-Submodules
-----------
-
-cryolike.stacks.image module
+cryolike.stacks.image
 ----------------------------
 
 .. automodule:: cryolike.stacks.image
    :members:
-   :undoc-members:
    :show-inheritance:
 
-cryolike.stacks.make\_templates\_from\_inputs\_api module
+cryolike.stacks.make\_templates\_from\_inputs\_api
 ---------------------------------------------------------
 
 .. automodule:: cryolike.stacks.make_templates_from_inputs_api
    :members:
-   :undoc-members:
    :show-inheritance:
 
-cryolike.stacks.template module
+cryolike.stacks.template
 -------------------------------
 
 .. automodule:: cryolike.stacks.template
    :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: cryolike.stacks
-   :members:
-   :undoc-members:
    :show-inheritance:

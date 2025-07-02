@@ -1,53 +1,30 @@
-cryolike.grids package
+cryolike.grids
 ======================
 
-Submodules
-----------
-
-cryolike.grids.cartesian\_grid module
+cryolike.grids.cartesian\_grid
 -------------------------------------
 
 .. automodule:: cryolike.grids.cartesian_grid
    :members:
-   :undoc-members:
    :show-inheritance:
 
-cryolike.grids.data\_transfer\_classes module
----------------------------------------------
-
-.. automodule:: cryolike.grids.data_transfer_classes
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-cryolike.grids.polar\_grid module
+cryolike.grids.polar\_grid
 ---------------------------------
 
 .. automodule:: cryolike.grids.polar_grid
    :members:
-   :undoc-members:
    :show-inheritance:
 
-cryolike.grids.sphere\_grid module
+cryolike.grids.sphere\_grid
 ----------------------------------
 
 .. automodule:: cryolike.grids.sphere_grid
    :members:
-   :undoc-members:
    :show-inheritance:
 
-cryolike.grids.volume module
+cryolike.grids.volume
 ----------------------------
 
 .. automodule:: cryolike.grids.volume
    :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: cryolike.grids
-   :members:
-   :undoc-members:
    :show-inheritance:

@@ -1,85 +1,47 @@
-cryolike.util package
+cryolike.util
 =====================
 
-Submodules
-----------
-
-cryolike.util.array module
---------------------------
-
-.. automodule:: cryolike.util.array
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-cryolike.util.atomic\_model module
+cryolike.util.atomic\_model
 ----------------------------------
 
 .. automodule:: cryolike.util.atomic_model
    :members:
-   :undoc-members:
    :show-inheritance:
 
-cryolike.util.data\_transfer\_classes module
---------------------------------------------
-
-.. automodule:: cryolike.util.data_transfer_classes
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-cryolike.util.device\_handling module
--------------------------------------
-
-.. automodule:: cryolike.util.device_handling
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-cryolike.util.enums module
+cryolike.util.enums
 --------------------------
 
 .. automodule:: cryolike.util.enums
    :members:
-   :undoc-members:
    :show-inheritance:
 
-cryolike.util.image\_manipulation module
-----------------------------------------
+.. cryolike.util.image\_manipulation module
+.. ----------------------------------------
 
-.. automodule:: cryolike.util.image_manipulation
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. .. automodule:: cryolike.util.image_manipulation
+..    :members:
+..    :undoc-members:
+..    :show-inheritance:
 
-cryolike.util.reformatting module
----------------------------------
+.. cryolike.util.reformatting module
+.. ---------------------------------
 
-.. automodule:: cryolike.util.reformatting
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. .. automodule:: cryolike.util.reformatting
+..    :members:
+..    :undoc-members:
+..    :show-inheritance:
 
-cryolike.util.typechecks module
--------------------------------
+.. cryolike.util.typechecks module
+.. -------------------------------
 
-.. automodule:: cryolike.util.typechecks
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. .. automodule:: cryolike.util.typechecks
+..    :members:
+..    :undoc-members:
+..    :show-inheritance:
 
-cryolike.util.types module
+cryolike.util.types
 --------------------------
 
 .. automodule:: cryolike.util.types
    :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: cryolike.util
-   :members:
-   :undoc-members:
    :show-inheritance:
