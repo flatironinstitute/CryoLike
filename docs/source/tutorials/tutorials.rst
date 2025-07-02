@@ -9,7 +9,12 @@ These pages provide more detailed tutorials of CryoLike.
   how to :doc:`install <installation>` the project.
 
 
-.. toctree:: 
+.. toctree::
     :maxdepth: 2
 
+    collect_likelihood_matrix
     From_structures_images_to_likelihoodmatrix
+    read_cryosparc_file
+    read_cryosparc_restack
+    read_star_file_indexed
+    read_star_file_noindex

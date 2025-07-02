@@ -30,8 +30,8 @@ If the dictionary is returned, we expect it to contain the keys ``optics``
 and ``particles``. These two dataframes will be joined together on
 the ``rlnOpticsGroup`` field.
 
-Any valid Starfile must contain at least the ``Voltage`` and ``SphericalAberration``
-fields.
+Any valid Starfile must contain at least the ``Voltage`` and
+``SphericalAberration`` fields.
 
 
 ReLion-formatted
@@ -96,8 +96,10 @@ We also support a more generic Starfile format. The same basic conditions
 parse the remaining rows, we simply treat the rows as a list of metadata
 values to be applied in sequence to images from an MRC file.
 
-This is the format expected in the ``convert_particle_stacks_from_star_files()``
-wrapper (see :doc:`the image conversion documentation</usage/imageConversion>`).
+This is the format expected in the
+``convert_particle_stacks_from_star_files()``
+wrapper
+(see :doc:`the image conversion documentation</usage/imageConversion>`).
 
 The expected fields are the same as for the ReLion case, above, except
 that we will ignore the ``AngleRot``, ``AngleTilt``, ``AnglePsi``, and
@@ -114,10 +116,11 @@ to be defined:
  - ``ctf/df1_A`` as the "DefocusU"
  - ``ctf/df2_A`` as the "DefocusV"
  - ``ctf/df_angle_rad`` as the defocus angle
- - ``ctf/cs_mm`` as the spherical aberration value (note that this is assumed to be
-   the same for all described images)
+ - ``ctf/cs_mm`` as the spherical aberration value (note
+   that this is assumed to be the same for all described images)
  - ``ctf/accel_kv`` as the voltage value (assumed consistent for all images)
- - ``ctf/amp_constrast`` as the amplitude contrast (assumed consistent for all images)
+ - ``ctf/amp_constrast`` as the amplitude contrast (assumed consistent
+   for all images)
  - ``ctf/phase_shift_rad`` as the phase shift value
 
 With internal index
@@ -126,8 +129,10 @@ With internal index
 If the CryoSparc file defines an internal index of particle files, we will
 also look for the following fileds:
 
- - ``blob/path``: defines the path to the MRC file containing each particle image
- - ``blob/idx``: states the index, within the MRC file, of the image being described
+ - ``blob/path``: defines the path to the MRC file containing
+   each particle image
+ - ``blob/idx``: states the index, within the MRC file, of the
+   image being described
  - ``blob/psize_A``: optional. If defined, states the pixel size of the image
 
 Note that all these values are being read by the same index. So for an indexed
@@ -148,5 +153,5 @@ If the internal index fields are not present, we assume that the
 records are correctly-ordered descriptors of the images in the
 MRC files in the job directory. See the
 :doc:`image conversion documentation</usage/imageConversion>`
-for more details (``convert_particle_stacks_from_cryosparc_restack()```).
+for more details (``convert_particle_stacks_from_cryosparc_restack()``).
 
