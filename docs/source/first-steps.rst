@@ -76,7 +76,8 @@ Data Sources
 
 .. _data_sources:
 
-Data used in the examples and test cases are retrieved from the following sources:
+Data used in the examples and test cases are retrieved
+from the following sources:
 
 - EMPIAR-10026
 - EMD: 2788
@@ -89,8 +90,9 @@ Detailed Tutorials
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-   
-   tutorials/read_star_file
-   tutorials/read_cryosparc_file
+
+   examples/read_star_file_indexed
+   examples/read_star_file_noindex
+   examples/read_cryosparc_file
 
 

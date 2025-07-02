@@ -18,5 +18,5 @@ These pages provide more detailed examples of the CryoLike functions and the use
     read_star_file_noindex
     read_star_file_indexed
     read_cryosparc_file
-    read_cryosparc_restack
     run_likelihood
+    .. read_cryosparc_restack

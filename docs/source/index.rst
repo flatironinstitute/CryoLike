@@ -23,5 +23,4 @@ Welcome to CryoLike's documentation!
    usage/usage
    examples/examples
    tutorials/tutorials
-.. 
    pythonapi/modules
