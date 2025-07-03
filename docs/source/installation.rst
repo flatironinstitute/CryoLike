@@ -30,9 +30,12 @@ If you are using a ``venv`` virtual environment:
    (venv) $ pip install finufft
    (venv) $ pip install cufinufft
 
-Note that the torch installation might depend on your system, please refer to the
-pytorch official website for the `pytorch installation guide <https://pytorch.org/get-started/locally/>`_.
-For detailed installation of finufft and cufinufft, please refer to `the official FINUFFT website <https://finufft.readthedocs.io/en/latest/>`_.
+Note that the torch installation might depend on
+your system, please refer to the
+``pytorch`` official website for the
+`pytorch installation guide <https://pytorch.org/get-started/locally/>`_.
+For detailed installation of ``finufft`` and ``cufinufft``, please refer to
+`the official FINUFFT website <https://finufft.readthedocs.io/en/latest/>`_.
 
 To install the CryoLike Python library itself, clone the repository and
 run the following command in the ``/python`` directory of the repository:

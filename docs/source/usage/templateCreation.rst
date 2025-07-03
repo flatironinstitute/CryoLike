@@ -1,26 +1,29 @@
 Template Creation
 ##############################
 
-In CryoLike, "Templates" (or a ``Templates`` object) are stacks of
+In CryoLike, "Templates" (or a
+:class:`Templates <cryolike.stacks.template.Templates>`
+object) are stacks of
 images, with each image representing the 2D projection of a
-base 3D structure or 3D map with a particular orientation
-("viewing angle") relative
-to the capture device.
+base 3D structure or 3D map onto a surface normal to a
+particular orientation ("viewing angle") of the
+capture device.
 
 Overview
 ==========
 
 CryoLike can convert models in several formats:
+ - PDB files
+ - MRC files
+ - In-memory representations (as Pytorch Tensors or Numpy Arrays)
 
- - MRC
- - PDB
-
-The ``Templates`` object itself is virtually identical to the
+The ``Templates`` object itself is an extension of the
 ``Images`` object: it consists
-of a stack of images. The main functional difference is that
+of a stack of images. The main difference is that
 the ``Templates`` requires that
 viewing angles be recorded (while ``Images`` objects may leave
-this field empty).
+this field empty, since its meaning is not well-defined in that
+context).
 
 
 Templates Metadata
@@ -28,7 +31,7 @@ Templates Metadata
 
 As described in more detail in the
 :doc:`image settings documentation</usage/imageSettings>`
-and the XREF-API documentation, there are some image descriptor
+and the **XREF-API** documentation, there are some image descriptor
 metadata fields that apply only to ``Templates`` during the
 conversion process. Other than viewing distance,
 these are only required or used for converting PDB files.
@@ -45,11 +48,17 @@ specified parameters for many PDBs of maps.
 For a basic example of generating ``Templates`` from PDB files, see the
 :doc:`template generation example </examples/make_templates>`.
 
+For complete documentation of the API, see the
+:doc:`API documentation </pythonapi/modules>`, in particular the
+:func:`make_templates_from_inputs() function
+<cryolike.stacks.make_templates_from_inputs_api.make_templates_from_inputs>`
+and the :class:`Templates class <cryolike.stacks.template.Templates>`.
+
+
 Wrapper function
 ----------------
 
-The ``make_templates_from_inputs()`` wrapper function is exported from
-``CryoLike.stacks``. It accepts:
+The ``make_templates_from_inputs()`` wrapper function accepts:
 
  - a list of inputs ``list_of_inputs``: each input can be a path
    to a file (PDB, MRC), or a Numpy array or Torch tensor containing
@@ -75,7 +84,7 @@ Each file will be named following the pattern:
 
  - for file-based inputs, the name of the source PDB or MRC
    file (without extension)
- - for in-nemory inputs, ``tensor_{i}`` where ``{i}`` is the order
+ - for in-memory inputs, ``tensor_{i}`` where ``{i}`` is the order
    of the item in the input list.
 
 If a file by this name already exists--for instance, if the user processed
@@ -123,7 +132,7 @@ Additional methods
 ------------------
 
 Most users are expected to use the wrapper function described above.
-However, the ``Tenmplates`` class also exposes some functions that
+However, the ``Templates`` class also exposes some functions that
 can generate a stack of templates from a function, as well as the
 underlying calls to create templates from physical volumes
 or from atom positions.
