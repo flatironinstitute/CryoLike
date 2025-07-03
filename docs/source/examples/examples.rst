@@ -1,14 +1,16 @@
 Examples
 ==========================
-.. Also considered: "Functionality in detail"
 
-These pages provide more detailed examples of the CryoLike
-functions and the use cases it can handle.
+These pages provide basic examples of the CryoLike
+functions and the use cases it can handle. They intentionally
+do not cover a wide array of possible use cases--more detailed
+information can be found in both the :doc:`/tutorials/tutorials`
+section and the :doc:`API documentation </pythonapi/modules>`.
 
-
-.. Check out the :doc:`usage` section for further information, including
-  how to :doc:`install <installation>` the project.
-
+These examples are distributed with the source code under the
+``src/example`` directory, and should work on every installation.
+Running through them
+is a good way to confirm that your system is set up properly.
 
 .. toctree::
     :maxdepth: 2
