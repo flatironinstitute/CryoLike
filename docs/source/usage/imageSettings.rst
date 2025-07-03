@@ -6,6 +6,8 @@ to interpret a set of 2D images (Images stack or Templates). An
 ``ImageDescriptor`` is a required input to the functions for making
 Templates or converting experimentally-captured Images.
 
+For full details, see **LINK TO API DOCUMENTATION.**
+
 Available fields
 ============================
 
@@ -21,16 +23,17 @@ The ``ImageDescriptor`` object has three fields that must
 be present, whether it is being used for Images or for Templates.
 
 These are:
- - A ``CartesianGrid2D`` instance
- - A ``PolarGrid`` instance
- - A ``Precision`` (single or double)
 
+ - A :class:`CartesianGrid2D <cryolike.grids.cartesian_grid.CartesianGrid2D>`
+   instance
+ - A :class:`PolarGrid <cryolike.grids.polar_grid.PolarGrid>` instance
+ - A precision (single or double), as a string or a
+   :class:`Precision <cryolike.util.enums.Precision>`
 
 The ``CartesianGrid2D`` describes a two-dimensional grid.
 While the class supports rectangular grids and pixel shapes,
-by default this will be a square grid defined by the number
-of pixels per side (``n_pixels``) and the pixel size
-(``pixel_size`` in Angstroms).
+by default this is a square grid defined by the number
+of pixels per side and the pixel size (in Angstroms).
 
 The ``PolarGrid`` describes a polar-coordinate grid used to
 discretize the Fourier-space representation of the image.
@@ -39,8 +42,6 @@ CryoLike as a whole does not yet support them. Uniform grids
 can be completely described by a number of shells (radii),
 the radial distances of the shells, and the number of in-plane
 points per shell.
-
-The ``Precision`` can be set to single or double precision.
 
 
 Template-specific fields
@@ -73,7 +74,7 @@ onto a 2D plane. These could be set manually, but in current
 usage they are computed automatically from the
 ``viewing distance``. A smaller ``viewing distance`` implies a
 finer angular search grid, and therefore creates more templates
-and increses the computational costs.
+and increases the computational costs.
 
 Once the viewing distance is defined, the grid for the
 :math:`\alpha` and :math:`\beta`
@@ -85,15 +86,22 @@ the figure below is applied to generate each template.
 The `resolution_factor` determines the maximum frequency
 in the Fourier polar grid up to
 which the cross-correlation and likelihood
-computations will be performed. `resolution_factor=1`
-performs calculations up to Nyqst (2 * ``pixel_size``)
-The maximum frequency radius is  the *resolution_factor/Nyqst*, and
+computations will be performed.
+If the `resolution_factor=1`,
+the template will be represented in full resolution up to the
+Nyquist frequency (set at 1/4 the number of voxels per dimension
+in the input 3D volume). Setting the resolution factor to 0.5 will
+result in half resolution, but represent the templates up to
+double the Nyquist frequency.
+
+The maximum frequency radius is the *resolution_factor/Nyqst*, and
 therefore a lower ``resolution_factor`` implies a lower frequency
 up to which to perform the calculation.
 
-Note that, since each Template is the 2D projection from a
+Note that, since each Template is the 2D projection of a 3D
+form from a
 specific angle, the number of viewing angles should match the number
-of Templates in the Templates file.
+of Templates in a Templates file.
 
 The remaining fields are required only for interpreting PDB
 models (not maps) and will be ignored otherwise. Note that
@@ -130,6 +138,9 @@ Interface
 The main way for a user to create an ``ImageDescriptor`` instance
 is by the ``ImageDescriptor.from_individual_values()`` function.
 
+See also the API documentation at **TODO: PROVIDE CROSS-REFERENCE**
+**BUT DOUBLE CHECK THIS MAY HAVE CHANGED**
+
 The following parameters are accepted:
 
  - Precision (as a string ``single`` or ``double``, or CryoLike
@@ -149,10 +160,10 @@ The following parameters are accepted:
      number of frequency radii in the polar grid
 
      - Higher values mean higher resolution
-     - Formula is (half pi) TODO
+     - Formula is (half pi) **TODO**
 
    - If not specified, a ``resolution_factor`` of 1 will be
-     used, resulting in **EXPLAIN**
+     used
 
  - For Template generation:
 
