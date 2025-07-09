@@ -1,4 +1,4 @@
-Parameter setting example
+Parameter seting example
 ==========================
 
 The imaging parameters include the number of voxels, voxel size, precision, viewing distance, number of inplanes, atom radii, atom selection, and whether to use the default protein residue model for the atomic radii for each amino acid type.

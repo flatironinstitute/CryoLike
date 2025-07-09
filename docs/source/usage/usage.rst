@@ -1,37 +1,19 @@
 Concepts
 ==========================
-.. Also considered: "Functionality in detail"
 
-These pages provide a more detailed explanation of the features offered
-by the CryoLike package and the use cases it can handle.
-
-For example usages in different scenarios, see the NEED CROSS-REFERENCE
-tutorials section.
-
-For exhaustive description of the public-facing API, see the NEED CROSS-REFERENCE
-python API section.
-
+These pages provide a more detailed explanation of the concepts and features offered
+by the CryoLike package.
 
 .. Check out the :doc:`usage` section for further information, including
   how to :doc:`install <installation>` the project.
 
-
-.. toctree:: 
-    :maxdepth: 2
-
-    imageSettings
-    templateCreation
-    imageConversion
-    likelihoodComputation
-    file_structure
-    formats
 
 
 Overview
 ------------------------
 
 The purpose of the CryoLike package is to allow users to compare 2D images
-(captured through Cryo-EM) with potential 3D structures from reference sources,
+(captured through cryo-EM) with 3D structures from reference sources, such as molecular dynamics or modelling tools,
 in order to determine the likelihood of each image under a given set of
 possible rotations and translations of projections of the 3D structure (templates).
 
@@ -72,12 +54,10 @@ Creating parameter settings
 CryoLike's representations of images depend upon two grids: one in two-dimensional Cartesian space,
 and one in Fourier space with polar coordinates. These grids, along with a precision (single or double),
 make up the required fields of the ``ImageDescriptor`` object. The object also has optional fields which
-control how CryoLike makes Templates from reference structures; the optional fields are not used when
+control how CryoLike makes Templates from reference structures. Note that the optional fields are not used when
 creating or interpreting Images.
 
-[TODO: I THINK THIS CHANGED]
-
-The first step to a CryoLike run is to create an image descriptor file. Once this file is present,
+The first step to a CryoLike run is to create a parameter file. Once this file is present,
 you can proceed with Templates creation and Images conversion. These may be done in parallel, if you
 have appropriate compute resources.
 
@@ -89,7 +69,7 @@ For more details about the available options, see the
 to the relevant API calls for further information.
 
 
-Creating Templates
+Creating templates
 ------------------------
 
 CryoLike currently supports creating Templates from ``.mrc`` files (``.mrc``, ``.mrcs``, ``.map``)
@@ -151,3 +131,22 @@ is more rigid. This may be changed in future versions.
 For more details about CryoLike's expected file locations, see the
 :doc:`detailed description of file/directory structure </usage/file_structure>`.
 
+To read more about the cryoLike concepts and functions see:
+
+.. toctree:: 
+    :maxdepth: 1
+
+    imageSettings
+    templateCreation
+    imageConversion
+    formats
+    likelihoodComputation
+    file_structure
+
+
+
+For example usages in different scenarios, see the NEED CROSS-REFERENCE
+tutorials section.
+
+For exhaustive description of the public-facing API, see the NEED CROSS-REFERENCE
+python API section.

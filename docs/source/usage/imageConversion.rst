@@ -8,14 +8,11 @@ Internally, these images are represented as paired multi-dimensional arrays--PyT
 Tensors--along with metadata values that describe how to interpret the arrays, and
 associated data such as any associated contrast transfer function (CTF).
 
-Because this format differs from the ones used by experimental software to store captured
+Because this format differs from the ones used by other software to store captured
 images, CryoLike needs to ingest those image files and convert them to our internal
 representation before comparisons can be made. As part of this process, we also offer
 ways to restack the images into regularly-sized stacks, which can help ensure more efficient
 use of computational resources.
-
-
-.. contents::  Table of Contents
 
 
 Overview
@@ -28,12 +25,9 @@ image capture equipment.
 We support several formats:
 
  - Lists of Star files (with one MRC file per Star file)
- - Internally indexed Star files (one Star file describes images from many MRC files, as with ReLion files)
+ - Internally indexed Star files (one Star file describes images from many MRC files)
  - Internally indexed CryoSparc files (one CryoSparc file describes images from multiple listed MRC files)
  - CryoSparc with 'jobs' folder (one CryoSparc file describes the MRC images located in a specified folder)
-
-Full details can be found at the API documentation. [TODO: XREF]
-
 
 Images Metadata
 ------------------
@@ -42,30 +36,27 @@ During the conversion process, image stacks require two sets of metadata. One of
 is partially shared with the image templates: this is the "image descriptor," which
 includes the discretization and scaling grids used to interpret the tensor representations
 of the images. For more detail on this, see the
-:doc:`image settings documentation</usage/imageSettings>`
-and the TODO: XREF-API documentation, 
+:doc:`image settings documentation</usage/imageSettings>`. 
 
 In addition, image conversion needs data describing the image capture apparatus--most notably
 defocus and phase shift information. This metadata is expected to come from the Starfile or
 CryoSparc file. A full description of the expected file formats can be found in the
-:doc:`file formats documentation</usage/formats>`
+:doc:`file formats documentation</usage/formats>`.
 
 
 Interfaces
 ============
 
 File conversion is managed by the ``ParticleStackConverter`` class. While it is possible
-to interface with this class directly (see XREF TO API DOCUMENTATION), we also offer
+to interface with this class directly, we also offer
 wrapper functions for the four use cases (i.e. converting from individual Star files,
 converting from indexed Star or CryoSparc files, and converting CryoSparc job directories).
 
 These wrapper functions are discussed below.
 
-For a basic example of converting ``Images`` from a set of Star files and particle files,
-see the :doc:`image conversion example </examples/convert_particle_stacks>`.
-
-For complete documentation of the API, see the API DOCUMENTATION
-(IF WE HAVEN'T LINKED TO THAT ENOUGH ALREADY)
+For a basic examples of converting ``Images`` from a set of Star files and particle files,
+see the :doc:`image conversion example </examples/read_star_file_noindex>` as well as the other 
+examples in that folder. 
 
 Wrapper functions
 -----------------
@@ -79,11 +70,13 @@ Common Parameters
  - The path to a file containing image descriptor information (``params_input``)
  - The root of the directory in which to output image stacks (``folder_output``)
  - The maximum (or target) number of images in a stack (``batch_size``)
+  - Whether to output plots (``flag_plots``). Default (``True``) causes plots to be output.
+  [PC: QUESTIONS should we take these two out? i've never uesde the downsampling how does this interfer with the resolution factor?]
  - A scalar downsampling factor (1, the default, means no downsampling; 2 would downsample
    by a factor of 2, etc) and downsample method ('mean' or 'max') (``downsample_factor``, ``downsample_type``)
  - A manually input pixel size (errors will be generated if this conflicts with the pixel
    size recorded in the source file). In Angstroms. (``pixel_size``)
- - Whether to output plots (``flag_plots``). Default (``True``) causes plots to be output.
+
 
 
 Output
@@ -119,9 +112,6 @@ input MRC/Starfile pair: if a single input contains more than ``batch_size`` ima
 split those images into multiple output stacks, but it will not combine images from multiple
 inputs into a single stack.
 
-The underlying converter can apply either logic to either type of input; please see the
-TODO: API XREF HERE for more information.
-
 .. admonition:: Example
 
   Suppose we have ``A.mrc``, ``B.mrc``, and ``C.mrc``, which have 7, 2, and 6 images,
@@ -132,8 +122,8 @@ TODO: API XREF HERE for more information.
     
   - ``output/fft/particles_fourier_stack_000000.pt`` (containing Fourier-space
     representations  of all 7 images from ``A.mrc``,
-    both images from ``B.mrc``, and one image from ``C.mrc``)
-  - ``output/fft/particles_fourier_stack_000000.npz`` (containing Fourier-space
+    the 2 images from ``B.mrc``, and one image from ``C.mrc``)
+  - ``output/fft/particles_fourier_stack_000001.pt`` (containing Fourier-space
     representations  of the remaining 5 images from ``C.mrc``)
   - ``output/`` and ``..._000001.npz`` (containing metadata
     for the above stacks)
@@ -149,16 +139,17 @@ TODO: API XREF HERE for more information.
 
 .. admonition:: Common Pitfalls
 
-    TODO Something about make sure you have enough CTFs/defocus angles etc
+    Please note that each image must have an associated CTF defocus value, 
+    which is retrieved from either the ``.star`` or ``.cs`` files. 
+    If this information is missing, a read error will occur.
 
 
-``convert_particle_stacks_from_star_files()``
+Lists of Star files: ``convert_particle_stacks_from_star_files()``
 **********************************************
 
 This function is designed to convert images stored in a series of MRC files, described
 by a corresponding series of Star files. The two file lists should be of the same length.
 
-API XREF LINK
 
 In addition to the common parameters above, this function exposes the following parameters:
 
@@ -174,7 +165,7 @@ As described above, this wrapper function follows a different batching logic tha
 other two: it never makes output stacks that combine images from multiple MRC files.
 
 
-``convert_particle_stacks_from_indexed_star_files()``
+Indexed Star file: ``convert_particle_stacks_from_indexed_star_files()``
 ****************************************************************
 
 This function is designed to convert images stored in a series of MRC files, described
@@ -182,26 +173,23 @@ by a single Star file that refers to the images individually.
 
 For more information about the expected file format, see :doc:`the formats page</usage/formats>`.
 
-API XREF LINK
 
 In addition to the common parameters above, this function exposes the following parameters:
 
  - A Star file referring to images in individual MRC files (``star_file``)
  - The location of the MRC files referred to (``folder_mrc``)
    
-If the ``folder_mrc`` value is set, any path information in the Star file will be ignored; the MRC
+If the ``folder_mrc`` value is set, any path information in the Star file will be ignored. The MRC
 files will be assumed to reside directly in this directory. If this value is NOT set,
 then the system will use the paths in the Star file. Those paths will be assumed to
 be relative to the current directory.
 
 
-``convert_particle_stacks_from_cryosparc()``
+Indexed CryoSparc files: ``convert_particle_stacks_from_cryosparc()``
 ****************************************************************
 
 This function is designed to convert images stored in a series of MRC files, described
 by a single CryoSparc file (``.cs``) that refers to the images individually.
-
-API XREF LINK
 
 In addition to the common parameters above, this function exposes the following parameters:
 
@@ -217,14 +205,13 @@ only the filename (without path information) from the CryoSparc index, and look 
 those filenames within the ``folder_cryosparc`` directory.
 
 
-``convert_particle_stacks_from_cryosparc_restack()``
+CryoSparc job folder: ``convert_particle_stacks_from_cryosparc_restack()``
 ****************************************************************
 
 This function is designed to convert images stored in a CryoSparc job folder, described
 by a single unified CryoSparc file. It expects to load all the images from all the MRC
 files in the job directory, in order, until the sequence of MRC files is broken.
 
-API XREF LINK
 
 Instead of looking explicitly at the specified MRC files, as in the "``indexed``" wrappers
 above, this function attempts to process all MRC files that follow a certain naming
@@ -279,11 +266,10 @@ to interact with the ``ParticleStackConverter`` class directly. This could be
 useful for, for instance, interactively converting several different sources of
 images.
 
-In this event, the implementations of the wrapper functions [TODO: INSERT XREF LINK]
+In this event, the implementations of the wrapper functions
 are instructive, as they all follow the same pattern:
 
  #. Instantiate the converter with basic information (parameters, output, stack settings)
  #. Load the converter with the input files to process
  #. Call the ``convert_stacks`` function to write out the processed batches
 
-For further information, see the TODO: XREF API DOCUMENTATION or the code itself.
