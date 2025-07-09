@@ -10,8 +10,8 @@ Overview
 ==========
 
 CryoLike can convert models in several formats:
- - Files (PDB or MRC)
-
+ - MRC
+ - PDB
 The ``Templates`` object itself is virtually identical to the ``Images`` object: it consists
 of a stack of images. The main functional difference is that the ``Templates`` requires that
 viewing angles be recorded (while ``Images`` objects may leave this field empty).
@@ -20,8 +20,8 @@ viewing angles be recorded (while ``Images`` objects may leave this field empty)
 Templates Metadata
 ------------------
 
-As described in more detail in the :doc:`image settings documentation</usage/imageSettings>`
-and the XREF-API documentation, there are some image descriptor metadata fields that apply only
+As described in more detail in the :doc:`image settings documentation</usage/imageSettings>`,
+there are some image descriptor metadata fields that apply only
 to ``Templates`` during the conversion process. Other than viewing distance, 
 these are only required or used for converting PDB files. 
 
@@ -29,14 +29,13 @@ these are only required or used for converting PDB files.
 Interfaces
 ============
 
-Most users should generate ``Templates`` using the ``make_templates_from_inputs()``
-wrapper function.
+Users should generate ``Templates`` using the ``make_templates_from_inputs()``
+wrapper function, which generates all templates using previously specified parameters
+for many PDBs of maps.  
+
 
 For a basic example of generating ``Templates`` from PDB files, see the
 :doc:`template generation example </examples/make_templates>`.
-
-For complete documentation of the API, see the API DOCUMENTATION NOTE: XREF to
-both the make_templates_from_inputs_api file and the template.py
 
 Wrapper function
 ----------------
@@ -46,7 +45,6 @@ The ``make_templates_from_inputs()`` wrapper function is exported from
 
  - a list of inputs ``list_of_inputs``: each input can be a path to a file (PDB, MRC),
    or a Numpy array or Torch tensor containing density data already loaded into memory.
-   File inputs are expected to contain a single model.
  - The path to an image descriptor file (see the
    :doc:`image settings documentation</usage/imageSettings>` for more details)
  - Whether or not to output plotted samples of the converted Templates (``output_plots``)
@@ -106,7 +104,7 @@ Additional methods
 ------------------
 
 Most users are expected to use the wrapper function described above. However, the
-``Tenmplates`` class also exposes some functions that can generate a stack of templates
+``Templates`` class also exposes some functions that can generate a stack of templates
 from a function, as well as the underlying calls to create templates from physical volumes
 or from atom positions. 
 

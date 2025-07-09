@@ -1,6 +1,9 @@
 Mathematical Framework
 ======================
 
+.. _mathframework:
+        :title: Math Framework
+
 CryoLike is a GPU-accelerated software package for efficiently computing 
 image-to-structure likelihood in cryo-electron microscopy (cryo-EM). 
 It is upon a mathematical framework using Fourier-Bessel representations, and draws on prior work in cross-correlation computation
@@ -67,7 +70,7 @@ at pose :math:`\phi`, with image-specific intensity :math:`\alpha`, a constant o
 
     I(\mathbf{x}) \sim \alpha T_{\phi}(\mathbf{x}) + \beta \mathbb{1}(\mathbf{x}) + \epsilon(\mathbf{x}),
 
-where :math:`\epsilon(\mathbf{x})` is drawn from a zero-mean Gaussian distribution with constant pixel variance :math:`\lambda^2`.
+where :math:`\epsilon(\mathbf{x})` is drawn from a zero-mean Gaussian noise with constant pixel variance :math:`\lambda^2`.
 
 The likelihood of observing image :math:`I` given the template and parameters is:
 
@@ -79,9 +82,9 @@ where :math:`\ell_{\text{phys}}` is the squared L2-norm between the modeled and 
 
 .. math::
 
-    \ell_{\text{phys}}(I, T_{\phi}, \alpha, \beta) = \int_{\Omega} \left| \alpha T_{\phi}(\mathbf{x}) + \beta \mathbb{1}(\mathbf{x}) - I(\mathbf{x}) \right|^2 d\mathbf{x}.
+    \ell_{\text{phys}}(I, T_{\phi}, \alpha, \beta) = \int_{\Omega} \left| \alpha T_{\phi}(\mathbf{x}) + \beta \mathbb{1}(\mathbf{x}) - I(\mathbf{x}) \right|^2 d\mathbf{x},
 
-We can write the last expression as a function of the cross-correlation 
+where :math:`\Omega` is the image space. We can write the last expression as a function of the cross-correlation 
 .. math::
     missing
 
