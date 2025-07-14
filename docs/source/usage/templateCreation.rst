@@ -30,8 +30,8 @@ Templates Metadata
 ------------------
 
 As described in more detail in the
-:doc:`image settings documentation</usage/imageSettings>`
-and the **XREF-API** documentation, there are some image descriptor
+:doc:`image settings documentation</usage/imageSettings>`,
+there are some image descriptor
 metadata fields that apply only to ``Templates`` during the
 conversion process. Other than viewing distance,
 these are only required or used for converting PDB files.

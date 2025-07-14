@@ -14,17 +14,6 @@ For exhaustive description of the public-facing API, see
 .. Check out the :doc:`usage` section for further information, including
   how to :doc:`install <installation>` the project.
 
-
-.. toctree::
-    :maxdepth: 2
-
-    imageSettings
-    imageConversion
-    templateCreation
-    likelihoodComputation
-    file_structure
-    formats
-
 Overview
 ------------------------
 
@@ -35,33 +24,36 @@ in order to determine the likelihood of each image under a given set of
 "templates" (possible rotations and translations of projections of
 the 3D structure).
 
-Data files
-##########
+There are four main steps of a CryoLike run:
 
-The two data types--known structures and experimental images--give rise to two
-types of data files:
+#. Setting the imaging and CryoLike parameters
+   **[TODO: explain and reference]**
+#. Generating the templates by projecting
+   the 3D structures into 2D space
+#. Converting the particles into CryoLike's
+   internal representation
+#. Running the comparison
+
+
+Generated files
+#################
+
+The first three steps of this process emit several types of
+files. Template generation and particle conversion create
+two types of data files:
 
 - *Templates*, which are sets of 2D projections of a 3D structure or map at
   known viewing angles (poses), and
 - *Images*, or stacks of experimentally-captured cryoEM particle images
 
-The user should begin by setting the imaging and CryoLike parameters
-**[TODO: explain and reference]**
-
-Then, the user must *generate the Templates* by
-projecting the 3D structures into 2D space,
-and *convert the particles* into a representation
-that CryoLike can handle.
-
-The output of these processes are the parameter files, and the Image and
-Template files being compared.
 These are stored as `.pt` (Pytorch Tensor) files. We commonly
 refer to them as "stacks," since they usually contain many images
 per file.
 
-In addition to the Images and Templates files, CryoLike also
-stores *metadata* files that describe
-how to interpret these images. Metadata includes:
+In addition, the first step creates collection(s) of parameters
+that describe how to interpret the images. These parameter
+files are collectively called *metadata* files.
+Metadata includes:
 
 - Data that is relevant to both file types (such as the
   Cartesian-space and Fourier-space discretization grids used to
@@ -136,7 +128,8 @@ process also handles "restacking," or converting Image inputs into
 files with an equal number of images each.
 
 Converted Images stacks are stored in a standard directory
-structure. Each stack has its own parameters file recording
+structure. Each stack has its own parameters file; this file
+records
 provenance and capture data, as well as description of grids.
 A description of the file layout can be found at the
 :doc:`file structure documentation </usage/file_structure>`.
@@ -182,7 +175,7 @@ For more details about CryoLike's expected file locations, see the
 :doc:`detailed description of
 file/directory structure </usage/file_structure>`.
 
-To read more about the cryoLike concepts and functions see:
+To read more about the CryoLike concepts and functions see:
 
 .. toctree::
     :maxdepth: 1

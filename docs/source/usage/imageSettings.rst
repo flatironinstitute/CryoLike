@@ -6,7 +6,8 @@ to interpret a set of 2D images (Images stack or Templates). An
 ``ImageDescriptor`` is a required input to the functions for making
 Templates or converting experimentally-captured Images.
 
-For full details, see **LINK TO API DOCUMENTATION.**
+For full details, see **LINK TO API DOCUMENTATION ONCE
+WE HAVE THE DEV VERSION MERGED IN.**
 
 Available fields
 ============================
@@ -33,7 +34,8 @@ These are:
 The ``CartesianGrid2D`` describes a two-dimensional grid.
 While the class supports rectangular grids and pixel shapes,
 by default this is a square grid defined by the number
-of pixels per side and the pixel size (in Angstroms).
+of pixels per side (``n_pixels``) and the pixel
+size (``pixel_size``, in Angstroms).
 
 The ``PolarGrid`` describes a polar-coordinate grid used to
 discretize the Fourier-space representation of the image.
@@ -55,12 +57,15 @@ They are saved as part of the metadata file for future reference.
 These are the specific fields potentially used for Templates creation:
 
  - A set of (:py:class:`ViewingAngles
-   <cryolike.microscopy.viewing_angles.ViewingAngles>`)
- - A `viewing distance` (in Angstroms)
+   <cryolike.microscopy.viewing_angles.ViewingAngles>`) that
+   determines the number of viewing angles, and thus the
+   number of templates generated
+ - A `viewing distance` (in Angstroms) used to generate the
+   ``ViewingAngles``, if they are not specified explicitly
  - The `resolution_factor` in [0,1]
  - The `radii` (in Angstroms) of the atoms or beads in the model
  - A string identifying the `selected atoms` to take from the
-   structure if ``PDB`` format is used.
+   structure if ``PDB`` format is used
  - Whether to use the `default protein residue model` atomic sizes
  - The `shape` of the atoms (i.e. whether to interpret them as hard
    spheres or Gaussian probability clouds with a given
@@ -156,14 +161,14 @@ The following parameters are accepted:
  - For setting the polar grid:
 
    - number of points per shell (``n_inplanes``)
-   - ``resolution_factor`` in for deteriming the maximum
+   - ``resolution_factor`` for deteriming the maximum
      number of frequency radii in the polar grid
 
      - Higher values mean higher resolution
      - Formula is (half pi) **TODO**
 
    - If not specified, a ``resolution_factor`` of 1 will be
-     used
+     used, which takes the maximum frequency radii up to Nyquist
 
  - For Template generation:
 
