@@ -1,4 +1,4 @@
-Parameter seting example
+Parameter-setting example
 ==========================
 
 **NOTE--This appears to be fully incorporated into the

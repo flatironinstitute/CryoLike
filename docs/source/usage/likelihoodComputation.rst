@@ -53,19 +53,23 @@ The ``run_likelihood`` function takes the following parameters:
  - A set of :doc:`image descriptor parameters</usage/imageSettings>`, in
    on-disk or in-memory form (``params_input``)
  - The path to the directory where templates are stored (``folder_templates``)
- - The path to the directory where image stacks are stored (``folder_particles``)
+ - The path to the directory where image stacks are stored
+   (``folder_particles``)
  - The root of the output directory (``folder_output``)
  - The index of the template file to process (``i_template``)
  - The number of image stacks to process (``n_stacks``)
- - Whether to skip processing when the output files appear to exist already (``skip_exist``)
- - Number of templates and images to use per batch, and whether to attempt to determine
-   those values automatically (``n_templates_per_batch``, ``n_images_per_batch``, 
-   ``search_batch_size``)
- - The largest-size displacement to consider, and the number of displacements to
-   consider in both directions (``max_displacement_pixels``, ``n_displacements_x``,
+ - Whether to skip processing when the output files appear to exist
+   already (``skip_exist``)
+ - Number of templates and images to use per batch, and whether to
+   attempt to determine
+   those values automatically (``n_templates_per_batch``,
+   ``n_images_per_batch``, ``search_batch_size``)
+ - The largest-size displacement to consider, and the number of
+   displacements to consider in both directions
+   (``max_displacement_pixels``, ``n_displacements_x``,
    ``n_displacements_y``)
  - Flags to configure which output files are written
- [PC: Question is there a flag for the CC?]
+   **[PC: Question is there a flag for the CC?]**
  
    - ``return_likelihood_integrated_pose_fourier``
    - ``return_optimal_pose``
@@ -77,41 +81,54 @@ The ``run_likelihood`` function takes the following parameters:
 Input System
 ***************
 
-We compute likelihood by matching images against templates. We expect the templates
-to be located under the directory specified by ``folder_templates`` and the images
-to be located under the directory specified by ``folder_particles``. Specifically:
+We compute likelihood by matching images against templates.
+We expect the templates to be located under the directory
+specified by ``folder_templates`` and the images to be located
+under the directory specified by ``folder_particles``. Specifically:
 
- - There must be a "template file list" ``folder_templates/template_file_list.npy`` in the
+ - There must be a "template file list"
+   ``folder_templates/template_file_list.npy`` in the
    ``folder_templates`` directory which lists the available template stacks
 
-   - The ``i_template`` parameter determines which of the template files in the template file
-     list will be used
+   - The ``i_template`` parameter determines which of the template files
+     in the template file list will be used
 
- - Templates themselves can be placed anywhere, provided the template file list has paths to them
- - Image stacks should be in ``folder_particles/fft/particles_fourier_stack_NUMBER.pt``
- 
+ - Templates themselves can be placed anywhere, provided the template
+   file list has paths to them
+ - Image stacks should be in
+   ``folder_particles/fft/particles_fourier_stack_NUMBER.pt``
+
    - ``NUMBER`` here is a six-digit 0-padded increment starting from 0
-   - Every image file should have a correspondingly-named metadata file with an ``.npz`` extension
- 
+   - Every image file should have a correspondingly-named metadata file
+     with an ``.npz`` extension
 
-It is anticipated that users may wish to run these comparisons in parallel, especially when a cluster
-environment is available; hence the need for the ``i_template`` parameter.
+It is anticipated that users may wish to run these comparisons in parallel,
+especially when a cluster environment is available; hence the need for
+the ``i_template`` parameter.
 
 
 Displacement handling
 ***********************
 
 The user specifies the displacement values to check using the
-``n_displacements_x``, ``n_displacements_y``, and ``max_displacement_pixels`` parameters.
+``n_displacements_x``, ``n_displacements_y``, and
+``max_displacement_pixels`` parameters.
 
-To compute the available displacements, the ``max_displacement_pixels`` is first
-converted to Angstrom using the pixel size associated with the image/template grids. The
-resulting ``max_displacement`` is treated as a potential displacement in either direction,
-creating a total displacement length of ``2 * max_displacement``. This distance is then
-divided linearly into ``n_displacements_x`` and ``n_displacements_y`` steps, resulting in
-a grid of displacement positions to test during cross-correlation computation.
+To compute the available displacements to try, the
+``max_displacement_pixels`` is first
+converted to Angstrom using the pixel size associated with
+the image/template grids. The
+resulting ``max_displacement`` is treated as a potential
+displacement in either direction,
+creating a total displacement length of ``2 * max_displacement``.
+This distance is then
+divided linearly into ``n_displacements_x`` and ``n_displacements_y``
+steps, resulting in
+a grid of displacement positions to test during cross-correlation
+computation.
 
-The set of displacements tested will be preserved in ``folder_output/displacements_set.pt``.
+The set of displacements tested will be preserved in
+``folder_output/displacements_set.pt``.
 
 Possible Outputs
 =========================
@@ -125,28 +142,32 @@ Note that these correspond to the ``NamedTuple`` return-type classes defined in
 Output Type Selection
 *************************
 
-The ``run_likelihood()`` function exposes the following flags to control which of the
-above return types will be returned, as well as which additional likelihood reports will
-be written.
+The ``run_likelihood()`` function exposes the following flags to control
+which of the above return types will be returned, as well as which
+additional likelihood reports will be written.
 
    - ``return_likelihood_integrated_pose_fourier``
 
-If true, we will additionally write a Tensor with the integrated log likelihood of the
-Fourier-space (see the :doc:`Mathematical Framework</about.rst>` and :ref:`the Integrated likelihood section <_integrated_likelihood>`).
+If ``True``, we will additionally write a Tensor with the integrated
+log likelihood of the Fourier-space cross-correlation (see the
+:doc:`Mathematical Framework </about.rst>` and
+:ref:`the Integrated likelihood section <_integrated_likelihood>`).
 
    - ``return_optimal_pose``
 
 If true, we will output the Tensors described under
-:ref:`the Optimal Pose section<optimal_pose>` below. 
+:ref:`the Optimal Pose section<optimal_pose>` below.
 If this is set to true, the remaining  options will be ignored.
 
+The remaining three options can be set individually, but the output will
+depend on the chosen combination.
 
 
 Output Paths
 **************
 
-The wrapper function writes computed likelihoods to disk for later review. The exact files
-written depend on the requested outputs.
+The wrapper function writes computed likelihoods to disk for
+later review. The exact files written depend on the requested outputs.
 
 The root output directory is specified by the ``folder_output`` parameter.
 Within that directory, the following paths will be used. Note that the
@@ -156,34 +177,44 @@ In the case of a name collision between an output file and an existing
 file, the existing file will be *overwritten* unless the ``skip_exist``
 parameter is set *and* the complete set of output files are present.
 
-For the following examples, assume ``folder_output`` is set to ``FOLDER_OUTPUT``.
-``N`` is the template number (the value of ``i_template``), NOT zero-padded.
+For the following examples, assume ``folder_output`` is set to
+``OUT``. ``N`` is the template number (the
+value of ``i_template``), NOT zero-padded.
 ``STACK`` is the 6-digit 0-padded number, starting from 0, of the stack being
 processed.
 
  - In all cases:
 
     - The actual set of displacement values used will be written to
-      ``FOLDER_OUTPUT/displacements_set.pt``
+      ``OUT/displacements_set.pt``
 
  - ``return_optimal_pose``: Will write the 5 Tensors
    :ref:`discussed above<optimal_pose>` to individual files:
- 
-     - ``FOLDER_OUTPUT/templateN/cross_correlation/cross_correlation_stack_STACK.pt``
-     - ``FOLDER_OUTPUT/templateN/optimal_pose/optimal_template_stack_STACK.pt``
-     - ``FOLDER_OUTPUT/templateN/optimal_pose/optimal_displacement_x_stack_STACK.pt``
-     - ``FOLDER_OUTPUT/templateN/optimal_pose/optimal_displacement_y_stack_STACK.pt``
-     - ``FOLDER_OUTPUT/templateN/optimal_pose/optimal_inplane_rotation_stack_STACK.pt``
 
- - ``return_likelihood_integrated_pose_fourier``: will write the integrated likelihoods to:
+     - ``OUT/templateN/cross_correlation/cross_correlation_stack_STACK.pt``
+     - ``OUT/templateN/optimal_pose/optimal_template_stack_STACK.pt``
+     - ``OUT/templateN/optimal_pose/optimal_displacement_x_stack_STACK.pt``
+     - ``OUT/templateN/optimal_pose/optimal_displacement_y_stack_STACK.pt``
+     - ``OUT/templateN/optimal_pose/optimal_inplane_rotation_stack_STACK.pt``
 
-     - ``FOLDER_OUTPUT/templateN/log_likelihood/log_likelihood_integrated_fourier_stack_STACK.pt``
+ - ``return_likelihood_integrated_pose_fourier``: will write the
+   **TODO: WHATEVER THIS IS, I think the actual likelihoods?** to:
 
+     - ``OUT/templateN/log_likelihood/log_likelihood_integrated_fourier_stack_STACK.pt``
 
+ - ``return_likelihood_optimal_pose_fourier``: will write the
+   **TODO: WHATEVER THIS IS** to:
 
+     - ``OUT/templateN/log_likelihood/log_likelihood_optimal_fourier_stack_STACK.pt``
+
+ - ``return_likelihood_optimal_pose_physical``: will write the
+   **TODO: WHATEVER THIS IS** to:
+
+     - ``OUT/templateN/log_likelihood/log_likelihood_optimal_physical_stack_STACK.pt``
 
 
 .. _integrated_likelihood:
+
 Integrated Log-Likelihood
 ******************************
 
@@ -203,10 +234,12 @@ This will return 5 1-dimensional Tensors, indexed by the image sequence index:
 Cross-correlation
 ******************************
 
-  - Best cross-correlation value for each image (``cross_correlation_S``) [TO DO: CHECK _S] The highest cross-correlation
-per image is a cryoLike output. As described in the :doc:`Mathematical Framework</about.rst>`, cryoLike calculates
-the cross-correlation between each image and each template. 
- 
+ - Best cross-correlation value for each image
+   (``cross_correlation_S``) **[TO DO: CHECK _S]** The highest
+   cross-correlation per image is a cryoLike output. As
+   described in the :doc:`Mathematical Framework</about.rst>`,
+   CryoLike calculates the cross-correlation between each image
+   and each template.
  - The template (by sequence number) of the best match (``optimal_template_S``)
  - The optimal x-displacement matching this image with the best-fitting
    template (``optimal_displacement_x_S``)
@@ -227,10 +260,10 @@ the cross-correlation between each image and each template.
 
 
 
-[TO DO::: I DONT KNOW IF THIS IS AN OUTPUT ANYMORE, and its not referenced in the output section above]
+**[TO DO::: I DONT KNOW IF THIS IS AN OUTPUT ANYMORE, and its
+not referenced in the output section above]**
 
 .. _optimal_displacement_rotations:
-
 
 Optimized Displacement and Rotations
 *********************************************
@@ -308,8 +341,8 @@ It returns 2 3-D Tensors:
  - The rotation value generating that (best/likeliest)
    alignment (``optimal_inplane_rotation_SMd``)
 
-TODO: SAY SOMETHING ABOUT THE FACT WE ONLY USE A SINGLE INDEX FOR DISPLACEMENT.
-
+**TODO: SAY SOMETHING ABOUT THE FACT WE ONLY USE
+SINGLE INDEX FOR DISPLACEMENT.**
 
 .. _complete_disagg:
 
@@ -322,188 +355,11 @@ index, then template sequence index, then displacement index,
 then rotation index.
 The Tensor is ``cross_correlation_SMdw``.
 
-TODO: SAY SOMETHING ABOUT THE FACT WE USE ONLY A SINGLE INDEX FOR DISPLACEMENT
+**TODO: SAY SOMETHING ABOUT THE FACT WE USE
+ONLY A SINGLE INDEX FOR DISPLACEMENT**
 
 
 
-Interface
-==============
-
-The ``run_likelihood`` wrapper function exposes an interface to the underlying
-``CrossCorrelationLikelihood`` object that incorporates convenience features
-for file management and optionally attempts to find the best batch sizes for
-available GPU hardware (if any).
-
-For a worked example of this wrapper function, see the
-:doc:`run likelihood example</examples/run_likelihood>`.
-
-TODO: REALLY WE SHOULD PROBABLY JUST LINK TO THE API DOCUMENTATION FOR THIS...
-
-The ``run_likelihood`` function takes the following parameters:
-
- - A set of :doc:`image descriptor parameters</usage/imageSettings>`, in
-   on-disk or in-memory form (``params_input``)
- - The path to the directory where templates are stored (``folder_templates``)
- - The path to the directory where image stacks are stored
-   (``folder_particles``)
- - The root of the output directory (``folder_output``)
- - The index of the template file to process (``i_template``)
- - The number of image stacks to process (``n_stacks``)
- - Whether to skip processing when the output files appear to exist
-   already (``skip_exist``)
- - Number of templates and images to use per batch, and whether
-   to attempt to determine
-   those values automatically (``n_templates_per_batch``,
-   ``n_images_per_batch``,
-   ``search_batch_size``)
- - The largest-size displacement to consider, and the number of
-   displacements to
-   consider in both directions (``max_displacement_pixels``,
-   ``n_displacements_x``,
-   ``n_displacements_y``)
- - Flags to configure which output files are written
-
-   - ``return_likelihood_integrated_pose_fourier``
-   - ``return_likelihood_optimal_pose_fourier``
-   - ``return_optimal_pose``
-   - ``optimized_inplane_rotation``
-   - ``optimized_displacement``
-   - ``optimized_viewing_angle``
-
-On these, see below.
-
-Input System
-***************
-
-We compute likelihood by matching images against templates.
-We expect the templates to be located under the directory
-specified by ``folder_templates`` and the images to be located
-under the directory specified by ``folder_particles``. Specifically:
-
- - There must be a "template file list"
-   ``folder_templates/template_file_list.npy`` in the
-   ``folder_templates`` directory which lists the available template stacks
-
-   - The ``i_template`` parameter determines which of the template files
-     in the template file list will be used
-
- - Templates themselves can be placed anywhere, provided the template
-   file list has paths to them
- - Image stacks should be in
-   ``folder_particles/fft/particles_fourier_stack_NUMBER.pt``
-
-   - ``NUMBER`` here is a six-digit 0-padded increment starting from 0
-   - Every image file should have a correspondingly-named metadata file
-     with an ``.npz`` extension
-
-
-It is anticipated that users may wish to run these comparisons in parallel,
-especially when a cluster environment is available; hence the need for
-the ``i_template`` parameter.
-
-
-Displacement handling
-***********************
-
-The user specifies the displacement values to check using the
-``n_displacements_x``, ``n_displacements_y``, and
-``max_displacement_pixels`` parameters.
-
-To compute the available displacements to try, the
-``max_displacement_pixels`` is first
-converted to Angstrom using the pixel size associated with
-the image/template grids. The
-resulting ``max_displacement`` is treated as a potential
-displacement in either direction,
-creating a total displacement length of ``2 * max_displacement``.
-This distance is then
-divided linearly into ``n_displacements_x`` and ``n_displacements_y``
-steps, resulting in
-a grid of displacement positions to test during cross-correlation
-computation.
-
-The set of displacements tested will be preserved in
-``folder_output/displacements_set.pt``.
-
-Output Type Selection
-*************************
-
-The ``run_likelihood()`` function exposes the following flags to
-control which of the above return types will be returned, as well
-as which additional likelihood reports will be written.
-
-   - ``return_likelihood_integrated_pose_fourier``
-
-If true, we will additionally write a Tensor with the integrated
-log likelihood of the
-Fourier-space cross correlation **TODO: ACTUALLY EXPLAIN THIS**
-
-
-   - ``return_likelihood_optimal_pose_fourier``
-
-If true, we will additionally write a Tensor with **TODO**
-
-   - ``return_optimal_pose``
-
-If true, we will output the Tensors described under
-:ref:`the Optimal Pose section<optimal_pose>` above.
-
-If this is set to true, the remaining three options will be ignored.
-
-The remaining three options can be set individually, but the output will
-depend on the chosen combination.
-
-
-
-
-Output Paths
-**************
-
-The wrapper function writes computed likelihoods to disk for
-later review. The exact files written depend on the requested outputs.
-
-The root output directory is specified by the ``folder_output`` parameter.
-Within that directory, the following paths will be used. Note that the
-directories will be created if they do not exist.
-
-In the case of a name collision between an output file and an existing
-file, the existing file will be *overwritten* unless the ``skip_exist``
-parameter is set *and* the complete set of output files are present.
-
-For the following examples, assume ``folder_output`` is set to
-``OUT``. ``N`` is the template number (the
-value of ``i_template``), NOT zero-padded.
-``STACK`` is the 6-digit 0-padded number, starting from 0, of the stack being
-processed.
-
- - In all cases:
-
-    - The actual set of displacement values used will be written to
-      ``OUT/displacements_set.pt``
-
- - ``return_optimal_pose``: Will write the 5 Tensors
-   :ref:`discussed above<optimal_pose>` to individual files:
-
-     - ``OUT/templateN/cross_correlation/cross_correlation_stack_STACK.pt``
-     - ``OUT/templateN/optimal_pose/optimal_template_stack_STACK.pt``
-     - ``OUT/templateN/optimal_pose/optimal_displacement_x_stack_STACK.pt``
-     - ``OUT/templateN/optimal_pose/optimal_displacement_y_stack_STACK.pt``
-     - ``OUT/templateN/optimal_pose/optimal_inplane_rotation_stack_STACK.pt``
-
- - ``return_likelihood_integrated_pose_fourier``: will write the
-   **TODO: WHATEVER THIS IS, I think the actual likelihoods?** to:
-
-     - ``OUT/templateN/log_likelihood/log_likelihood_integrated_fourier_stack_STACK.pt``
-
- - ``return_likelihood_optimal_pose_fourier``: will write the
-   **TODO: WHATEVER THIS IS** to:
-
-     - ``OUT/templateN/log_likelihood/log_likelihood_optimal_fourier_stack_STACK.pt``
-
- - ``return_likelihood_optimal_pose_physical``: will write the
-   **TODO: WHATEVER THIS IS** to:
-
-     - ``OUT/templateN/log_likelihood/log_likelihood_optimal_physical_stack_STACK.pt``
 
 Base Comparator
 ================
@@ -515,4 +371,3 @@ yet supported by the wrapper, but are currently available.
 
 For further information, see
 :py:mod:`cryolike.cross_correlation_likelihood`.
-

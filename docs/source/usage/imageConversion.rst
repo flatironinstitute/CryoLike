@@ -47,13 +47,11 @@ images. For more detail on this, see the
 :doc:`image settings documentation</usage/imageSettings>`
 and the :py:mod:`cryolike.microscopy.parameters` documentation.
 
-**TODO: DOUBLE CHECK LINK**
-
 In addition, image conversion needs data describing the image capture
 apparatus--most notably defocus and phase shift information. This
 metadata is expected to come from the Starfile or CryoSparc file.
 A full description of the expected file formats can be found in the
-:doc:`file formats documentation</usage/formats>`
+:doc:`file formats documentation</usage/formats>`.
 
 
 Interfaces
@@ -103,6 +101,9 @@ Common Parameters
    In Angstroms. (``pixel_size``)
  - Whether to output plots (``flag_plots``). Default (``True``)
    causes plots to be output.
+   **[PC: QUESTIONS should we take these two out? I've never
+   used the downsampling how does this interact with the
+   resolution factor?]**
 
 
 Output
@@ -182,9 +183,10 @@ input; please see the documentation linked above.
 
 .. admonition:: Common Pitfalls
 
-    Please note that each image must have an associated CTF defocus value,
-    which is retrieved from either the ``.star`` or ``.cs`` files.
-    If this information is missing, a read error will occur.
+    Please note that each image must have an associated CTF
+    defocus value, which is retrieved from either the
+    ``.star`` or ``.cs`` files. If this information is
+    missing, a read error will occur.
 
 
 Lists of Star files: ``convert_particle_stacks_from_star_files()``
@@ -234,7 +236,7 @@ the following parameters:
  - The location of the MRC files referred to (``folder_mrc``)
 
 If the ``folder_mrc`` value is set, any path information in the
-Star file will be ignored; the MRC files will be assumed to
+Star file will be ignored. The MRC files will be assumed to
 reside directly in this directory. If this value is NOT set,
 then the system will use the paths in the Star file. Those
 paths will be assumed to be relative to the current directory.
@@ -250,7 +252,6 @@ This function is designed to convert images stored in a series of
 MRC files, described
 by a single CryoSparc file (``.cs``) that refers to the
 images individually.
-
 
 In addition to the common parameters above, this function
 exposes the following parameters:
@@ -338,7 +339,7 @@ is also possible to interact with the ``ParticleStackConverter``
 class directly. This could be useful for, for instance, interactively
 converting several different sources of images.
 
-In this event, the implementations of the wrapper functions
+In this case, the implementations of the wrapper functions
 are instructive, as they all follow the same pattern:
 
  #. Instantiate the converter with basic information (parameters, output,
