@@ -6,7 +6,7 @@ Mathematical Framework
 
 CryoLike is a GPU-accelerated software package for
 efficiently computing image-to-structure likelihood
-n cryo-electron microscopy (cryo-EM).
+in cryo-electron microscopy (cryo-EM).
 It is built upon a mathematical framework using
 Fourier-Bessel representations,
 and draws on prior work in cross-correlation computation
