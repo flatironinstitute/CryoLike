@@ -114,7 +114,7 @@ The user specifies the displacement values to check using the
 ``n_displacements_x``, ``n_displacements_y``, and
 ``max_displacement_pixels`` parameters.
 
-To compute the available displacements to try, the
+To compute the available displacements, the
 ``max_displacement_pixels`` is first
 converted to Angstrom using the pixel size associated with
 the image/template grids. The
