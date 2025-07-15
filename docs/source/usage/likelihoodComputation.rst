@@ -197,21 +197,6 @@ processed.
      - ``OUT/templateN/optimal_pose/optimal_displacement_y_stack_STACK.pt``
      - ``OUT/templateN/optimal_pose/optimal_inplane_rotation_stack_STACK.pt``
 
- - ``return_likelihood_integrated_pose_fourier``: will write the
-   **TODO: WHATEVER THIS IS, I think the actual likelihoods?** to:
-
-     - ``OUT/templateN/log_likelihood/log_likelihood_integrated_fourier_stack_STACK.pt``
-
- - ``return_likelihood_optimal_pose_fourier``: will write the
-   **TODO: WHATEVER THIS IS** to:
-
-     - ``OUT/templateN/log_likelihood/log_likelihood_optimal_fourier_stack_STACK.pt``
-
- - ``return_likelihood_optimal_pose_physical``: will write the
-   **TODO: WHATEVER THIS IS** to:
-
-     - ``OUT/templateN/log_likelihood/log_likelihood_optimal_physical_stack_STACK.pt``
-
 
 .. _integrated_likelihood:
 
