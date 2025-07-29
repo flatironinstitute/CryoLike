@@ -169,7 +169,7 @@ class SphereShell:
 class SphereGrid:
     """Class to sample points on a spherical grid comprised of shells.
 
-    Attributes
+    Attributes:
         radius_max (float): Maximum radius of the sphere
         dist_eq (float): minimum distance between two points at the equator
         equal_shell (bool): if True, all shells have the same angular points
@@ -181,9 +181,9 @@ class SphereGrid:
         n_points (int): total number of points
         radius_points (FloatArrayType): radius of each point
         polar_points (FloatArrayType): polar angle of each point
-        azimu_points: (FloatArrayType): azimuthal angle of each point
+        azimu_points (FloatArrayType): azimuthal angle of each point
         weight_points (FloatArrayType): weight of each point
-        shells list[SphereShell(]): list of radial shells
+        shells (list[SphereShell]): list of radial shells
         point_shell_start_indices (IntArrayType): start index of each shell within the point list
         cartesian_points (Optional[CartesianShell]): If set, a NamedTuple of four float arrays
             (x_points, y_points, z_points, xyz_points) defining cartesian coordinates of each

@@ -682,7 +682,7 @@ class CrossCorrelationLikelihood:
         if return_integrated_likelihood:
             return self._compute_cross_correlation_likelihood(device, images_fourier, ctf, n_pixels_phys, n_images_per_batch, n_templates_per_batch, return_type=CrossCorrelationReturnType.OPTIMAL_ROTATION, return_integrated_likelihood=True)
         return self._compute_cross_correlation_likelihood(device, images_fourier, ctf, n_pixels_phys, n_images_per_batch, n_templates_per_batch, return_type=CrossCorrelationReturnType.OPTIMAL_ROTATION, return_integrated_likelihood=False)
-
+#  
 
     @overload
     def compute_cross_correlation_complete(self, device: torch.device, images_fourier: torch.Tensor, ctf: torch.Tensor, n_pixels_phys: int, n_images_per_batch: int, n_templates_per_batch: int,
@@ -702,7 +702,7 @@ class CrossCorrelationLikelihood:
         n_images_per_batch: int,
         n_templates_per_batch: int,
         return_integrated_likelihood: bool
-    ):
+    ) -> CrossCorrelationReturn | tuple[CrossCorrelationReturn, integrated_log_likelihood_type]:
         """Compute cross-correlation between templates and images, returning a
         tensor identifying the cross-correlation for each displacement and rotation,
         and (optionally) the integrated log likelihood, for each template-image pair.
@@ -720,9 +720,11 @@ class CrossCorrelationLikelihood:
                 in the return
 
         Returns:
-            CrossCorrelationReturn | tuple(CrossCorrelationReturn, integrated_log_likelihood_type): The
-                full cross correlation matrix for each image (if no ILL requested) or a tuple of (same, ILL). ILL is
-                represented as a matrix of scores indexed as [image, template].
+            The full cross correlation matrix for each image (if no ILL requested) or a tuple
+            of (same, ILL). ILL is represented as a matrix of scores indexed as [image, template].
+
+        Return Type:
+            CrossCorrelationReturn | tuple[CrossCorrelationReturn, integrated_log_likelihood_type]
         """    
         if return_integrated_likelihood:
             return self._compute_cross_correlation_likelihood(device, images_fourier, ctf, n_pixels_phys, n_images_per_batch, n_templates_per_batch, return_type=CrossCorrelationReturnType.FULL_TENSOR, return_integrated_likelihood=True)

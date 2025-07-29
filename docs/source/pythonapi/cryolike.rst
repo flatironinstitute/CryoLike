@@ -1,57 +1,31 @@
-cryolike package
-================
+cryolike
+===================
 
-Subpackages
------------
-
-.. toctree::
-   :maxdepth: 4
-
-   cryolike.convert_particle_stacks
-   cryolike.grids
-   cryolike.microscopy
-   cryolike.stacks
-   cryolike.util
-
-Submodules
-----------
-
-cryolike.cross\_correlation\_likelihood module
+cryolike.cross\_correlation\_likelihood
 ----------------------------------------------
 
 .. automodule:: cryolike.cross_correlation_likelihood
    :members:
-   :undoc-members:
+   :exclude-members: IllKernelFn, conform_ctf, WeightedTemplates
    :show-inheritance:
 
-cryolike.likelihood module
---------------------------
+.. cryolike.likelihood
+.. --------------------------
 
-.. automodule:: cryolike.likelihood
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. .. automodule:: cryolike.likelihood
+..    :members:
+..    :show-inheritance:
 
-cryolike.plot module
+cryolike.plot
 --------------------
 
 .. automodule:: cryolike.plot
    :members:
-   :undoc-members:
    :show-inheritance:
 
-cryolike.run\_likelihood module
+cryolike.run\_likelihood
 -------------------------------
 
 .. automodule:: cryolike.run_likelihood
    :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: cryolike
-   :members:
-   :undoc-members:
    :show-inheritance:
