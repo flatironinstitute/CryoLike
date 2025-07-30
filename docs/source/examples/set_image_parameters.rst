@@ -1,8 +1,9 @@
 Parameter-setting example
 ==========================
 
-**NOTE--This appears to be fully incorporated into the
-make-templates example?**
+CryoLike requires setting various parameters for image conversion,
+template creation, and likelihood computation. This example
+demonstrates how to set these parameters using a script.
 
 The imaging parameters include the number of voxels, voxel size,
 precision, viewing distance, number of inplanes, atom radii,
@@ -20,4 +21,5 @@ default atomic radii for each amino acid type.
 If the user does not specify the atom selection, the function
 will use all atoms in the atomic model.
 
-NOTE THAT THE PARTICLES SHOULD BE XXX
+.. literalinclude:: ../../../example/set_image_parameters_example.py
+    :language: python

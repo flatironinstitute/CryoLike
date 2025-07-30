@@ -1,8 +1,6 @@
 Run likelihood
 =================
-
-**TODO QUERY: Should we cross-link to Tutorials?**
-
+This example demonstrates how to run the likelihood computation.
 This script demonstrates the usage of the
 :py:func:`run_likelihood() <cryolike.run_likelihood.run_likelihood>`
 function from the :py:mod:`cryolike.run_likelihood` module. Please
@@ -10,10 +8,10 @@ see the linked documentation for a brief overview of the possible
 parameters.
 
 The :py:func:`run_likelihood() <cryolike.run_likelihood.run_likelihood>`
-function computes the likelihood of observing the given cryo-EM images,
-assuming the stated underlying 3D structure. The 3D structure is
+function computes the likelihood of observing the cryo-EM images given a set of 3D structures or maps.
+The 3D structure is
 represented as a set of 2D template images, observed from different
-viewing angles.
+viewing angles, for example, created in in :doc:`/example/make_templates_from_inputs_example`.
 
 .. The following parameters are required:
 
