@@ -20,7 +20,7 @@ Typical CryoLike usage requires four steps:
 
 CryoLike provides functions for each of these four tasks. The full
 range of options will be discussed in detail in
-**[TODO LINK APPROPRIATE DETAILED DOCUMENTATION HERE]**.
+the :doc:`tutorials section </tutorials/tutorials>`.
 
 This page walks you through a few scripts that demonstrate
 basic usage. Successfully running the example scripts also
@@ -117,12 +117,6 @@ from the following sources:
 Detailed Tutorials
 ---------------------
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   tutorials/read_star_file_indexed
-   tutorials/read_star_file_noindex
-   tutorials/read_cryosparc_file
-
+For example usages in different scenarios, see the
+:doc:`tutorials section </tutorials/tutorials>`.
 

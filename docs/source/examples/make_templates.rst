@@ -10,7 +10,7 @@ The wrapper function for making templates is
 in the :py:mod:`cryolike.stacks
 <cryolike.stacks.make_templates_from_inputs_api>` module.
 The function takes a list of inputs for the cryo-EM
-density map or atomic model, the imaging parameters, and
+density map or atomic model, the imaging parameters perviously set (see :doc:`/examples/set_image_parameters`), and
 the output folder. For a brief overview of the possible parameters,
 please see the linked API documentation.
 

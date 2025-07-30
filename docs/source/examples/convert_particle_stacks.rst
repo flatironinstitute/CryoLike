@@ -4,9 +4,7 @@ Convert Particles
 This script demonstrates the usage of the
 :py:func:`convert_particle_stacks_from_star_files()
 <cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_star_files>`
-function from
-the :py:mod:`cryolike.convert_particle_stacks.particle_stacks_conversion`
-module. Please see the linked documentation for a brief description
+function. Please see the linked documentation for a brief description
 of the possible parameters.
 
 The :py:func:`convert_particle_stacks_from_star_files()
