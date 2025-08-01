@@ -9,7 +9,7 @@ dependencies installed:
 
 - ``numpy``
 - ``scipy``
-- ``pytorch``: for GPU acceleration
+- ``torch``: for GPU acceleration
 - ``matplotlib``: for plotting
 - ``finufft``: for non-uniform FFT
 - ``cufinufft``: GPU version of finufft
@@ -36,8 +36,10 @@ your system, please refer to the
 `pytorch installation guide <https://pytorch.org/get-started/locally/>`_.
 For detailed installation of ``finufft`` and ``cufinufft``, please refer to
 `the official FINUFFT website <https://finufft.readthedocs.io/en/latest/>`_.
+Some environments recommend using the ``--system-site-packages`` flag with
+the virtual environment; if in doubt, consult your local system administrator.
 
-To install the CryoLike Python library itself, clone the repository and
+Next, install the CryoLike Python library itself. Clone the repository and
 run the following command in the ``/python`` directory of the repository:
 
 .. code-block:: console
@@ -52,4 +54,7 @@ To test the installation, run the following commands:
    (venv) $ pytest
 
 Note that this requires installing ``pytest`` and ``pytest-cov``
-in addition to the dependencies above.
+in addition to the dependencies above; these are not necessary during
+normal usage. If you wish to avoid running tests locally, you can
+also just step through the examples distributed with the repository
+(see the :doc:`examples section</examples/examples>`).

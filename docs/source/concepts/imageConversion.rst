@@ -44,14 +44,14 @@ metadata. One of these is partially shared with the image templates:
 this is the "image descriptor," which includes the  discretization and
 scaling grids used to interpret the tensor representations of the
 images. For more detail on this, see the
-:doc:`image settings documentation</usage/imageSettings>`
+:doc:`image settings documentation</concepts/imageSettings>`
 and the :py:mod:`cryolike.microscopy.parameters` documentation.
 
 In addition, image conversion needs data describing the image capture
 apparatus--most notably defocus and phase shift information. This
 metadata is expected to come from the Starfile or CryoSparc file.
 A full description of the expected file formats can be found in the
-:doc:`file formats documentation</usage/formats>`.
+:doc:`file formats documentation</concepts/formats>`.
 
 
 Interfaces
@@ -227,7 +227,7 @@ of MRC files, described by a single Star file that refers to
 the images individually.
 
 For more information about the expected file format,
-see :doc:`the formats page</usage/formats>`.
+see :doc:`the formats page</concepts/formats>`.
 
 In addition to the common parameters above, this function exposes
 the following parameters:

@@ -17,10 +17,10 @@ Welcome to CryoLike's documentation!
    :titlesonly:
    :caption: Documentation Contents:
 
-   about
-   installation
-   first-steps
-   usage/usage
-   examples/examples
-   tutorials/tutorials
-   pythonapi/modules
+   /about
+   /installation
+   /first-steps
+   /concepts/overview
+   /examples/examples
+   /tutorials/tutorials
+   /pythonapi/modules

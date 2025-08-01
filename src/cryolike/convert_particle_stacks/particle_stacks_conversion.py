@@ -341,7 +341,7 @@ def convert_particle_stacks_from_cryosparc(
         file_cs (str, optional): Path to cryosparc metadata file.
         folder_cryosparc (str, optional): Parent folder of the cryospark
             output jobs. Assumes directory structure is
-            'folder_cryosparc/J_/' where _ is the job number, with no
+            ``folder_cryosparc/Jx/`` where x is the job number, with no
             padding. Defaults to the current directory.
         folder_output (str, optional): Directory to use for outputting
             transcoded image files and metadata. Defaults to the current
@@ -469,7 +469,7 @@ def convert_particle_stacks_from_cryosparc_restack(
             representation and define output precision.
         folder_cryosparc (str, optional): Parent folder of the cryospark
             output jobs. Assumes directory structure is
-            'folder_cryosparc/J_/' where _ is the job number, with no
+            ``folder_cryosparc/Jx/`` where x is the job number, with no
             padding. Defaults to the current directory.
         job_number (int, optional): Job number of the cryosparc output.
             Used to form the job output directory. The cryosparc metadata

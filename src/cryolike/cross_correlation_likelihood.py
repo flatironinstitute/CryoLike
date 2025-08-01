@@ -364,7 +364,7 @@ class CrossCorrelationLikelihood:
             viewing angles. Used in computing integrated log likelihood.
         box_size (float): Side length of the (square) viewing box
         n_displacements (int): number of displacements considered in checking optimal displacement.
-            Should be the length of the x_ and y_displacement vectors.
+            Should be the length of the ``x_`` and ``y_displacement`` vectors.
         x_displacements (torch.Tensor): Vector of x_displacements to consider in matching
         y_displacements (torch.Tensor): Vector of y_displacements to consider in matching
         s_points (torch.Tensor): Matrix of x- and y-points from the template grid, after

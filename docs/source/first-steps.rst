@@ -43,13 +43,13 @@ below, we assume your
 environment's python interpreter is invoked through the
 ``python3`` command; this may vary slightly on your system.
 
-- The first script creates an image-parameters file and stores it
+- The :doc:`first script</examples/set_image_parameters>`
+  creates an image-parameters file and stores it
   in ``example/output/templates/parameters.npz``.
 
-  This file stores
+  The image parameters file stores
   information about the image dimensions and discretization grid
-  used to represent both template and image files. The parameters
-  are needed for creating both template and image files. For a
+  used to represent both template and image files. For a
   comparison to be well-founded, template and image data need to
   have compatible dimensions and discretizations.
 
@@ -59,10 +59,11 @@ environment's python interpreter is invoked through the
 
    (venv) $ python3 set_image_parameters_example.py
 
-- The second script reads the PDB files distributed with the repository
+- The :doc:`second script</examples/make_templates>`
+  reads the PDB files distributed with the repository
   in ``example/data/pdb``, converts them into Templates, and saves
-  them in a user-defined output directory (which for the example
-  we have specified as ``example/output/templates/``).
+  them in a user-defined output directory (which we have specified as
+  ``example/output/templates/`` for this example).
 
   To create the templates, run:
 
@@ -70,7 +71,8 @@ environment's python interpreter is invoked through the
 
    (venv) $ python3 make_templates_from_inputs_example.py
 
-- The third script reads particle stacks from ``particles.mrcs``
+- The :doc:`third script</examples/convert_particle_stacks>`
+  reads particle stacks from ``particles.mrcs``
   and ``particle_data.star`` (distributed in ``example/data/particles/``),
   converts them into CryoLike-format Image stacks, and saves them
   in a user-defined output directory (``example/output/particles/``).
@@ -81,7 +83,8 @@ environment's python interpreter is invoked through the
 
    (venv) $ python3 convert_particle_stacks_example.py
 
-- The final script compares the image stacks and templates, and computes
+- The :doc:`final script</examples/run_likelihood>` compares
+  the image stacks and templates, and computes
   the likelihoods in the ``example/output/likelihood`` directory tree:
 
 .. code-block:: console

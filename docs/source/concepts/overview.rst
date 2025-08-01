@@ -11,9 +11,6 @@ For exhaustive description of the public-facing API, see
 :doc:`the python API section </pythonapi/modules>`.
 
 
-.. Check out the :doc:`usage` section for further information, including
-  how to :doc:`install <installation>` the project.
-
 Overview
 ------------------------
 
@@ -93,7 +90,7 @@ For an example of creating an image descriptor, see the
 :doc:`image settings creation example </examples/set_image_parameters>`.
 
 For more details about the available options, see the
-:doc:`detailed description of image parameters </usage/imageSettings>`,
+:doc:`detailed description of image parameters </concepts/imageSettings>`,
 which also links
 to the relevant parts of the CryoLike API for further information.
 
@@ -114,7 +111,7 @@ For a basic example of generating Templates from PDB files, see the
 :doc:`template generation example </examples/make_templates>`.
 
 For more details about the available options for Template creation, see the
-:doc:`detailed description of Templates creation </usage/templateCreation>`,
+:doc:`detailed description of Templates creation </concepts/templateCreation>`,
 which includes details about the available parameters, supported formats,
 and links to the relevant parts of the CryoLike API.
 
@@ -132,13 +129,13 @@ structure. Each stack has its own parameters file; this file
 records
 provenance and capture data, as well as description of grids.
 A description of the file layout can be found at the
-:doc:`file structure documentation </usage/file_structure>`.
+:doc:`file structure documentation </concepts/file_structure>`.
 
 For a basic example of converting Images from star files, see the
 :doc:`image conversion example</examples/convert_particle_stacks>`.
 
 For more details about the available options for Image conversion, see the
-:doc:`detailed description of Images conversion </usage/imageConversion>`,
+:doc:`detailed description of Images conversion </concepts/imageConversion>`,
 which includes details about the available parameters, supported formats,
 and links to relevant API calls.
 
@@ -156,7 +153,7 @@ For a basic example of likelihood computation, see the
 For more details about the types of output CryoLike can generate,
 see the
 :doc:`detailed description of cross-correlational likelihood
-computation</usage/likelihoodComputation>`,
+computation</concepts/likelihoodComputation>`,
 which includes details about the available parameters and output
 specifications, as well
 as links to relevant API calls and a description of the wrapper functions.
@@ -173,7 +170,7 @@ is more rigid. This may be changed in future versions.
 
 For more details about CryoLike's expected file locations, see the
 :doc:`detailed description of
-file/directory structure </usage/file_structure>`.
+file/directory structure </concepts/file_structure>`.
 
 To read more about the CryoLike concepts and functions see:
 
@@ -186,12 +183,3 @@ To read more about the CryoLike concepts and functions see:
     formats
     likelihoodComputation
     file_structure
-
-
-
-For example usages in different scenarios, see the
-:doc:`tutorials section</tutorials/tutorials>`.
-
-For exhaustive description of the public-facing API,
-see the
-:doc:`python API section</pythonapi/modules>`.
