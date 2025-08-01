@@ -2,7 +2,7 @@ File formats for image conversion
 ##########################################
 
 Image conversion (from mrc or cryoSPARC particle files) requires both an
-:doc:`image descriptor</usage/imageSettings>` and capture apparatus
+:doc:`image descriptor</concepts/imageSettings>` and capture apparatus
 metadata. The image descriptor defines the grids and scales to use
 to interpret the image and is usually constructed from base values.
 
@@ -99,7 +99,7 @@ values to be applied in sequence to images from an MRC file.
 This is the format expected in the
 ``convert_particle_stacks_from_star_files()``
 wrapper
-(see :doc:`the image conversion documentation</usage/imageConversion>`).
+(see :doc:`the image conversion documentation</concepts/imageConversion>`).
 
 The expected fields are the same as for the ReLion case, above, except
 that we will ignore the ``AngleRot``, ``AngleTilt``, ``AnglePsi``, and
@@ -152,6 +152,6 @@ Without internal index
 If the internal index fields are not present, we assume that the
 records are correctly-ordered descriptors of the images in the
 MRC files in the job directory. See the
-:doc:`image conversion documentation</usage/imageConversion>`
+:doc:`image conversion documentation</concepts/imageConversion>`
 for more details (``convert_particle_stacks_from_cryosparc_restack()``).
 

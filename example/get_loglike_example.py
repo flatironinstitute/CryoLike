@@ -1,21 +1,22 @@
 import os, sys
 import torch
 import numpy as np
+from pathlib import Path
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-#number of templates
+# number of templates
 numtemp = int(sys.argv[1])
 
 # Define the base directory (adjust this to your actual base directory)
-base_dir = "./output/likelihood/"
+base_dir = Path("./output/likelihood/")
 
 # Initialize a list to store the concatenated results for each template folder
 all_templates_concat = []
 
-for x in range(0,numtemp):
-    template_dir = os.path.join(base_dir, f"template{x}", "log_likelihood")
+for x in range(0, numtemp):
+    template_dir = base_dir / f"template{x}" / "log_likelihood"
 
     files_concat = []
 

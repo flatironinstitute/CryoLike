@@ -96,7 +96,7 @@ of the total number of stacks converted so far. Then:
 Likelihood Patterns
 ==========================
 
-See also :doc:`/usage/likelihoodComputation`
+See also :doc:`/concepts/likelihoodComputation`
 
 
 Inputs

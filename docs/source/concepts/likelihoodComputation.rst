@@ -10,11 +10,11 @@ Overview
 At its heart, CryoLike offers a way to compute the likelihood of a given
 observed 2D image to a particular 3D structure.
 As described in the
-:doc:`Mathematical Framework</about.rst>`,
+:doc:`Mathematical Framework</about>`,
 likelihood comparisons are based on comparing a stack of
 images with a templates set using the cross-correlation.
 
-:doc:`Templates sets</usage/templateCreation>`
+:doc:`Templates sets</concepts/templateCreation>`
 are projections of a single 3D structure into image
 space from multiple viewing angles.
 Images will be compared against these templates
@@ -50,7 +50,7 @@ For a worked example of this wrapper function, see the
 
 The ``run_likelihood`` function takes the following parameters:
 
- - A set of :doc:`image descriptor parameters</usage/imageSettings>`, in
+ - A set of :doc:`image descriptor parameters</concepts/imageSettings>`, in
    on-disk or in-memory form (``params_input``)
  - The path to the directory where templates are stored (``folder_templates``)
  - The path to the directory where image stacks are stored
@@ -70,7 +70,7 @@ The ``run_likelihood`` function takes the following parameters:
    ``n_displacements_y``)
  - Flags to configure which output files are written
    **[PC: Question is there a flag for the CC?]**
- 
+
    - ``return_likelihood_integrated_pose_fourier``
    - ``return_optimal_pose``
    - ``optimized_inplane_rotation``
@@ -150,8 +150,8 @@ additional likelihood reports will be written.
 
 If ``True``, we will additionally write a Tensor with the integrated
 log likelihood of the Fourier-space cross-correlation (see the
-:doc:`Mathematical Framework </about.rst>` and
-:ref:`the Integrated likelihood section <_integrated_likelihood>`).
+:doc:`Mathematical Framework </about>` and
+:ref:`the Integrated likelihood section <integrated_likelihood>`).
 
    - ``return_optimal_pose``
 
@@ -207,7 +207,7 @@ The integrated likelihood is the main output of CryoLike.
 It is calculated by comparing
 each image to each template in the Fourier-Bessel
 representation using the Cross-correlation
-as described in the :doc:`Mathematical Framework</about.rst>`.
+as described in the :doc:`Mathematical Framework</about>`.
 
 .. _optimal_pose:
 
@@ -222,7 +222,7 @@ Cross-correlation
  - Best cross-correlation value for each image
    (``cross_correlation_S``) **[TO DO: CHECK _S]** The highest
    cross-correlation per image is a cryoLike output. As
-   described in the :doc:`Mathematical Framework</about.rst>`,
+   described in the :doc:`Mathematical Framework</about>`,
    CryoLike calculates the cross-correlation between each image
    and each template.
  - The template (by sequence number) of the best match (``optimal_template_S``)

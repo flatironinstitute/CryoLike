@@ -8,6 +8,7 @@ CryoLike Python API
    cryolike.convert_particle_stacks
    cryolike.grids
    cryolike.microscopy
+   cryolike.metadata
    cryolike.stacks
    cryolike.util
 

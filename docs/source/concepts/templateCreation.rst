@@ -30,7 +30,7 @@ Templates Metadata
 ------------------
 
 As described in more detail in the
-:doc:`image settings documentation</usage/imageSettings>`,
+:doc:`image settings documentation</concepts/imageSettings>`,
 there are some image descriptor
 metadata fields that apply only to ``Templates`` during the
 conversion process. Other than viewing distance,
@@ -64,7 +64,7 @@ The ``make_templates_from_inputs()`` wrapper function accepts:
    to a file (PDB, MRC), or a Numpy array or Torch tensor containing
    density data already loaded into memory.
  - The path to an image descriptor file (see the
-   :doc:`image settings documentation</usage/imageSettings>`
+   :doc:`image settings documentation</concepts/imageSettings>`
    for more details)
  - Whether or not to output plotted samples of the converted
    Templates (``output_plots``)
