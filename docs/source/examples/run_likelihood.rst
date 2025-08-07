@@ -13,9 +13,9 @@ function computes the likelihood of observing the cryo-EM images given
 a set of 3D structures or maps.
 The 3D structure is represented as a set of 2D template images,
 observed from different viewing angles, for example, created in
-:doc:`/example/make_templates_from_inputs_example`.
+:doc:`/examples/make_templates`.
 
-Eaxmple usage:
+Example usage:
 
 .. literalinclude:: ../../../example/run_likelihood_example.py
     :language: python

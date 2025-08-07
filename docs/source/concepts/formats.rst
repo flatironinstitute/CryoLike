@@ -17,10 +17,11 @@ phase shift information, if present) need to be available for
 each captured image.
 
 
+
+.. _starfile-format-background-info:
+
 Starfile
 =========
-
-The base Starfile file reader can be found at TODO: API XREF
 
 We expect that the Starfile can be read by the ``starfile`` library
 and will return either a Pandas dataframe or a dictionary of string
@@ -105,8 +106,9 @@ The expected fields are the same as for the ReLion case, above, except
 that we will ignore the ``AngleRot``, ``AngleTilt``, ``AnglePsi``, and
 ``ImagePixelSize`` fields in this case, even if they are present.
 
+.. _cryosparc-needed-fields:
 
-CryoSparc
+CryoSPARC
 ==========
 
 CryoSparc files do not require a special library to read; they are assumed

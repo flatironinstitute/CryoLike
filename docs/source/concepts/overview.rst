@@ -24,7 +24,7 @@ the 3D structure).
 There are four main steps of a CryoLike run:
 
 #. Setting the imaging and CryoLike parameters
-   **[TODO: explain and reference]**
+   (via the :doc:`ImageDescriptor object</concepts/imageSettings>`)
 #. Generating the templates by projecting
    the 3D structures into 2D space
 #. Converting the particles into CryoLike's

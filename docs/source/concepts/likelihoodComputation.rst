@@ -28,7 +28,7 @@ can be returned with several different means of aggregation.
     To reduce memory transfer overhead, we preference Templates as the outer
     set of images to loop over.
 
-Main Outputs
+Main outputs
 ************
 
 The primary outputs of CryoLike are the *best cross-correlation*
@@ -68,8 +68,9 @@ The ``run_likelihood`` function takes the following parameters:
    displacements to consider in both directions
    (``max_displacement_pixels``, ``n_displacements_x``,
    ``n_displacements_y``)
- - Flags to configure which output files are written
-   **[PC: Question is there a flag for the CC?]**
+ - Flags to configure which output files are written. Note that
+   the integrated log likelihood is optional, but some form of
+   cross-correlation likelihood will always be returned.
 
    - ``return_likelihood_integrated_pose_fourier``
    - ``return_optimal_pose``
@@ -78,7 +79,7 @@ The ``run_likelihood`` function takes the following parameters:
    - ``optimized_viewing_angle``
 
 
-Input System
+Input system
 ***************
 
 We compute likelihood by matching images against templates.
@@ -130,7 +131,7 @@ computation.
 The set of displacements tested will be preserved in
 ``folder_output/displacements_set.pt``.
 
-Possible Outputs
+Possible outputs
 =========================
 
 CryoLike can return the following aggregation levels of the computations.
@@ -139,7 +140,7 @@ Note that these correspond to the ``NamedTuple`` return-type classes defined in
 ``cross_correlation_likelihood.py``. For more detail, see
 :py:mod:`cryolike.cross_correlation_likelihood`.
 
-Output Type Selection
+Output type selection
 *************************
 
 The ``run_likelihood()`` function exposes the following flags to control
@@ -163,7 +164,7 @@ The remaining three options can be set individually, but the output will
 depend on the chosen combination.
 
 
-Output Paths
+Output paths
 **************
 
 The wrapper function writes computed likelihoods to disk for
@@ -203,29 +204,33 @@ processed.
 Integrated Log-Likelihood
 ******************************
 
-The integrated likelihood is the main output of CryoLike.
-It is calculated by comparing
+**TODO: this seems inadequate, & also doesn't distinguish between**
+**ILL and cross-correlation likelihood**
+The integrated likelihood is calculated by comparing
 each image to each template in the Fourier-Bessel
-representation using the Cross-correlation
+representation using the cross-correlation
 as described in the :doc:`Mathematical Framework</about>`.
 
-.. _optimal_pose:
-
-Optimal Pose Outputs
-****************************
-
-This will return 5 1-dimensional Tensors, indexed by the image sequence index:
 
 Cross-correlation
 ******************************
 
+.. _optimal_pose:
+
+Optimal pose outputs
+------------------------
+
+This will return 5 1-dimensional Tensors, indexed by the image sequence index:
+
  - Best cross-correlation value for each image
-   (``cross_correlation_S``) **[TO DO: CHECK _S]** The highest
-   cross-correlation per image is a cryoLike output. As
-   described in the :doc:`Mathematical Framework</about>`,
+   (``cross_correlation_S``). **TODO: CHECK S there may be an indexing issue**
+   As described in the :doc:`Mathematical Framework</about>`,
    CryoLike calculates the cross-correlation between each image
-   and each template.
- - The template (by sequence number) of the best match (``optimal_template_S``)
+   and each template. This tensor reports the numeric value of the
+   best match achieved.
+ - The template (by sequence number) of the best match
+   (``optimal_template_S``), i.e. the template that produced
+   the number in the corresponding index of ``cross_correlation_S``
  - The optimal x-displacement matching this image with the best-fitting
    template (``optimal_displacement_x_S``)
  - The optimal y-displacement matching this image with the best-fitting
@@ -244,105 +249,110 @@ Cross-correlation
     - ``optimal_inplane_rotation_S[i]`` is the rotation resulting in that alignment score
 
 
+.. .. _optimal_displacement_rotations:
 
-**[TO DO::: I DONT KNOW IF THIS IS AN OUTPUT ANYMORE, and its
-not referenced in the output section above]**
+.. Optimized Displacement and Rotations
+.. ----------------------------------------
 
-.. _optimal_displacement_rotations:
+.. This will return 4 2-dimensional Tensors. The outer (first) index
+.. is the image sequence index,
+.. and the inner (second) index is the template sequence index:
 
-Optimized Displacement and Rotations
-*********************************************
+..  - Cross-correlation value for each image (``cross_correlation_SM``)
+..  - The optimal x-displacement (``optimal_displacement_x_SM``)
+..  - The optimal y-displacement (``optimal_displacement_y_SM``)
+..  - The optimal inplane rotation (``optimal_inplane_rotation_SM``)
 
-This will return 4 2-dimensional Tensors. The outer (first) index
-is the image sequence index,
-and the inner (second) index is the template sequence index:
+.. As these Tensors are two-dimensional, they are communicating the values
+.. resulting in best alignment of each image and template.
 
- - Cross-correlation value for each image (``cross_correlation_SM``)
- - The optimal x-displacement (``optimal_displacement_x_SM``)
- - The optimal y-displacement (``optimal_displacement_y_SM``)
- - The optimal inplane rotation (``optimal_inplane_rotation_SM``)
+.. .. admonition:: Example:
 
-As these Tensors are two-dimensional, they are communicating the values
-resulting in best alignment of each image and template.
+..     Consider indexing into these Tensors at outer index ``i`` and
+..     inner index ``j`` . This will
+..     correspond to the best-alignment values between the ``i`` th
+..     image and ``j`` th tensor of the stack.
+..     Then:
 
-.. admonition:: Example:
-
-    Consider indexing into these Tensors at outer index ``i`` and inner index ``j`` . This will
-    correspond to the best-alignment values between the ``i`` th image and ``j`` th tensor of the stack.
-    Then:
-
-      - ``cross_correlation_SM[i][j]`` is the best-alignment likelihood score between image ``i`` and template ``j``
-      - ``optimal_displacement_x_SM[i][j]`` is the x-displacement resulting in best alignment for this pair
-      - ``optimal_inplane_rotation_SM[i][j]`` is the rotational value resulting in best alignment for this pair
+..       - ``cross_correlation_SM[i][j]`` is the best-alignment likelihood
+..         score between image ``i`` and template ``j``
+..       - ``optimal_displacement_x_SM[i][j]`` is the x-displacement resulting
+..         in best alignment for this pair
+..       - ``optimal_inplane_rotation_SM[i][j]`` is the rotational value
+..         resulting in best alignment for this pair
 
 
-.. _optimized_displacement:
+.. .. _optimized_displacement:
 
-Optimized Displacement
-******************************
+.. Optimized Displacement
+.. ------------------------
 
-This data states the optimal displacements, de-aggregated over image,
-template, and rotation.
+.. This data states the optimal displacements, de-aggregated over image,
+.. template, and rotation.
 
-This will return 3 3-dimensional Tensors. The outer (first) index is
-the image sequence index, the
-middle (second) index is the template sequence index, and the inner
-(third) index is the index of the
-corresponding rotational value (from the list of discrete rotations
-used for comparison).
+.. This will return 3 3-dimensional Tensors. The outer (first) index is
+.. the image sequence index, the
+.. middle (second) index is the template sequence index, and the inner
+.. (third) index is the index of the
+.. corresponding rotational value (from the list of discrete rotations
+.. used for comparison).
 
- - Cross-correlation value for each image and template pair at each
-   possible rotational alignment (``cross_correlation_SMw``)
- - Best X- and Y-displacements for each image-template pair at each
-   rotational alignment (``optimal_displacement_x_SMw`` and ``..._y_...``)
+..  - Cross-correlation value for each image and template pair at each
+..    possible rotational alignment (``cross_correlation_SMw``)
+..  - Best X- and Y-displacements for each image-template pair at each
+..    rotational alignment (``optimal_displacement_x_SMw`` and ``..._y_...``)
 
-.. admonition:: Example:
+.. .. admonition:: Example:
 
-  Consider indexing into these Tensors at outer index ``i``, middle
-  index ``j``, and inner index ``k``. This
-  corresponds to looking at the alignment between the ``i`` th image
-  and ``j`` th template, at the ``k`` th rotation
-  value. Then:
+..   Consider indexing into these Tensors at outer index ``i``, middle
+..   index ``j``, and inner index ``k``. This
+..   corresponds to looking at the alignment between the ``i`` th image
+..   and ``j`` th template, at the ``k`` th rotation
+..   value. Then:
 
-      - ``cross_correlation_SMw[i][j]`` is a 1-D slice with the
-        likelihood score of the best displacement value for each rotation
-      - ``optimal_displacement_x_SMw[i][j][k]`` is the displacement that
-        best aligns image ``i`` with template ``j`` when the image
-        has been rotated by the ``k`` th rotation value
+..       - ``cross_correlation_SMw[i][j]`` is a 1-D slice with the
+..         likelihood score of the best displacement value for each rotation
+..       - ``optimal_displacement_x_SMw[i][j][k]`` is the displacement that
+..         best aligns image ``i`` with template ``j`` when the image
+..         has been rotated by the ``k`` th rotation value
 
-.. _optimized_rotation:
+.. .. _optimized_rotation:
 
-Optimized Rotation
-******************************
+.. Optimized Rotation
+.. -----------------------
 
-This data states the optimal rotations, de-aggregated over image, template,
-and displacement index. It is very similar to the optimized displacement
-return type above, except that it returns the best rotation for each
-displacement, rather than the best displacement for each rotation.
-It returns 2 3-D Tensors:
+.. This data states the optimal rotations, de-aggregated over image, template,
+.. and displacement index. It is very similar to the optimized displacement
+.. return type above, except that it returns the best rotation for each
+.. displacement, rather than the best displacement for each rotation.
+.. It returns 2 3-D Tensors:
 
- - The likelihood of alignment between the pair, at each displacement
-   value, given the most-likely angle of rotation (``cross_correlation_SMd``)
- - The rotation value generating that (best/likeliest)
-   alignment (``optimal_inplane_rotation_SMd``)
+..  - The likelihood of alignment between the pair, at each displacement
+..    value, given the most-likely angle of
+..    rotation (``cross_correlation_SMd``)
+..  - The rotation value generating that (best/likeliest)
+..    alignment (``optimal_inplane_rotation_SMd``)
 
-**TODO: SAY SOMETHING ABOUT THE FACT WE ONLY USE
-SINGLE INDEX FOR DISPLACEMENT.**
+.. Note that the displacement grid is linearized, so we use only a single index
+.. to indicate the displacement. This index refers to the displacements as
+.. converted to the Fourier-space polar grid.
 
-.. _complete_disagg:
+.. .. _complete_disagg:
 
-Complete Disaggregated
-******************************
+.. Complete Disaggregated
+.. --------------------------
 
-This data provides a completely disaggregated view into the cross-correlation
-likelihood results. It returns a single 4-D Tensor, indexed by image sequence
-index, then template sequence index, then displacement index,
-then rotation index.
-The Tensor is ``cross_correlation_SMdw``.
+.. This data provides a completely disaggregated view into the
+.. cross-correlation
+.. likelihood results. It returns a single 4-D Tensor, indexed
+.. by image sequence
+.. index, then template sequence index, then displacement index,
+.. then rotation index.
+.. The Tensor is ``cross_correlation_SMdw``.
 
-**TODO: SAY SOMETHING ABOUT THE FACT WE USE
-ONLY A SINGLE INDEX FOR DISPLACEMENT**
-
+.. Note that the displacement grid is linearized, so we use only a single index
+.. to indicate the displacement. This index refers to the displacements as
+.. converted to the Fourier-space polar grid.
 
 
 
