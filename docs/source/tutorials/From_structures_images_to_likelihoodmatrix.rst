@@ -1,4 +1,4 @@
-Full cryoLike pipeline from models and images to Likelihood matrix
+Full CryoLike pipeline from models and images to likelihood matrix
 =====================================================================
 
 Overview
@@ -28,7 +28,7 @@ parameters and search ranges:
 
   .. code-block:: console
 
-   (venv) $ python3 set_image_parameters_example.py
+   (venv) $ python set_image_parameters_example.py
 
 See :doc:`/concepts/imageSettings` for details about the parameters,
 and :doc:`/examples/set_image_parameters` for the example code.
@@ -64,8 +64,8 @@ The resulting Templates objects are saved in the ``output/templates``
 folder.
 
 See :doc:`/examples/make_templates` for more information about
-this example, and **TODO LINK** for detailed documentation
-about the template conversion functions.
+this example, and :doc:`</concepts/templateCreation>`
+for details about the template creation functions.
 
 
 Step 3: Convert images
@@ -79,14 +79,13 @@ To convert the particles in that folder, run
 
   .. code-block:: console
 
-   (venv) $ pyhton convert_particle_stacks_example.py
+   (venv) $ python convert_particle_stacks_example.py
 
 Converted particles are stored in the ``output/particles`` folder.
 
 See :doc:`/concepts/imageConversion` for an overview of image
-conversion, and :doc:`/tutorials/read_cryosparc_file`,
-:doc:`/tutorials/read_cryosparc_restack`, and
-:doc:`/tutorials/read_star_file_indexed` for tutorials on reading
+conversion, and :doc:`/tutorials/read_cryosparc_file` and
+:doc:`/tutorials/read_star_file` for tutorials on reading
 different image input file formats.
 
 

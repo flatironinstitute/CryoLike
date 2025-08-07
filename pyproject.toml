@@ -47,4 +47,4 @@ pythonpath = ["test/helpers"]
 tmp_path_retention_policy = "none"
 
 [tool.doc8]
-max-line-length=120
+max-line-length = 120

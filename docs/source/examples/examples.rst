@@ -19,6 +19,7 @@ is a good way to confirm that your system is set up properly.
     make_templates
     convert_particle_stacks
     run_likelihood
+    combine_likelihoods
 .. read_star_file_noindex
 .. read_star_file_indexed
 .. read_cryosparc_file

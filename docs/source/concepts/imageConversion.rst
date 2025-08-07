@@ -83,6 +83,8 @@ four cases listed above. These wrapper functions can be accessed
 at :py:mod:`CryoLike.convert_particle_stacks
 <cryolike.convert_particle_stacks.particle_stacks_conversion>`.
 
+.. _image-file-conversion-common-parameters:
+
 Common Parameters
 ****************************
 
@@ -189,6 +191,8 @@ input; please see the documentation linked above.
     missing, a read error will occur.
 
 
+.. _star-file-general-info:
+
 Lists of Star files: ``convert_particle_stacks_from_star_files()``
 ********************************************************************************************
 
@@ -269,6 +273,7 @@ set, we will take only the filename (without path information)
 from the CryoSparc index, and look for
 those filenames within the ``folder_cryosparc`` directory.
 
+.. _cryosparc-job-folder-full-description:
 
 CryoSparc job folder: ``convert_particle_stacks_from_cryosparc_restack()``
 **************************************************************************
@@ -314,7 +319,7 @@ The details are best expressed by example:
      - ``cryofolder/J2/restack`` containing files matching ``batch_NUMBER_restacked.mrc``, OR
      - ``cryofolder/J2/downsample`` containing files matching ``batch_NUMBER_downsample.mrc``
 
-  where ``NUMBER`` is a sequential index starting with 0.
+  where ``NUMBER`` is a six-digit zero-padded sequential index starting with 0.
 
   If both the ``restack`` and ``downsample`` subdirectories exist, ``restack`` will be used.
 
@@ -324,7 +329,7 @@ The details are best expressed by example:
 
   The converter will then process every file in the chosen directory, starting with 0, until
   it cannot find a file matching the expected naming pattern. (Note that this means that a
-  discontinuous numbering--going from ``batch_4_restacked.mrc`` to ``batch_6_restacked.mrc``--
+  discontinuous numbering--going from ``batch_000004_restacked.mrc`` to ``batch_000006_restacked.mrc``--
   will cause processing to terminate.)
 
   The CryoSparc file is expected to have metadata for each of the MRC files' images, in order.

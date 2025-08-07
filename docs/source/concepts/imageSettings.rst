@@ -86,7 +86,7 @@ Once the viewing distance is defined, the grid for the
 Euler angles is computed, and the rotation as exemplified in
 the figure below is applied to generate each template.
 
- [TODO: INCLUDE ADI's figure]
+ **[TODO: INCLUDE ADI's figure]**
 
 The `resolution_factor` determines the maximum frequency
 in the Fourier polar grid up to
@@ -144,15 +144,15 @@ The main way for a user to create an ``ImageDescriptor`` instance
 is by the ``ImageDescriptor.from_individual_values()`` function.
 
 See also the API documentation at **TODO: PROVIDE CROSS-REFERENCE**
-**BUT DOUBLE CHECK THIS MAY HAVE CHANGED**
+**THIS DEPENDS ON MERGES IN THE CODE SIDE**
 
 The following parameters are accepted:
 
- - Precision (as a string ``single`` or ``double``, or CryoLike
+ - Precision (as a string (``single`` or ``double``), or CryoLike
    enum representation)
  - For setting the Cartesian grid:
 
-   - Number of pixels per side of the grid (``n_pixels``) and
+   - Number of pixels per side of the grid (``n_pixels``), and
    - size, in Angstroms, of each pixel (``pixel_size``)
    - Grids and pixels are assumed to be square
    - These are the only required fields--the rest will be set
@@ -161,24 +161,32 @@ The following parameters are accepted:
  - For setting the polar grid:
 
    - number of points per shell (``n_inplanes``)
-   - ``resolution_factor`` for deteriming the maximum
-     number of frequency radii in the polar grid
+   - ``resolution_factor`` for determining the maximum
+     radius (corresponding to the maximum observable frequency).
 
-     - Higher values mean higher resolution
-     - Formula is (half pi) **TODO**
+     - Because we use a fixed distance of 0.25 between radii,
+       higher values mean higher resolution
+     - Maximum radius is set to :math:`\frac{F}{4p}`, where ``F``
+       is the resolution factor and ``p`` is the number of pixels
+       per side of the grid
 
    - If not specified, a ``resolution_factor`` of 1 will be
-     used, which takes the maximum frequency radii up to Nyquist
+     used, which takes the maximum frequency radius up to Nyquist
 
  - For Template generation:
 
     - A ``viewing distance``, to compute the viewing angles to use
-      for 3D-to-2D projection
+      for 3D-to-2D projection. In rough terms, this determines
+      how far apart the different viewing angles are on the surface
+      of a unit sphere centered on the template, so a smaller value
+      means a larger number of angles will be considered.
+
+      - If not specified, the default is
+        :math:`\frac{1}{4 \pi F}`, where ``F`` is the
+        same resolution factor used to determine the max
+        radius of the polar grid
+
     - atomic radii (a scalar value, in Angstrom)
     - atom selection (string)
-    - atom shape (hard-shell or Gaussian)
+    - atom shape (``hard-shell`` or ``Gaussian``)
     - whether to use the default ``protein residue model``
-
- - For the outputs: **[TO DO:]**
-    - output folder
-    - output name
