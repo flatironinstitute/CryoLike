@@ -177,35 +177,53 @@ def multiplicative_gradient(
     return log_weights, stats_tracking
 
 
+def reweighting_wrapper (
+    likelihoods_matrix,
+    cross_validate_sets=5,
+    random_seed=42
+    ):
+
+    np.random.seed(random_seed)
+
+    np.random.shuffle(likelihoods_matrix)
+    particle_sets = np.array_split(likelihoods_matrix,cross_validate_sets)
+    weights_array = torch.zeros([cross_validate_sets,likelihoods_matrix.shape[1]])
+
+    for i  in range(cross_validate_sets):
+        weights_array[i], __ =  multiplicative_gradient (particle_sets[i])
+
+         
+    return weights_array
+
+
+
+
 def reweighting (
     likelihoods_directory,
     opt=False,
     phys=False,
     integrated=False
     ):
+
     matrices_directory = os.path.join(likelihoods_directory, 'concatenated_matrices')
-    if opt==True:
+
+    if opt == True:
         opt_likelihoods = -torch.load(os.path.join(matrices_directory, 'optimal_fourier_log_likelihood_matrix.pt'), weights_only=False).T
-        opt_weights, stats_tracking =  multiplicative_gradient (opt_likelihoods)
+        weights_array = reweighting_wrapper (opt_likelihoods) 
+
         print("Using the optimal calculated posse and displacement, the relative weights between templates are.")
-        print(torch.exp(opt_weights))
-        print("with losses")
-        print(stats_tracking)
+        print(torch.exp(weights_array))
 
-        torch.save(opt_weights,os.path.join(likelihoods_directory,'opt_weights.pt'))
-        torch.save(stats_tracking,os.path.join(likelihoods_directory,'opt_losses.pt'))
-         
-    if integrated==True:
+        torch.save(weights_array,os.path.join(likelihoods_directory,'opt_weights.pt'))
+
+    if integrated == True:
         integrated_likelihoods = -torch.load(os.path.join(matrices_directory, 'integrated_fourier_log_likelihood_matrix.pt'), weights_only=False).T
-        integrated_likelihoods = torch.load(os.path.join(matrices_directory, 'integrated_fourier_log_likelihood_matrix.pt'), weights_only=False).T
-        integrated_weights, stats_tracking =  multiplicative_gradient (integrated_likelihoods)
-        print("Using the marginalised likelihoods, the relative weights between templates are.")
-        print(torch.exp(opt_weights))
-        print("with losses")
-        print(stats_tracking)
+        weights_array = reweighting_wrapper (integrated_likelihoods) 
 
-        torch.save(integrated_weights,os.path.join(likelihoods_directory,'integrated_weights.pt'))
-        torch.save(stats_tracking,os.path.join(likelihoods_directory,'integrated_losses.pt'))
+        print("Using the marginalised likelihoods, the relative weights between templates are.")
+        print(torch.exp(weights_array))
+
+        torch.save(weights_array,os.path.join(likelihoods_directory,'integrated_weights.pt'))
 
     if phys==True:
         print('physical likelihoods not supported don\'t use them')
