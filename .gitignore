@@ -113,6 +113,29 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# output
-output/
-html/
+.vscode
+backup
+cpp
+deprecated
+python_old
+playground
+setup*
+
+*.ipynb
+
+plots
+
+profile.html
+profile.json
+
+slurm_err
+slurm_out
+
+run_gpu.sh
+test/benchmark
+example/output/
+example/output-ref
+
+test_output/
+benchmark_output/
+profiler_output/

@@ -42,9 +42,6 @@ def test_nufft_3d():
                 uniform = True,
                 half_space = half_space
             )
-            theta = polar_grid.theta_shell
-            radius = polar_grid.radius_shells
-            n_shells = polar_grid.n_shells
             n_inplanes = polar_grid.n_inplanes
 
             phys_grid_3d = CartesianGrid3D(n_voxels = n_pixels, voxel_size = box_size / n_pixels)
@@ -60,19 +57,8 @@ def test_nufft_3d():
             density_physical = (Gauss_1 + Gauss_2) / 2.0
             image_phys_true = torch.sum(density_physical, dim = 2) * pixel_size
 
-            l1norm_image_phys_true = torch.sum(image_phys_true * pixel_size ** 2)
             l2norm_image_phys_true = torch.sqrt(torch.sum(torch.abs(image_phys_true) ** 2 * pixel_size ** 2))
             density_physical = density_physical + 0j
-            
-            x_p = torch.from_numpy(polar_grid.x_points) * (2.0 * np.pi)
-            y_p = torch.from_numpy(polar_grid.y_points) * (2.0 * np.pi)
-            r_p = torch.from_numpy(polar_grid.radius_points)
-            sigma_atom_sq_scaled = sigma_atom_sq * (2.0 / box_size) ** 2
-            Gauss_kp = - (2 * sigma_atom_sq_scaled * (np.pi * r_p) ** 2)
-            T_kp_1 = torch.exp(Gauss_kp - 1j * (x_p * x_1 + y_p * y_1) * 2.0 / box_size) * (2 * np.pi * sigma_atom_sq_scaled)
-            T_kp_2 = torch.exp(Gauss_kp - 1j * (x_p * x_2 + y_p * y_2) * 2.0 / box_size) * (2 * np.pi * sigma_atom_sq_scaled)
-            image_fourier_true = (T_kp_1 + T_kp_2) / 2.0
-            l2norm_image_fourier_true = np.sqrt(polar_grid.integrate(torch.abs(image_fourier_true) ** 2))
 
             voxel_size = box_size / n_pixels
             volume = Volume(density_physical_data=PhysicalVolume(
@@ -84,28 +70,24 @@ def test_nufft_3d():
             fourier_slices_z = torch.zeros_like(fourier_slices_x)
             fourier_slices = torch.stack([fourier_slices_x, fourier_slices_y, fourier_slices_z], dim = 1)
             for precision in [Precision.SINGLE, Precision.DOUBLE]:
-
                 nufft_eps = nufft_eps_single if precision == Precision.SINGLE else nufft_eps_double
-
-                for use_cuda in [True, False]:
-
-                    if not use_cuda and precision == Precision.SINGLE:
+                for device in ["cpu", "cuda"]:
+                    if device == "cpu" and precision == Precision.SINGLE:
                         continue
-
                     image_fourier = volume_phys_to_fourier_points(
                         volume = volume,
                         fourier_slices = fourier_slices,
                         eps = nufft_eps,
-                        precision = precision,
-                        use_cuda = use_cuda
+                        input_device = device,
+                        precision = precision
                     )
                     image_phys_recover = fourier_polar_to_cartesian_phys(
                         grid_fourier_polar = polar_grid,
                         grid_cartesian_phys = phys_grid,
                         image_polar = image_fourier,
                         eps = nufft_eps,
-                        precision = precision,
-                        use_cuda = use_cuda
+                        device = device,
+                        precision = precision
                     )[0]
                     l2norm_image_phys_recover = torch.sqrt(torch.sum(torch.abs(image_phys_recover) ** 2 * pixel_size ** 2))
                     cross_correlation_back = (torch.sum(image_phys_true * image_phys_recover * pixel_size ** 2) / l2norm_image_phys_recover / l2norm_image_phys_true).real.item()

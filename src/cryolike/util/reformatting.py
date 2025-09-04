@@ -1,4 +1,4 @@
-from typing import Literal, overload
+from typing import Literal, overload, Any, cast
 import numpy as np
 from cryolike.util.types import FloatArrayType, IntArrayType
 from enum import Enum
@@ -10,11 +10,11 @@ class TargetType(Enum):
     FLOAT = 2
 
 
-def project_scalar(scalar: int | float, dims: int) -> IntArrayType | FloatArrayType:
+def project_scalar(scalar: int | float | np.int_ | np.float64 | np.float32, dims: int) -> IntArrayType | FloatArrayType:
     """Returns a numpy array of appropriate dtype and dimension from a scalar input.
 
     Args:
-        scalar (int | float): The value to project to an array
+        scalar (int | float | np.int_ | np.float64 | np.float32): The value to project to an array
         dims (int): Dimension (1d) of the desired array
 
     Returns:
@@ -55,7 +55,6 @@ def project_vector(vector: list | np.ndarray, dims: int, label: str) -> IntArray
         if len(v) < dims:
             raise ValueError(f"{label} must be at least {dims}-dimensional.")
         if len(v) > dims:
-            # QUERY: should we actually allow this? It probably represents a mistake on the caller's part.
             print(f"Warning: {label} is more than {dims}-dimensional. Ignoring higher dimensions...")
         result = np.array(v[:dims])
     return result
@@ -67,16 +66,16 @@ descriptor_types = int | float | list[int] | list[float] | IntArrayType | FloatA
 
 @overload
 def project_descriptor(descriptor: descriptor_types, label: str, dims: int, target_type: Literal[TargetType.INT]) -> IntArrayType:
-    ...
+    ... # pragma: no cover
 @overload
 def project_descriptor(descriptor: descriptor_types, label: str, dims: int, target_type: Literal[TargetType.FLOAT]) -> FloatArrayType:
-    ...
+    ... # pragma: no cover
 @overload
 def project_descriptor(descriptor: int_descriptors, label: str, dims: int, target_type: None) -> IntArrayType:
-    ...
+    ... # pragma: no cover
 @overload
 def project_descriptor(descriptor: float_descriptors, label: str, dims: int, target_type: None) -> FloatArrayType:
-    ...
+    ... # pragma: no cover
 def project_descriptor(descriptor: descriptor_types, label: str, dims: int, target_type: TargetType | None) -> IntArrayType | FloatArrayType:
     """Normalizes grid inputs to desired-length 1D vectors, with descriptive error checking.
 
@@ -102,15 +101,14 @@ def project_descriptor(descriptor: descriptor_types, label: str, dims: int, targ
             testval = descriptor
         if isinstance(testval, float):
             target_type = TargetType.FLOAT
-        elif isinstance(testval, int):
+        elif isinstance(testval, int) or isinstance(testval, np.integer):
             target_type = TargetType.INT
         else:
             raise ValueError("Unreachable: test val was neither float nor int")
 
     # TODO: Typing contravariant stuff.
     if np.isscalar(descriptor):
-        assert isinstance(descriptor, (int, float))
-        result = project_scalar(descriptor, dims)
+        result = project_scalar(descriptor, dims) # type: ignore
     else:
         assert isinstance(descriptor, (list, np.ndarray))
         result = project_vector(descriptor, dims, label)
@@ -127,3 +125,35 @@ def project_descriptor(descriptor: descriptor_types, label: str, dims: int, targ
         raise ValueError(f"{label} must have positive values.")
 
     return result
+
+
+def extract_unique_float(x: float | FloatArrayType, desc: str = '') -> float:
+    if isinstance(x, float):
+        return x
+    if isinstance(x, int):
+        return float(x)
+    unique = np.unique(x)
+    if len(unique) > 1:
+        raise ValueError(f"Array ({desc}) has multiple distinct values.")
+    return unique.item()
+
+
+def extract_unique_str(x: str | np.ndarray, desc: str = "") -> str:
+    if isinstance(x, str):
+        return x
+    v = _unbox_unique(x, str, desc)
+    return cast(str, v)
+
+
+def _unbox_unique(x: np.ndarray | Any, target_type: type, desc: str = ""):
+    if not isinstance(x, np.ndarray):
+        assert isinstance(x, target_type)
+        return x
+    else:
+        unique = np.unique(x)
+        if len(unique) > 1:
+            raise ValueError(f"Array ({desc}) has multiple distinct values.")
+        result = unique.item()
+        if not isinstance(result, target_type):
+            raise ValueError(f"Array ({desc}) expected to have type {target_type} and has {type(result)}")
+        return result

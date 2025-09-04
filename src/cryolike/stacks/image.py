@@ -1,7 +1,9 @@
 from typing import Literal, Optional, cast
 import numpy as np
 import mrcfile
+from math import ceil
 import torch
+from torch import device, tensor, Tensor
 
 from cryolike.grids import (
     CartesianGrid2D,
@@ -11,19 +13,16 @@ from cryolike.grids import (
 )
 from cryolike.microscopy import (
     CTF,
-    translation_kernel_fourier,
     fourier_polar_to_cartesian_phys,
     cartesian_phys_to_fourier_polar,
-    translation_kernel_fourier,
-    ViewingAngles,
 )
-from .template import Templates
 from cryolike.util import (
     ensure_positive,
     Cartesian_grid_2d_descriptor,
     ComplexArrayType,
     FloatArrayType,
     get_imgs_max,
+    get_device,
     IntArrayType,
     NormType,
     Precision,
@@ -31,36 +30,9 @@ from cryolike.util import (
     TargetType,
     to_torch,
 )
-
-
-# Nobody is asking for this yet
-# def read_image_npy(filename: str) -> FloatArrayType:
-#     if not filename.endswith('.npy'):
-#         raise ValueError(f'Image file name {filename} must end with .npy extension.')
-#     return np.load(filename)
-
-
-def _project_displacements(displacements: torch.Tensor | FloatArrayType | float) -> torch.Tensor:
-    if isinstance(displacements, torch.Tensor):
-        return displacements
-    if isinstance(displacements, np.ndarray):
-        return torch.from_numpy(displacements)
-    # return torch.from_numpy(np.array([displacements], dtype = float)[None,:])
-    return torch.tensor([[displacements]], dtype = torch.double)
-
-
-Displacement_raw_type = torch.Tensor | FloatArrayType | float
-def _verify_displacements(x_disp_raw: Displacement_raw_type, y_disp_raw: Displacement_raw_type, n_imgs: int) -> tuple[torch.Tensor, torch.Tensor]:
-    x_disp = _project_displacements(x_disp_raw)
-    y_disp = _project_displacements(y_disp_raw)
-    if x_disp.shape[0] != y_disp.shape[0]:
-        raise ValueError("x_displacements and y_displacements must have the same length")
-    n_disp = x_disp.shape[0]
-    if n_disp == n_imgs:
-        return (x_disp, y_disp)
-    if n_disp == 1: # manually broadcast
-        return (x_disp[None,:], y_disp[None,:])
-    raise ValueError("Number of displacements must be 1 or equal to the number of images.")
+from cryolike.metadata import (
+    ViewingAngles
+)
 
 
 class Images:
@@ -70,147 +42,167 @@ class Images:
         box_size (FloatArrayType): Size of the (Cartesian-space) viewing port.
         phys_grid (CartesianGrid2D): A grid describing the space in which physical images reside.
         polar_grid (PolarGrid): A grid describing the space in which Fourier images reside.
-        images_phys (Optional[torch.Tensor]): Cartesian-space images as a pixel-value array of [image x X-index x Y-index].
-        images_fourier (Optional[torch.Tensor]): Fourier-space images as a complex-valued array of [image x ? x ?].
+        images_phys (torch.Tensor): Cartesian-space images as a pixel-value array of [image x X-index x Y-index].
+        images_fourier (torch.Tensor): Fourier-space images as a complex-valued array of [image x shell-index x point-index].
         n_images (int): Count of images in the collection.
-        ctf (CTF | None): Contrast transfer function applied to the images, if any.
+        ctf (CTF | None): Contrast transfer function associated with the image stack, if any.
         viewing_angles (Optional[ViewingAngles]): Optimal viewing angle, if set.
+        displacement_grid_angstrom (Tensor): Represents the grid of displacements to be searched in
+            image-template comparison, as a tensor of [x=0/y=1, n_displacements]. Defaults to null displacement.
+            Should not be set manually.
+        displacement_count (int): The number of displacements in the displacement grid. Defaults to 1.
+        _translation_matrix (torch.Tensor): Cached translation kernel that broadcasts the displacement grid
+            over the Fourier images, returning them with an extra "displacement" dimension. Has dimensions of
+            [n_displacements, n_radii, n_inplanes]. Should not be accessed directly.
         filename (str | None): The name of the file of origin of these images, if they were read from an MRC file.
     """
     box_size: FloatArrayType
     phys_grid: CartesianGrid2D
     polar_grid: PolarGrid
-    images_phys: Optional[torch.Tensor] # if set, should be ndarray of [n_imgs, pixel_column, pixel_row]
-    images_fourier: Optional[torch.Tensor]
+    images_phys: Tensor       # if set, should be ndarray of [n_imgs, pixel_column, pixel_row]
+    images_fourier: Tensor
     n_images: int
     ctf: CTF | None
-    viewing_angles: Optional[ViewingAngles]
+    viewing_angles: ViewingAngles | None
+    displacement_grid_angstrom: Tensor
+    displacement_count: int
+    _translation_matrix: Tensor
     filename: str | None
 
     def __init__(self,
-        phys_images_data: Optional[PhysicalImages] = None,
-        fourier_images_data: Optional[FourierImages] = None,
+        phys_data: Optional[PhysicalImages | CartesianGrid2D] = None,
+        fourier_data: Optional[FourierImages | PolarGrid] = None,
         box_size: Optional[float | FloatArrayType] = None,
             # box size trumps if provided, else use physical & derive from physical grid if provided;
             # if no box size (i.e. b/c only passed images_fourier) then default to 2x2
-        polar_grid: Optional[PolarGrid] = None,
-        phys_grid: Optional[CartesianGrid2D] = None,
         viewing_angles: Optional[ViewingAngles] = None,
         ctf : Optional[CTF] = None,
     ) -> None:
-        if (phys_images_data is None and fourier_images_data is None):
-            raise ValueError("Must pass at least one of Fourier and cartesian images.")
+        self.n_images = 0
+        self.images_phys = tensor([])
+        self.images_fourier = tensor([])
+        self.filename = None
 
-        phys_grid_set = False
-        if phys_images_data is not None:
-            if phys_images_data.phys_grid is None:
-                raise ValueError("Can't happen: this should be fixed in the constructor.")
-            self.phys_grid = phys_images_data.phys_grid
-            phys_grid_set = True
-            self.images_phys = phys_images_data.images_phys
-            self.n_images = self.images_phys.shape[0]
-        else:
-            self.images_phys = None
-        if phys_grid is not None and phys_images_data is None:
-            self.phys_grid = phys_grid
-            phys_grid_set = True
+        if phys_data is not None:
+            if isinstance(phys_data, CartesianGrid2D):
+                self.phys_grid = phys_data
+            else:
+                self.images_phys = phys_data.images_phys
+                self.phys_grid = phys_data.phys_grid
+                self.n_images = self.images_phys.shape[0]
 
-        if fourier_images_data is not None:
-            self.polar_grid = fourier_images_data.polar_grid
-            self.images_fourier = fourier_images_data.images_fourier
-            self.n_images = self.images_fourier.shape[0]
-        else:
-            self.images_fourier = None
-        if polar_grid is not None and fourier_images_data is None:
-            self.polar_grid = polar_grid
-        
+        if fourier_data is not None:
+            if isinstance(fourier_data, PolarGrid):
+                self.polar_grid = fourier_data
+            else:
+                self.images_fourier = fourier_data.images_fourier
+                self.polar_grid = fourier_data.polar_grid
+                self.n_images = self.images_fourier.shape[0]
+
+        if self.n_images == 0:
+            raise ValueError("No images provided in either Fourier or Cartesian space.")
+
+        # QUERY: Does it really make sense to have a box_size that doesn't match the grid?
         if box_size is not None:
             _box_size = cast(FloatArrayType, project_descriptor(box_size, "box_size", 2, TargetType.FLOAT))
             self.box_size = _box_size
-        elif phys_grid_set == True:
-            self.box_size = self.phys_grid.box_size
         else:
-            self.box_size = np.array([2., 2.])
+            grid = getattr(self, 'phys_grid', None)
+            if grid is not None:
+                self.box_size = self.phys_grid.box_size
+            else:
+                self.box_size = np.array([2., 2.])
 
         self._check_image_array()
-        self.set_ctf(ctf)
-        self.viewing_angles = viewing_angles
-
-
-    def set_ctf(self, ctf: Optional[CTF]):
         self.ctf = ctf
+        self.viewing_angles = viewing_angles
+        if getattr(self, 'phys_grid', None) is None:
+            self.set_displacement_grid(0., 1, 1, 1.)
+        else:
+            self.set_displacement_grid(0., 1, 1)
 
 
     def _ensure_phys_images(self):
-        if self.images_phys is None:
+        if not self.has_physical_images():
             raise ValueError("Physical images not found.")
-        if self.phys_grid is None:
-            raise ValueError("No physical grid found.")
+        self._check_phys_imgs()
         
 
     def _ensure_fourier_images(self):
-        if self.images_fourier is None:
+        if not self.has_fourier_images():
             raise ValueError("Fourier images not found.")
-        if self.polar_grid is None:
-            raise ValueError("No polar grid found.")
+        self._check_fourier_imgs()
+
+
+    def _check_phys_imgs(self):
+        if not self.has_physical_images():
+            return
+        if getattr(self, "phys_grid", None) is None:
+            # can't happen
+            raise ValueError("Physical grid is not defined for physical images")
+        if len(self.images_phys.shape) == 2:
+            self.images_phys = self.images_phys[None,:,:]
+            self.n_images = 1
+        if len(self.images_phys.shape) != 3:
+            raise ValueError("Invalid shape for images.")
+        if (self.n_images != self.images_phys.shape[0]):
+            raise ValueError(f"Images object lists image count of {self.n_images} but the physical images array has {self.images_phys.shape[0]} entries.")
+        # TODO: There's probably another consistency check required with the phys grid.
+        if (self.phys_grid.n_pixels[0] != self.images_phys.shape[1] or
+            self.phys_grid.n_pixels[1] != self.images_phys.shape[2]):
+            raise ValueError('Dimension mismatch: n_pixels {self.phys_grid.n_pixels[0]} x {self.phys_grid.n_pixels[1]} but shape is {self.images_phys.shape}')
+        if not np.allclose(self.box_size, self.phys_grid.box_size):
+            print(f"WARNING: Images box size {self.box_size} is outside tolerance of physical grid box size {self.phys_grid.box_size}")
+
+
+    def _check_fourier_imgs(self):
+        if self.images_fourier.shape[0] == 0:
+            return
+        if getattr(self, "polar_grid", None) is None:
+            # Can't happen
+            raise ValueError("Polar grid is not defined for Fourier images")
+        if self.n_images != self.images_fourier.shape[0]:
+            raise ValueError(f"Images object lists image count of {self.n_images} but the fourier images array has {self.images_fourier.shape[0]} entries.")
 
 
     def _check_image_array(self):
-        if self.images_phys is None and self.images_fourier is None:
-            raise ValueError("No image array found")
-        if self.images_phys is not None:
-            if self.phys_grid is None:
-                # can't happen
-                raise ValueError("Physical grid is not defined for physical images")
-            if len(self.images_phys.shape) == 2:
-                self.images_phys = self.images_phys[None,:,:]
-            if len(self.images_phys.shape) != 3:
-                raise ValueError("Invalid shape for images.")
-            if (self.n_images != self.images_phys.shape[0]):
-                raise ValueError(f"Images object lists image count of {self.n_images} but the physical images array has {self.images_phys.shape[0]} entries.")
-            # TODO: There's probably another consistency check required with the phys grid.
-            if (self.phys_grid.n_pixels[0] != self.images_phys.shape[1] or self.phys_grid.n_pixels[1] != self.images_phys.shape[2]):
-                raise ValueError('Dimension mismatch: n_pixels {self.phys_grid.n_pixels[0]} x {self.phys_grid.n_pixels[1]} but shape is {self.images_phys.shape}')
-            if not np.allclose(self.box_size, self.phys_grid.box_size):
-                print(f"WARNING: Images box size {self.box_size} is outside tolerance of physical grid box size {self.phys_grid.box_size}")
-        if self.images_fourier is not None:
-            if self.polar_grid is None:
-                # Can't happen
-                raise ValueError("Polar grid is not defined for Fourier images")
-            if self.n_images != self.images_fourier.shape[0]:
-                raise ValueError(f"Images object lists image count of {self.n_images} but the fourier images array has {self.images_fourier.shape[0]} entries.")
+        self._check_phys_imgs()
+        self._check_fourier_imgs()
+        # NOTE: Inconsistent image counts is not possible; we've already checked both values
+        # against n_images, so if they don't match, one of those would have failed.
+        # TODO: Look for more consistency checks
 
 
-    @classmethod
-    def from_templates(cls, templates: Templates):
-        """Create an Images object from existing Templates. Mainly for testing.
+    def has_physical_images(self):
+        return self.images_phys.shape[0] > 0
+
+
+    def has_fourier_images(self):
+        return self.images_fourier.shape[0] > 0
+
+
+    def get_item_size(self, space: Literal['fourier'] | Literal['physical'] = 'fourier'):
+        """Returns the size, in bytes, of one image in the stack.
 
         Args:
-            templates (Templates): Templates to convert to Images.
+            space ('fourier' | 'physical', optional): Whether to compute the size of the
+                physical or fourier representation. Defaults to 'fourier'.
 
         Returns:
-            Images: The images in the passed templates, as an Images object.
+            int: Per-image size, in bytes.
         """
-        ## initialize the image class with the template class
-        if templates.templates_fourier is not None:
-            fourier_templates = templates.templates_fourier
-            if not isinstance(fourier_templates, torch.Tensor):
-                # This shouldn't happen
-                fourier_templates = torch.from_numpy(templates.templates_fourier)
-            fourier_im = FourierImages(fourier_templates, templates.polar_grid)
+        if space == 'fourier':
+            if not self.has_fourier_images():
+                return 0
+            imgs = self.images_fourier
+        elif space == 'physical':
+            if not self.has_physical_images():
+                return 0
+            imgs = self.images_phys
         else:
-            fourier_im = None
-        if templates.templates_phys is not None:
-            phys_im = PhysicalImages(templates.templates_phys, templates.phys_grid.pixel_size)
-        else:
-            phys_im = None
-        
-        return cls(
-            phys_images_data = phys_im,
-            fourier_images_data = fourier_im,
-            box_size = templates.box_size,
-            viewing_angles = templates.viewing_angles
-        )
+            raise NotImplementedError('Impossible branch')
+        total_size = imgs.element_size() * imgs.nelement()
+        return ceil(total_size / self.n_images)
 
 
     @classmethod
@@ -246,7 +238,7 @@ class Images:
                     raise ValueError(f"MRC file {filename} contains non-positive pixel sizes.")
             imgs_phys = torch.from_numpy(imgs_phys).to(device)
             phys_imgs_data = PhysicalImages(images_phys=imgs_phys, pixel_size=_pixel_size)
-        imgs = cls(phys_images_data=phys_imgs_data)
+        imgs = cls(phys_data=phys_imgs_data)
         imgs.filename = filename
         return imgs
 
@@ -278,11 +270,11 @@ class Images:
         self.box_size = self.phys_grid.box_size
 
 
-    def _pad_images_if_needed(self):
-        assert self.images_phys is not None
+    def _pad_or_trim_images_if_needed(self):
+        if not self.has_physical_images():
+            return
         device = self.images_phys.device
         pad_width = [(0, 0), (0, 0), (0, 0)]
-        # NOTE: I have not checked the math on this.
         for i in range(2):
             if self.phys_grid.n_pixels[i] == self.images_phys.shape[i+1]:
                 continue
@@ -320,7 +312,8 @@ class Images:
             raise ValueError("Only one of n_pixels or box_size must be provided.")
         if box_size is None and n_pixels is None:
             raise ValueError("Either n_pixels or box_size must be provided.")
-        if self.images_phys is None:
+        if not self.has_physical_images():
+            # TODO: Query: should this be an error, or can we just let it slide?
             raise ValueError('Attempt to change physical image size, but no physical images have been set.')
         if box_size is not None:
             _box_size = cast(FloatArrayType, project_descriptor(box_size, "box size", 2, TargetType.FLOAT))
@@ -329,7 +322,7 @@ class Images:
         assert n_pixels is not None   # either it came in, or we just set it
         _n_pixels = cast(IntArrayType, project_descriptor(n_pixels, "n_pixels", 2, TargetType.INT))
         self.phys_grid = CartesianGrid2D(_n_pixels, self.phys_grid.pixel_size)
-        self._pad_images_if_needed()
+        self._pad_or_trim_images_if_needed()
         if box_size is None:
             self.box_size = self.phys_grid.box_size
         self._check_image_array()
@@ -340,7 +333,7 @@ class Images:
         polar_grid: Optional[PolarGrid] = None,
         nufft_eps: float = 1e-12,
         precision: Precision = Precision.DEFAULT,
-        use_cuda: bool = True       # TODO: Better to ask for a device
+        device: str | device | None = 'cuda'
     ):
         """Transform the physical images in this collection to Fourier-space representation. Existing
         physical images are kept. The new Fourier-space images will be placed on the same device as the
@@ -360,24 +353,21 @@ class Images:
             ValueError: If no polar grid exists on the collection already, and none is passed.
         """
         self._ensure_phys_images()
-        # TODO: find way to remove assertion
-        assert self.images_phys is not None
         if polar_grid is not None:
             self.polar_grid = polar_grid
-        if self.polar_grid is None:
+        if getattr(self, "polar_grid", None) is None:
             raise ValueError("No polar grid found")
         if precision == Precision.DEFAULT:
             precision = Precision.SINGLE if self.images_phys.dtype == torch.float32 else Precision.DOUBLE
+        _device = get_device(device)
         self.images_fourier = cartesian_phys_to_fourier_polar(
             grid_cartesian_phys = self.phys_grid,
             grid_fourier_polar = self.polar_grid,
             images_phys = self.images_phys,
             eps = nufft_eps,
             precision = precision,
-            use_cuda = use_cuda
+            device = _device
         )
-        # TODO: Remove this assertion once cartesian_phys_to_fourier_polar is typed
-        assert self.images_fourier is not None
         if self.polar_grid.uniform:
             self.images_fourier = self.images_fourier.reshape(self.n_images, self.polar_grid.n_shells, self.polar_grid.n_inplanes)
         self.images_fourier.to(self.images_phys.device)     # TODO: make this user-configurable, they might not want same device
@@ -388,8 +378,9 @@ class Images:
         grid: CartesianGrid2D | Cartesian_grid_2d_descriptor | None = None,
         nufft_eps: float = 1e-12,
         precision: Precision = Precision.DEFAULT,
-        use_cuda: bool = True
-    ):
+        max_to_transform: int = -1,
+        device: str | device | None = None
+    ) -> torch.Tensor:
         """Transform the Fourier-space images in this collection to a Cartesian-space representation.
         Existing Fourier-space images are kept. The new images will be placed on the same device as the
         Fourier-space images.
@@ -407,34 +398,39 @@ class Images:
             ValueError: If no existing Cartesian grid was set, and no new one was passed.
         """
         self._ensure_fourier_images()
-        assert self.images_fourier is not None
-        if grid is None and self.phys_grid is None:
+        if grid is None and getattr(self, "phys_grid", None) is None:
             raise ValueError('No physical grid found, and physical grid parameters were not provided.')
         if grid is not None:
             self.phys_grid = CartesianGrid2D.from_descriptor(grid)
-        device = self.images_fourier.device
-        images_fourier = self.images_fourier.reshape(self.n_images, -1)
-        # images_fourier = cast(ComplexArrayType, images_fourier)
-        if not isinstance(images_fourier, torch.Tensor):
-            images_fourier = torch.from_numpy(images_fourier)
+        persist_transformed = False
+        if max_to_transform <= 0:
+            if max_to_transform == -1:
+                persist_transformed = True
+            max_to_transform = self.n_images
+        if not persist_transformed:
+            print(f"Transforming only the first {max_to_transform} images, probably for testing or plotting. Transformed images will be returned but not persisted.")
+
+        device = self.images_fourier.device if device is None else device
+        _device = get_device(device)
+        images_fourier = self.images_fourier[:max_to_transform]
+        images_fourier = images_fourier.reshape(images_fourier.shape[0], -1)
         if precision == Precision.DEFAULT:
             precision = Precision.SINGLE if images_fourier.dtype == torch.complex64 else Precision.DOUBLE
         else:
             if (precision == Precision.SINGLE and images_fourier.dtype != torch.complex64) or \
-               (precision == Precision.DOUBLE and images_fourier.dtype == torch.complex128):
+               (precision == Precision.DOUBLE and images_fourier.dtype != torch.complex128):
                 print("Precision %s provided, overriding the existing precision." % precision.value)
-        self.images_phys = fourier_polar_to_cartesian_phys(
+        images_phys = fourier_polar_to_cartesian_phys(
             grid_fourier_polar = self.polar_grid,
             grid_cartesian_phys = self.phys_grid,
             image_polar = images_fourier,
             eps = nufft_eps,
             precision = precision,
-            use_cuda = use_cuda     # TODO: Better to ask for a device
+            device = _device
         ).real
-        if isinstance(self.images_phys, torch.Tensor):
-            self.images_phys.to(device)     # TODO: Make this configurable
-        else:
-            raise ValueError("images_phys were not returned as a tensor. Shouldn't happen.")
+        if persist_transformed:
+            self.images_phys = images_phys.to(device)     # TODO: Make this configurable
+        return images_phys
 
     
     def center_physical_image_signal(self, norm_type: NormType = NormType.MAX):
@@ -450,14 +446,15 @@ class Images:
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: The computed mean and norm of the images.
         """
-        if self.images_phys is None:
-            raise ValueError("Physical images not generated.")
+        self._ensure_phys_images()
         mean = torch.mean(self.images_phys, dim = (1,2), keepdim=True)
         self.images_phys -= mean
         if norm_type == NormType.MAX:
             norm = torch.amax(torch.abs(self.images_phys), dim = (1,2), keepdim = True)
         elif norm_type == NormType.STD:
             norm = torch.std(self.images_phys, dim = (1,2), keepdim = True)
+        else:
+            raise ValueError("Unreachable: unsupported norm type.")
         self.images_phys /= norm
         return mean, norm
 
@@ -479,7 +476,6 @@ class Images:
         if not self.polar_grid.uniform:
             raise NotImplementedError("Non-uniform Fourier images not implemented yet.")
         self.ctf = ctf
-        assert self.images_fourier is not None
         self.images_fourier = ctf.apply(self.images_fourier)
         return self.images_fourier
 
@@ -498,7 +494,7 @@ class Images:
                 noise applied to them. 
         """
         ensure_positive(snr, "signal-to-noise ratio")
-        if (self.images_phys is None):
+        if not self.has_physical_images():
             raise ValueError("Atempting to add physical noise, but physical images are not set.")
         device = self.images_phys.device
         # if not torch.cuda.is_available():
@@ -512,7 +508,6 @@ class Images:
         return self.images_phys, sigma_noise.flatten().cpu().numpy()
 
 
-    # def add_noise_fourier(self, snr: float | FloatArrayType | torch.Tensor = 1.0, device: str = 'cuda'):
     def add_noise_fourier(self, snr: float | FloatArrayType | torch.Tensor = 1.0):
         """Add random ((0,1) complex normal) noise to Fourier-space images in the collection.
 
@@ -527,7 +522,7 @@ class Images:
                 noise applied to them. 
         """
         ensure_positive(snr, "signal-to-noise ratio")
-        if (self.images_fourier is None):
+        if self.images_fourier.shape[0] == 0:
             raise ValueError("Attempting to add fourier noise, but fourier images are not set.")
         device = self.images_fourier.device
         if isinstance(snr, np.ndarray):
@@ -540,13 +535,134 @@ class Images:
         return self.images_fourier, sigma_noise.flatten().cpu().numpy()
 
 
-    def displace_images_fourier(
+    def set_displacement_grid(
+        self,
+        max_displacement_pixels: float,
+        n_displacements_x: int,
+        n_displacements_y: int,
+        pixel_size_angstrom: float | None = None,
+    ):
+        """Sets the displacement grid (the set of displacements to search
+        in cross-comparison) for this object. This will also set the
+        translation kernel that enables broadcasting the images over the
+        displacements. The resulting grid will be square in shape, with a
+        maximum displacement in both X and Y of max_displacement_pixels,
+        but the number of displacements in either direction will vary. The
+        original image (a displacement of (0, 0)) will always be included.
+
+        Args:
+            max_displacement_pixels (float): Maximum displacement value
+            n_displacements_x (int): Number of displacements in the x-direction
+            n_displacements_y (int): Number of displacements in the y-direction
+            pixel_size_angstrom (float | None, optional): Size of each pixel, in
+                angstrom. Needed to interpret the max_displacement_pixels. Only
+                required if this image stack does not have a physical grid set.
+        """
+        if pixel_size_angstrom is None:
+            if getattr(self, 'phys_grid', None) is None:
+                raise ValueError("If pixel size is not provided, a physical grid must be set.")
+            # NOTE: Assumes square pixels!
+            pixel_size_angstrom = self.phys_grid.pixel_size[0]
+        assert pixel_size_angstrom is not None
+        if self.box_size[0] != self.box_size[1]:
+            print("Displacement grid currently only implemented for square viewing box. Results may be unreliable.")
+            # raise NotImplementedError("Displacement grid currently only implemented for square viewing box.")
+
+        max_d_angstrom = max_displacement_pixels * pixel_size_angstrom
+        n_displacements_x = max(1, n_displacements_x)
+        n_displacements_y = max(1, n_displacements_y)
+        self.n_displacements = n_displacements_x * n_displacements_y
+        if self.n_displacements == 1:
+            max_d_angstrom = 0.
+
+        x_disp = max_d_angstrom if n_displacements_x > 1 else 0.
+        y_disp = max_d_angstrom if n_displacements_y > 1 else 0.
+        _x = torch.linspace( -x_disp, x_disp, n_displacements_x)
+        _y = torch.linspace( -y_disp, y_disp, n_displacements_y)
+        _X, _Y = torch.meshgrid(_x, _y, indexing="xy")
+        _X = _X.flatten()
+        _Y = _Y.flatten()
+        assert self.n_displacements == _X.size()[0]
+
+        if n_displacements_x % 2 == 0 or n_displacements_y % 2 == 0:
+            # even number of steps means we omitted (0, 0); add it back in
+            _X = torch.cat((_X, torch.tensor([0.])))
+            _Y = torch.cat((_Y, torch.tensor([0.])))
+            self.n_displacements += 1
+        self.displacement_grid_angstrom = torch.stack([_X, _Y])
+        if getattr(self, 'polar_grid', None) is None:
+            print("Warning: No polar grid set. Translation matrix is invalid.")
+            return
+        self._translation_matrix = self.polar_grid.get_fourier_translation_kernel(
+            _X,
+            _Y,
+            self.box_size[0],
+            self.box_size[1],
+            Precision.SINGLE if self.images_fourier.dtype == torch.complex64 else Precision.DOUBLE,
+            self.images_fourier.device
+        )
+
+
+    def project_images_over_displacements(
+        self,
+        range_min: int,
+        range_max_excl: int,
+        device: torch.device | str | None = None
+    ):
+        """Returns a tensor of the requested range of the Fourier-space images,
+        projected over the currently configured displacements, stored on the
+        requested device.
+
+        Args:
+            range_min (int): Index of first image to return
+            range_max_excl (int): One more than the index of the last image
+                to be returned
+            device (torch.device | str | None): Device on which to store the
+                returned tensor. If unset, will default to the device where
+                the current Fourier images reside.
+
+        Returns:
+            torch.Tensor: A tensor of Fourier-space images, projected over
+                the configured displacements. This tensor will be indexed
+                as [image, displacement, radius, inplane-value], with the
+                latter two dimensions corresponding to the polar quadrature
+                grid.
+        """
+
+        if getattr(self, '_translation_matrix', None) is None:
+            raise ValueError("Translation kernel was never set. Most likely this image object lacks a polar grid.")
+        if device is None:
+            device = self.images_fourier.device
+        return (self.images_fourier[range_min:range_max_excl].unsqueeze(1) * self._translation_matrix).to(device)
+
+
+    def _verify_displacements(
         self,
         x_displacements: FloatArrayType | torch.Tensor | float,
         y_displacements: FloatArrayType | torch.Tensor | float,
-        precision: Precision = Precision.DEFAULT,
+        precision: Precision,
+        device: torch.device,
+        displacement_per_image: bool = False
     ):
-        """Apply a displacement to the Fourier-space images in the collection.
+        x_disp = to_torch(x_displacements, precision, device)
+        y_disp = to_torch(y_displacements, precision, device)
+
+        if displacement_per_image:
+            if x_disp.shape[0] != self.n_images or y_disp.shape[0] != self.n_images:
+                raise ValueError("Per-image displacements must provide one displacement per image.")
+            return (x_disp, y_disp)
+        return (x_disp.sum().unsqueeze(0), y_disp.sum().unsqueeze(0))
+
+
+    def displace_fourier_images(
+        self,
+        x_displacements: FloatArrayType | torch.Tensor | float,
+        y_displacements: FloatArrayType | torch.Tensor | float,
+        displacement_per_image: bool = False
+    ):
+        """Apply a displacement to the Fourier-space images in the collection, modifying them in-place.
+        The displacements are assumed to be intended as a fraction of half a viewing box (i.e. they
+        will be multiplied by 2 and divided by the viewing box size)
 
         Args:
             x_displacements (FloatArrayType | torch.Tensor | float): Displacements to apply. May be constant
@@ -555,22 +671,26 @@ class Images:
             y_displacements (FloatArrayType | torch.Tensor | float): Displacements to apply. May be constant
                 for each pixel, or a set of displacements to apply per-pixel for each image, or a complete
                 tensor of displacements.
-            precision (Precision, optional): Whether to use single or double precision for the resulting
-                representation. Defaults to keeping current image precision.
+            displacement_per_image (bool, optional): If True, enforce that the displacements are equal-length
+                tensors with one element each per image. Otherwise, assume they are a set of displacements to
+                sum and apply to each image.
         """
         self._ensure_fourier_images()
-        assert self.images_fourier is not None
-        if precision == Precision.DEFAULT:
-            precision = Precision.SINGLE if self.images_fourier.dtype == torch.complex64 else Precision.DOUBLE
+        precision = Precision.SINGLE if self.images_fourier.dtype == torch.complex64 else Precision.DOUBLE
         device = self.images_fourier.device
-        (x_disp, y_disp) = _verify_displacements(x_displacements, y_displacements, self.images_fourier.shape[0])
-        x_disp = x_disp * 2.0 / self.box_size[0]
-        y_disp = y_disp * 2.0 / self.box_size[1]
-        translation_kernel = translation_kernel_fourier(self.polar_grid, x_disp, y_disp, precision, str(device))
-        image_fourier_device = to_torch(self.images_fourier, precision, device)
-        self.images_fourier = (image_fourier_device * translation_kernel)
 
-    
+        (x_disp, y_disp) = self._verify_displacements(x_displacements, y_displacements, precision, device, displacement_per_image)
+        translation_kernel = self.polar_grid.get_fourier_translation_kernel(
+            x_disp,
+            y_disp,
+            self.box_size[0],
+            self.box_size[1],
+            precision,
+            device
+        )
+        self.images_fourier = (self.images_fourier * translation_kernel)
+
+
     def normalize_images_phys(
         self,
         ord: int = 1,
@@ -586,13 +706,14 @@ class Images:
             torch.Tensor: The norm applied to the images (which are modified in-place).
         """
         self._ensure_phys_images()
-        assert self.images_phys is not None
         if use_max:
+            # note that this normalizes to [-1, 1]
             maxval = get_imgs_max(self.images_phys)
             self.images_phys /= maxval
             return maxval
         else:
             lpnorm = torch.norm(self.images_phys, dim = (1,2), p = ord, keepdim = False)
+            # This is probably equivalent to just using keepdim = True
             self.images_phys /= lpnorm[:,None,None]
             return lpnorm
 
@@ -612,7 +733,6 @@ class Images:
             torch.Tensor: The norm applied to the images (which are modified in-place).
         """
         self._ensure_fourier_images()
-        assert self.images_fourier is not None
         if use_max:
             maxval = get_imgs_max(self.images_fourier)
             self.images_fourier /= maxval
@@ -626,56 +746,82 @@ class Images:
             return lpnorm
 
 
-    def rotate_images_fourier(
+    def _make_rotation_tensor(self, inplane_rotations: np.ndarray | torch.Tensor | float) -> torch.Tensor:
+        if np.isscalar(inplane_rotations):
+            _rotations = torch.tensor([inplane_rotations], dtype = torch.double)
+        elif isinstance(inplane_rotations, np.ndarray):
+            _rotations = torch.from_numpy(inplane_rotations).to(dtype = torch.double)
+        else:
+            assert isinstance(inplane_rotations, torch.Tensor)
+            _rotations = inplane_rotations.to(dtype=torch.double)
+        if _rotations.ndim > 1:
+            raise ValueError("inplane_rotations must be a 1D array.")
+        if _rotations.shape[0] != self.images_fourier.shape[0]:
+            if _rotations.shape[0] == 1:
+                # Manually broadcast rotations
+                _rotations = _rotations * torch.ones(self.images_fourier.shape[0])
+            else:
+                raise ValueError("Number of rotations must be equal to the number of images.")
+        _rotations.to(self.images_fourier.device)
+
+        return _rotations
+
+
+    # TODO: Need to change this to stay discretized the whole way through
+    # ALSO need to map up the discretized angles/indexes to the actual angle
+    # measures they correspond to, which we'll need to communicate to the user
+    # (somehow)
+    # Ultimately, needs to change (to a purely discretized version) in 3 places:
+    #  - here
+    #  - the cross-correlation-likelihood.py fn
+    #  - the optimized likelihood.py
+    # HERE, these should be discretized to begin with (& change fn name to add "_discretized")
+    # HOWEVER, we will likely also need a continuous version for dealing with data from external sources
+    def rotate_images_fourier_discrete(
         self,
-        inplane_rotations : np.ndarray | torch.Tensor | float
+        inplane_rotations: np.ndarray | torch.Tensor | float
     ):
         """Apply an in-plane rotation to the Fourier-space images.
 
+        While a continuous value is accepted, the resulting rotated object must align
+        with the points on the polar grid, so the rotation will be discretized.
+
+        Assumes a uniform polar grid.
+
         Args:
-            inplane_rotations (np.ndarray | torch.Tensor | float): Rotation to apply.
+            inplane_rotations (np.ndarray | torch.Tensor | float): Rotation to apply,
+                in revolutions [RADIANS?] TODO. If an array or tensor, must be of length 1 (in which
+                case it will be applied to all images) or a 1-d array of length equal
+                to the number of images (one rotation per image).
 
         Raises:
             ValueError: If the inplane_rotations is multi-dimensional, or cannot be
                 obviously broadcast to the number of images.
         """
         self._ensure_fourier_images()
-        assert self.images_fourier is not None
-        if np.isscalar(inplane_rotations):
-            inplane_rotations = torch.tensor([inplane_rotations], dtype = torch.double)
-        if isinstance(inplane_rotations, np.ndarray):
-            inplane_rotations = torch.from_numpy(inplane_rotations)
-        assert isinstance(inplane_rotations, torch.Tensor)
-        if inplane_rotations.ndim > 1:
-            raise ValueError("inplane_rotations must be a 1D array.")
-        inplane_rotations.to(self.images_fourier.device)
+        _rotations = self._make_rotation_tensor(inplane_rotations)
 
-        if inplane_rotations.shape[0] != self.images_fourier.shape[0]:
-            if inplane_rotations.shape[0] == 1:
-                # Manually broadcast rotations
-                inplane_rotations = inplane_rotations * torch.ones(self.images_fourier.shape[0])
-            else:
-                raise ValueError("Number of rotations must be equal to the number of images.")
-        inplane_rotations_step = 2 * np.pi / self.polar_grid.n_inplanes
-        inplane_rotations_discrete = cast(torch.Tensor, -np.round(inplane_rotations / inplane_rotations_step))
-        # TODO: See if this can be vectorized better
+        inplane_rotation_step = 2 * np.pi / self.polar_grid.n_inplanes
+        inplane_rotations_discrete = -torch.round(_rotations / inplane_rotation_step)
         for i in range(self.n_images):
             self.images_fourier[i] = torch.roll(self.images_fourier[i], int(inplane_rotations_discrete[i]), dims = 1)
 
     
+    ## This function is used for specific datasets, need more documentation to expose it to users
     def filter_padded_images(self, rtol = 1e-1):
         """Restrict the image collection to the set of images which do not have padding.
         """
         ## this is to remove the artifacted images in some dataset on EMPIAR
         ## find padded physical images and remove them
-        if self.images_phys is None:
+        if not self.has_physical_images():
             return
         not_padded = np.ones(self.images_phys.shape[0], dtype=bool)
         for i in range(self.images_phys.shape[0]):
-            if np.allclose(self.images_phys[i,0,:], self.images_phys[i,1,:], rtol = rtol) or \
-                np.allclose(self.images_phys[i,:,0], self.images_phys[i,:,1], rtol = rtol) or \
-                np.allclose(self.images_phys[i,-1,:], self.images_phys[i,-2,:], rtol = rtol) or \
-                np.allclose(self.images_phys[i,:,-1], self.images_phys[i,:,-2], rtol = rtol):
+            if (torch.allclose(self.images_phys[i, 0, :], self.images_phys[i, 1, :], rtol = rtol) or
+                torch.allclose(self.images_phys[i, :, 0], self.images_phys[i, :, 1], rtol = rtol) or
+                torch.allclose(self.images_phys[i,-1, :], self.images_phys[i,-2, :], rtol = rtol) or
+                torch.allclose(self.images_phys[i, :,-1], self.images_phys[i, :,-2], rtol = rtol)
+            ):
                 not_padded[i] = False
         # print(f"Number of not padded images: {np.sum(not_padded)}")
         self.images_phys = self.images_phys[not_padded]
@@ -693,7 +839,7 @@ class Images:
         Returns:
             Tuple[np.ndarray, np.ndarray]: Tuple of power-spectrum values and the resolutions.
         """
-        if self.images_fourier is None:
+        if self.images_fourier.shape[0] == 0:
             raise ValueError("Fourier images not found. Please transform the images to Fourier domain before calculating the power spectrum.")
         resolutions = np.amax(self.box_size) / (2.0 * self.polar_grid.radius_shells)
         images_fourier = self.images_fourier
@@ -701,16 +847,15 @@ class Images:
         return power_spectrum, resolutions
     
 
-    # TODO: Figure out the right type hint for tensor indexing
-    def select_images(self, indices):
+    def select_images(self, indices: list[int] | IntArrayType | torch.Tensor):
         """Restrict this collection's images to the specified indices.
 
         Args:
             indices (_type_): The indices to keep.
         """
-        if self.images_phys is not None:
+        if self.has_physical_images():
             self.images_phys = self.images_phys[indices]
-        if self.images_fourier is not None:
+        if self.has_fourier_images():
             self.images_fourier = self.images_fourier[indices]
         self.n_images = len(indices)
 
@@ -735,8 +880,9 @@ class Images:
         ## downsample factor must be an integer of multiple of 2
         if downsample_factor % 2 != 0:
             raise ValueError("Downsample factor must be a multiple of 2.")
-        assert self.images_phys is not None
-        self.images_phys = self.images_phys.unsqueeze(1)
+        if downsample_factor <= 0:
+            raise ValueError("Downsample factor must be positive.")
+        self.images_phys = self.images_phys.unsqueeze(1)        # NOTE: ??
         if type == 'mean':
             self.images_phys = torch.nn.functional.avg_pool2d(self.images_phys, downsample_factor, downsample_factor)
         elif type == 'max':

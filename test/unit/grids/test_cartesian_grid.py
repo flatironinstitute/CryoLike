@@ -1,4 +1,6 @@
 import numpy as np
+from pytest import mark
+from unittest.mock import Mock, patch
 
 from cryolike.grids.cartesian_grid import (
     CartesianGrid2D,
@@ -6,6 +8,8 @@ from cryolike.grids.cartesian_grid import (
     _compute_grid_dims,
     _setup_grid,
 )
+
+PKG = "cryolike.grids.cartesian_grid"
 
 def test_setup_grid_returns_right_result_count():
     r_2d = np.array([3., 3.])
@@ -18,6 +22,7 @@ def test_setup_grid_returns_right_result_count():
     (axes, xels) = _setup_grid(r_3d, n_xels_3d, False)
     assert len(axes) == 3
     assert len(xels) == 3
+
 
 def test_setup_grid_returns_good_axes():
     r_2d = np.array([4., 1.])
@@ -33,6 +38,7 @@ def test_setup_grid_returns_good_axes():
             assert axes[j][0] == -1 * rs[i][j]
             assert axes[j][-1] == rs[i][j] - (2*rs[i][j]/(n_xels[i][j]))
 
+
 def test_setup_grid_returns_good_mesh():
     r_2d = np.array([4., 1.])
     n_xels_2d = np.array([4, 2])
@@ -47,6 +53,34 @@ def test_setup_grid_returns_good_mesh():
             # I haven't been able to sort out exactly how to express the relation in Numpy, alas
             # assert np.all(xels[j] == np.array(axes[j] * n_xels[i][j]).transpose())
 
+
+@mark.parametrize('with_existing_grid', [(False), (True)])
+def test_cartesian_grid_from_descriptor(with_existing_grid: bool):
+    if with_existing_grid:
+        with patch(f"{PKG}.isinstance") as mock_isinstance:
+            mock_isinstance.return_value = True
+            grid_desc = Mock()
+            res = CartesianGrid2D.from_descriptor(grid_desc)
+            assert res == grid_desc
+            return
+    else:
+        n_pixels = np.array([6, 6])
+        pixel_size = np.array([3., 3.])
+        box = n_pixels * pixel_size
+        radius = box * 0.5
+        (exp_axes, exp_pixels) = _setup_grid(radius, n_pixels, False)
+
+        res = CartesianGrid2D.from_descriptor((n_pixels, pixel_size))
+
+        assert np.allclose(res.n_pixels, n_pixels)
+        assert np.allclose(res.pixel_size, pixel_size)
+        assert np.allclose(res.x_axis, exp_axes[0])
+        assert np.allclose(res.y_axis, exp_axes[1])
+        assert np.allclose(res.x_pixels, exp_pixels[0])
+        assert np.allclose(res.y_pixels, exp_pixels[1])
+        assert res.n_pixels_total == exp_pixels[0].size
+
+
 def test_compute_grid_dims_computes_2d():
     n_xels_in = [2, 3]
     size = 3
@@ -57,6 +91,7 @@ def test_compute_grid_dims_computes_2d():
     np.testing.assert_allclose(box_size, np.array(n_xels_in) * expected_size)
     np.testing.assert_allclose(radius, box_size * 0.5)
 
+
 def test_compute_grid_dims_computes_3d():
     n_xels_in = [3, 4, 5]
     size = [5., 4., 3.]
@@ -65,6 +100,7 @@ def test_compute_grid_dims_computes_3d():
     np.testing.assert_allclose(xel_size, np.array(size))
     np.testing.assert_allclose(box_size, np.array(n_xels_in) * np.array(size))
     np.testing.assert_allclose(radius, box_size * 0.5)
+
 
 def test_cartesian_grid_2d():
     n_pixels = 4
@@ -80,6 +116,7 @@ def test_cartesian_grid_2d():
     np.testing.assert_allclose(cg2d.y_axis, cg2d.x_axis)
     np.testing.assert_allclose(cg2d.x_pixels, cg2d.y_pixels.transpose())
     assert cg2d.n_pixels_total == 16
+
 
 def test_cartesian_grid_3d():
     n_voxels = [10, 10, 20]

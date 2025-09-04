@@ -128,7 +128,7 @@ class AtomicModel:
     def read_from_pdb(cls,
         pdb_file: str,
         box_size: float | None = None,
-        atom_radii: Union[np.ndarray, float] = 0.1,
+        atom_radii: np.ndarray | float | None = 0.1,
         atom_selection: str | None = None,
         centering: bool = True,
         use_protein_residue_model: bool = True,
@@ -153,6 +153,8 @@ class AtomicModel:
         Returns:
             AtomicModel: Instantiated atomic model from the PDB file.
         """
+        if atom_radii is None and not use_protein_residue_model:
+            raise ValueError("Cannot read an atomic model from PDB if atom_radii is unset and use_protein_residue_model is False.")
         from mdtraj import load_pdb, Trajectory, Topology
         u: Trajectory = load_pdb(pdb_file, frame=0, no_boxchk=True)
         assert u.xyz is not None
@@ -166,6 +168,7 @@ class AtomicModel:
                 resname = res(i).name
                 atom_radii[i] = _ATOMIC_RADIUS_RESNAME.get(resname, 3.0)    
             print("atomic radii = ", atom_radii)
+        assert atom_radii is not None
         if atom_selection is not None:
             assert isinstance(u.topology, Topology)
             indices = u.topology.select(atom_selection)

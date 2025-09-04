@@ -16,7 +16,8 @@ def make_grids() -> List[Tuple[int, float, PolarGrid, str, str]]:
     grids = []
     for n in ns:
         n_inplanes = n #* 2
-        radius_max = n * np.pi / 2 / (2.0 * np.pi)
+        # radius_max = n * np.pi / 2 / (2.0 * np.pi)
+        radius_max = n / 4. # just reducing the above
         dist_inplane = dist_inplane_default
         for (n_inplanes, uniform) in [
             (n_inplanes, True),
