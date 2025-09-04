@@ -13,30 +13,6 @@ from cryolike.util import (
     TargetType,
 )
 
-# 
-# Density_type = FloatArrayType | ComplexArrayType
-
-# def _read_mrc(
-#     filename : str
-# ) -> tuple[torch.Tensor, np.ndarray]:
-#     if not filename.endswith('.mrc') or not filename.endswith('.mrcs'):
-#         raise ValueError(" %% Error: File must be an mrc file. ")
-#     import mrcfile
-#     with mrcfile.open(filename) as mrc:
-#         data = torch.from_numpy(mrc.data)
-#         voxel_size = np.array([mrc.voxel_size.x, mrc.voxel_size.y, mrc.voxel_size.z], dtype = np.float64)
-#     return data, voxel_size
-
-
-# def _ensure_phys_grid(grid_desc: Voxel_grid_descriptor) -> CartesianGrid3D:
-#     if isinstance(grid_desc, CartesianGrid3D):
-#         return grid_desc
-#     elif isinstance(grid_desc, tuple):
-#         (n_voxels, voxel_size) = grid_desc
-#         return CartesianGrid3D(n_voxels = n_voxels, voxel_size = voxel_size)
-#     else:
-#         raise ValueError(" %% Error: Unknown physical voxel grid descriptor. ")
-
 
 class Volume:
     """Class representing a volume in physical or Fourier space, with methods manipulating them.
@@ -152,7 +128,6 @@ class Volume:
         with mrcfile.open(filename) as mrc:
             assert isinstance(mrc.data, np.ndarray)
             density_phys = mrc.data.copy()
-            # TODO: Confirm--there's probably a more idiomatic way to do this
             if len(density_phys.shape) == 2:
                 density_phys = density_phys[None, :, :]
             if voxel_size is not None:

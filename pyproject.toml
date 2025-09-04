@@ -10,6 +10,7 @@ name = "cryolike"
 version = "0.0.1"
 description = "Python package for CryoLike"
 authors = [
+    { name = "Jeff Soules", email = "jsoules@flatironinstitute.org" },
     { name = "Wai Shing Tang", email = "wtang@flatironinstitute.org" }
 ]
 readme = "README.md"
@@ -38,3 +39,9 @@ plugins = ["numpy.typing.mypy_plugin"]
 branch = true
 source = ["src"]
 omit = ["test/*"]
+
+[tool.pytest.ini_options]
+addopts = "--ignore=test/integration/backup --ignore=test/unit/backup --cov --cov-report xml --cov-report term-missing -rs"
+norecursedirs = "test/helpers"
+pythonpath = ["test/helpers"]
+tmp_path_retention_policy = "none"

@@ -7,25 +7,27 @@ from math import ceil
 
 from cryolike.util import SamplingStrategy, ensure_positive_finite, FloatArrayType, IntArrayType
 
+
 class CartesianShell(NamedTuple):
     """Collection of Cartesian points for a sphere or spherical shell.
 
     Attributes:
-        x_points (FloatArrayType): x-positions of the points.
-        y_points (FloatArrayType): y-positions of the points.
-        z_points (FloatArrayType): z-positions of the points.
-        xyz_points (FloatArrayType): arrays of x, y, z positions for each point. TODO: CONFIRM
+        x_points (FloatArrayType): x-positions of the points
+        y_points (FloatArrayType): y-positions of the points
+        z_points (FloatArrayType): z-positions of the points
+        xyz_points (FloatArrayType): arrays of x, y, z positions for each point
     """
     x_points: FloatArrayType
     y_points: FloatArrayType
     z_points: FloatArrayType
     xyz_points: FloatArrayType
 
+
 class SphereShell:
     """Class to sample points on a sphere shell of known radius r.
 
     Attributes:
-        radius (float): Radius of the sphere in TODO:UNITS. Positive finite.
+        radius (float): Radius of the sphere in Angstrom. Positive finite.
         dist_eq (float): Distance between points at the equator. Positive finite.
         azimuthal_sampling (SamplingStrategy): Whether the grid is uniform or adaptive.
         n_points (int): number of points
@@ -62,11 +64,11 @@ class SphereShell:
         """Class to sample points on a sphere shell of known radius r.
 
         Args:
-            radius (float, optional): Radius of the sphere in TODO:UNITS. Must be positive finite. Defaults to 1.0.
+            radius (float, optional): Radius of the sphere in Angstrom. Must be positive finite. Defaults to 1.0.
             dist_eq (float, optional): Distance between points at equator. Must be positive finite.
                 Defaults to 1.0/(2.0 * np.pi).
             azimuthal_sampling (SamplingStrategy, optional): Enum indicating whether to use uniform sampling
-                (the default) or adaptive sampling (TODO: ADAPTIVE HOW?).
+                (the default) or adaptive sampling.
             compute_cartesian (bool, optional): Whether to populate a cartesian grid for the sphere. If True,
                 the resulting shell will have a cartesian_points member set. Defaults to True.
         """
@@ -77,6 +79,7 @@ class SphereShell:
         self.azimuthal_sampling = azimuthal_sampling
         self._build_shell(azimuthal_sampling, compute_cartesian)
 
+
     def _build_shell(self, azimuthal_sampling: SamplingStrategy, compute_cartesian: bool = True):
         self._build_circles(azimuthal_sampling)
 
@@ -86,13 +89,13 @@ class SphereShell:
         self.weight_points = np.zeros(self.n_points, dtype = np.float64)
         radius_sq = self.radius ** 2
         i_point = 0
-        # TODO: Is there a more elegant way to do this without explicit loop
         for i, n_azimus in enumerate(self.n_azimus_each_circle):
             self._compute_circle_azimus(i, n_azimus, i_point, radius_sq)
             i_point += n_azimus
         if compute_cartesian:
             self._calc_cartesian()
     
+
     def _build_circles(self, azimuthal_sampling: SamplingStrategy):
         angular_frequency = 2. * np.pi * self.radius / self.dist_eq
         n_point_eq = 3 + int(round(angular_frequency))  # number of points on equator
@@ -110,12 +113,14 @@ class SphereShell:
         else:
             raise ValueError('Unreachable: Unsupported value for azimuthal_sampling')
 
+
     def _compute_circle_azimus(self, i: int, n_azimus: int, i_point: int, radius_sq: float):
         azimu_per_polar = np.linspace(0, 2 * np.pi, n_azimus, endpoint = False)
         d_azimu = azimu_per_polar[1] - azimu_per_polar[0]
         self.azimu_points[i_point : i_point + n_azimus] = azimu_per_polar
         self.polar_points[i_point : i_point + n_azimus] = self.polar_circles[i]
         self.weight_points[i_point : i_point + n_azimus] = self.weights_polar[i] * radius_sq * d_azimu  ## integrate to 4pir^2
+
 
     def _calc_cartesian(self):
         cos_azimu_ = np.cos(self.azimu_points)
@@ -129,6 +134,7 @@ class SphereShell:
         xyz_points = np.array([x_points, y_points, z_points]).T
         self.cartesian_points = CartesianShell(x_points, y_points, z_points, xyz_points)
     
+
     def integrate(self,
         f: FloatArrayType | Tensor, # functional values to integrate
         use_torch : bool = False,
@@ -148,6 +154,7 @@ class SphereShell:
         else:
             return np.sum(f * self.weight_points, axis = -1)
 
+
     def copy(self):
         shell = copy(self)
         shell.polar_circles = self.polar_circles.copy()
@@ -165,6 +172,7 @@ class SphereShell:
             )
 
         return shell
+
 
 class SphereGrid:
     """Class to sample points on a spherical grid comprised of shells.
@@ -231,18 +239,20 @@ class SphereGrid:
         self.dist_type = dist_type
         self.azimuthal_sampling = azimuthal_sampling
         self._sample_radii()
-        self._init_grid()    # TODO: Can this just be skipped entirely?
+        self._init_grid()
         if equal_shell:
             self._build_grid_equal_shells()
         else:
             self._build_grid_varied_shells()
         self._calc_cartesian()
         
+
     def _sample_radii(self) -> None :
         self.n_shells = 1 + int(np.ceil(self.radius_max / self.dist_eq))          # number of radial shells
         points_jacobi, weights_jacobi = roots_jacobi(self.n_shells, 0, 2)         # Gauss-Jacobi quadrature.
         self.radius_shells = (points_jacobi + 1.0) * self.radius_max / 2          # radius of each radial shell
         self.weights_radius_shells = weights_jacobi * (self.radius_max / 2) ** 3  # weight of each radial shell
+
 
     def _init_grid(self):
         self.radius_points = np.array([])
@@ -253,9 +263,7 @@ class SphereGrid:
         self.point_shell_start_indices = np.zeros(self.n_shells + 1, dtype=int)
         self.cartesian_points = None
 
-    # TODO: This could be combined fairly straightforwardly with the _varied_shells
-    # version, by setting the appropriate values of radius_shells, dist_eq_shells.
-    # Maybe a couple other variables. That seems worth doing to simplify the code...
+
     def _build_grid_equal_shells(self):
         shell: SphereShell = SphereShell(radius = 1.0, dist_eq = self.dist_eq / self.radius_max,
             azimuthal_sampling = self.azimuthal_sampling)
@@ -279,6 +287,7 @@ class SphereGrid:
         self.azimu_points = np.tile(shell.azimu_points, self.n_shells)
         self.point_shell_start_indices = np.arange(self.n_shells + 1) * shell.n_points
 
+
     def _build_grid_varied_shells(self):
         self.n_points = 0
         dist_eq_shells = np.zeros(self.n_shells, dtype=float)
@@ -301,6 +310,7 @@ class SphereGrid:
 
         self.point_shell_start_indices[-1] = self.n_points
 
+
     def _calc_cartesian(self):
         x_points = np.array([])
         y_points = np.array([])
@@ -319,6 +329,7 @@ class SphereGrid:
             else:
                 xyz_points = np.vstack((xyz_points, xyz_pts))
         self.cartesian_points = CartesianShell(x_points, y_points, z_points, xyz_points)
+
 
     def integrate(self,
         f: FloatArrayType | Tensor, # functional values to integrate

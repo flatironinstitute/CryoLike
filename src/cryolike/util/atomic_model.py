@@ -68,12 +68,10 @@ class AtomicModel:
         if box_size is None:
             print("Box size not specified. Using default box_size = 2.0.")
             box_size = 2.0
-        # if not np.isscalar(box_size):
-        #     ## not supported yet
-        #     box_size = box_size[0] ## TODO: replace with proper handling
-        self.box_size = float(box_size)
+        if not np.isscalar(box_size):
+            raise NotImplementedError()
+        self.box_size = float(box_size) # type: ignore
         if atomic_coordinates is None:
-            # raise ValueError("Atomic coordinates or pdb_file must be specified.")
             print("Atomic coordinates or pdb_file not specified. Using default random set of coordinates.")
             atomic_coordinates = _random_coordinates(radius = self.box_size / 4)
         self.atomic_coordinates = atomic_coordinates
@@ -105,9 +103,6 @@ class AtomicModel:
         if self.atomic_coordinates.shape[1] != 3:
             raise ValueError("atomic_coordinates.shape[1] != 3")
         self.n_atoms = self.atomic_coordinates.shape[0]
-        ### Add check if atomic coordinates are within the box_size
-        ### ...
-        ###
         if self.atom_radii is None:
             # NOTE: This is different from the default in the constructor
             print("Atomic radii not specified. Using default radii = 3.0.")
@@ -128,7 +123,7 @@ class AtomicModel:
     def read_from_pdb(cls,
         pdb_file: str,
         box_size: float | None = None,
-        atom_radii: Union[np.ndarray, float] = 0.1,
+        atom_radii: np.ndarray | float | None = 0.1,
         atom_selection: str | None = None,
         centering: bool = True,
         use_protein_residue_model: bool = True,
@@ -153,6 +148,8 @@ class AtomicModel:
         Returns:
             AtomicModel: Instantiated atomic model from the PDB file.
         """
+        if atom_radii is None and not use_protein_residue_model:
+            raise ValueError("Cannot read an atomic model from PDB if atom_radii is unset and use_protein_residue_model is False.")
         from mdtraj import load_pdb, Trajectory, Topology
         u: Trajectory = load_pdb(pdb_file, frame=0, no_boxchk=True)
         assert u.xyz is not None
@@ -166,6 +163,7 @@ class AtomicModel:
                 resname = res(i).name
                 atom_radii[i] = _ATOMIC_RADIUS_RESNAME.get(resname, 3.0)    
             print("atomic radii = ", atom_radii)
+        assert atom_radii is not None
         if atom_selection is not None:
             assert isinstance(u.topology, Topology)
             indices = u.topology.select(atom_selection)

@@ -13,21 +13,22 @@ from cryolike.grids import (
 
 from cryolike.microscopy import (
     CTF,
-    fourier_polar_to_cartesian_phys,
     volume_phys_to_fourier_points,
-    ViewingAngles,
+)
+
+from .image import Images
+
+from cryolike.metadata import (
+    ViewingAngles
 )
 
 from cryolike.util import (
     AtomShape,
     AtomicModel,
-    check_cuda,
-    Cartesian_grid_2d_descriptor,
+    get_device,
     FloatArrayType,
-    get_imgs_max,
     Precision,
     project_descriptor,
-    set_precision,
     TargetType,
 )
 
@@ -79,8 +80,8 @@ def _get_circles(viewing_angles: ViewingAngles, polar_grid: PolarGrid, float_typ
 
 
 def _get_offset(polar_grid: PolarGrid, float_type: torch.dtype, device: torch.device) -> torch.Tensor:
-    x_points = torch.tensor(polar_grid.x_points, dtype = float_type, device = device)
-    y_points = torch.tensor(polar_grid.y_points, dtype = float_type, device = device)
+    x_points = torch.tensor(polar_grid.x_points, dtype=float_type, device=device)
+    y_points = torch.tensor(polar_grid.y_points, dtype=float_type, device=device)
     offset = torch.sinc(2.0 * x_points) * torch.sinc(2.0 * y_points)
     return offset
 
@@ -95,142 +96,115 @@ class _ParsedAtomicModel(NamedTuple):
 
 def _parse_atomic_model(atomic_model: AtomicModel, polar_grid: PolarGrid, box_size: FloatArrayType, float_type: torch.dtype, device: torch.device) -> _ParsedAtomicModel:
     atomic_coordinates = torch.tensor(atomic_model.atomic_coordinates, dtype=float_type, device=device)
-    atomic_radii = torch.tensor(atomic_model.atom_radii, dtype=float_type, device=device)
-    box_max = np.amax(box_size)
-    ## TODO: haddle anisotropic box sizes
+    box_max = np.amax(box_size).item()
     atomic_coordinates_scaled = atomic_coordinates.T / box_max * 2.0 * (- 2.0 * np.pi)
 
+    atomic_radii = torch.tensor(atomic_model.atom_radii, dtype=float_type, device=device)
     atomic_radius_scaled = atomic_radii / box_max * 2.0
     pi_atomic_radius_sq_times_two = 2.0 * (np.pi * atomic_radius_scaled) ** 2
-    radius_shells = torch.tensor(polar_grid.radius_shells, dtype = float_type, device = device)
+    radius_shells = torch.tensor(polar_grid.radius_shells, dtype=float_type, device=device)
     radius_shells_sq = radius_shells ** 2
     return _ParsedAtomicModel(atomic_radius_scaled, radius_shells, radius_shells_sq, pi_atomic_radius_sq_times_two, atomic_coordinates_scaled)
 
 
-def _generate_templates_from_uniform_positions_hard_sphere(
+class _CommonKernelParams(NamedTuple):
+    xyz_template_points: torch.Tensor
+    parsed_model: _ParsedAtomicModel
+    templates_fourier: torch.Tensor
+    polar_grid: PolarGrid
+    n_atoms: int
+    n_templates: int
+    device: torch.device
+    output_device: torch.device
+    torch_float_type: torch.dtype
+    torch_complex_type: torch.dtype
+
+
+def _get_shared_kernel_params(
     atomic_model : AtomicModel,
     viewing_angles: ViewingAngles,
     polar_grid: PolarGrid,
     box_size: FloatArrayType,
-    precision: Precision = Precision.DEFAULT,
-    use_cuda: bool = True,
-    verbose : bool = False
-) -> torch.Tensor:
-    (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
-    device = check_cuda(use_cuda)
+    device: str | torch.device | None = None,
+    output_device: str | torch.device | None = "cpu",
+    precision: Precision = Precision.DEFAULT
+) -> _CommonKernelParams:
+    _device = get_device(device)
+    _output_device = get_device(output_device)
+    (torch_float_type, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
     n_templates = viewing_angles.n_angles
     parsed_model = _parse_atomic_model(
         atomic_model,
         polar_grid,
         box_size,
         float_type=torch_float_type,
-        device=device
+        device=_device
     )
-    xyz_template_points = _get_circles(viewing_angles, polar_grid, torch_float_type, device)
-    kR = 2 * np.pi * parsed_model.radius_shells[:,None] * parsed_model.atomic_radius_scaled[None,:] ## (n_shells, n_atoms)
-    kernelAtoms = (torch.sin(kR) - kR * torch.cos(kR)) * parsed_model.radius_shells.pow(-3)[:,None] / (8 * np.pi ** 2) * 3 / atomic_model.n_atoms
+    xyz_template_points = _get_circles(viewing_angles, polar_grid, torch_float_type, _device)
+    if polar_grid.uniform:
+        templates_fourier = torch.zeros((n_templates, polar_grid.n_shells, polar_grid.n_inplanes), dtype=torch_complex_type, device=_output_device)
+    else:
+        templates_fourier = torch.zeros((n_templates, polar_grid.n_points), dtype=torch_complex_type, device=_output_device)
+
+    return _CommonKernelParams(
+        xyz_template_points,
+        parsed_model,
+        templates_fourier,
+        polar_grid,
+        atomic_model.n_atoms,
+        viewing_angles.n_angles,
+        _device,
+        _output_device,
+        torch_float_type,
+        torch_complex_type
+    )
+
+
+def _make_uniform_hard_sphere_kernel(
+    params: _CommonKernelParams,
+):
+    kR = 2 * np.pi * params.parsed_model.radius_shells[:,None] * params.parsed_model.atomic_radius_scaled[None,:] ## (n_shells, n_atoms)
+    kernelAtoms = (torch.sin(kR) - kR * torch.cos(kR)) * params.parsed_model.radius_shells.pow(-3)[:,None] / (8 * np.pi ** 2) * 3 / params.n_atoms
     # offset = np.pi * parsed_model.atomic_radius_scaled.pow(3).sum() / atomic_model.n_atoms
     
-    templates_fourier = torch.zeros((n_templates, polar_grid.n_shells, polar_grid.n_inplanes), dtype=torch_complex_type, device="cpu")
     # offset = offset.reshape(polar_grid.n_shells, polar_grid.n_inplanes).unsqueeze(0)
     def _uniform_kernel(start: int, end: int):
-        kdotr_batch = torch.matmul(xyz_template_points[start:end,:,:], parsed_model.atomic_coordinates_scaled) ## uniform (n_templates, n_inplanes, n_atoms) or nonuniform (n_templates, n_points, n_atoms)
-        kdotr_batch = kdotr_batch[:,None,:,:] * parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_shells, n_inplanes, n_atoms)
+        kdotr_batch = torch.matmul(params.xyz_template_points[start:end,:,:], params.parsed_model.atomic_coordinates_scaled) ## uniform (n_templates, n_inplanes, n_atoms) or nonuniform (n_templates, n_points, n_atoms)
+        kdotr_batch = kdotr_batch[:,None,:,:] * params.parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_shells, n_inplanes, n_atoms)
         exponent = torch.exp(1j * kdotr_batch) * kernelAtoms[None,:,None,:] ## (n_templates, n_shells, n_inplanes, n_atoms)
         # exponent.exp_()
         # exponent = kernelAtoms[None,:,None,:]
         templates_fourier_batch = torch.sum(exponent, dim = 3)
-        templates_fourier[start:end,:,:] = templates_fourier_batch.cpu()
-    _iterate_kernel_with_memory_constraints(n_templates, kernel=_uniform_kernel, verbose=verbose)
-    return templates_fourier
+        params.templates_fourier[start:end,:,:] = templates_fourier_batch.to(params.output_device)
+    return _uniform_kernel
 
 
-def _generate_templates_from_uniform_positions_gaussian(
-    atomic_model : AtomicModel,
-    viewing_angles: ViewingAngles,
-    polar_grid: PolarGrid,
-    box_size: FloatArrayType,
-    precision: Precision = Precision.DEFAULT,
-    use_cuda: bool = True,
-    verbose : bool = False
-) -> torch.Tensor:
-    (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
-    device = check_cuda(use_cuda)
-    n_templates = viewing_angles.n_angles
-    parsed_model = _parse_atomic_model(
-        atomic_model,
-        polar_grid,
-        box_size,
-        float_type=torch_float_type,
-        device=device
-    )
-    xyz_template_points = _get_circles(viewing_angles, polar_grid, torch_float_type, device)
-    log_norm = - 1.5 * np.log(2 * np.pi) - 3 * torch.log(parsed_model.atomic_radius_scaled) - np.log(atomic_model.n_atoms)
-    offset = _get_offset(polar_grid, float_type=torch_float_type, device=device)
+def _make_uniform_gaussian_kernel(
+    params: _CommonKernelParams,
+):
+    log_norm = - 1.5 * np.log(2 * np.pi) - 3 * torch.log(params.parsed_model.atomic_radius_scaled) - np.log(params.n_atoms)
+    offset = _get_offset(params.polar_grid, float_type=params.torch_float_type, device=params.device)
     offset *= torch.sum(torch.exp(log_norm))
-    offset = offset.reshape(polar_grid.n_shells, polar_grid.n_inplanes).unsqueeze(0)
+    offset = offset.reshape(params.polar_grid.n_shells, params.polar_grid.n_inplanes).unsqueeze(0)
     ## Gaussian kernel
-    gaussKernelAtoms = - parsed_model.radius_shells_sq[:,None] * parsed_model.pi_atomic_radius_sq_times_two[None,:] + log_norm[None,:]
-    templates_fourier = torch.zeros((n_templates, polar_grid.n_shells, polar_grid.n_inplanes), dtype=torch_complex_type, device="cpu")
+    gaussKernelAtoms = - params.parsed_model.radius_shells_sq[:,None] * params.parsed_model.pi_atomic_radius_sq_times_two[None,:] + log_norm[None,:]
+
     def _uniform_kernel(start: int, end: int):
-        kdotr_batch = torch.matmul(xyz_template_points[start:end,:,:], parsed_model.atomic_coordinates_scaled) ## uniform (n_templates, n_inplanes, n_atoms) or nonuniform (n_templates, n_points, n_atoms)
-        kdotr_batch = kdotr_batch[:,None,:,:] * parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_inplanes, n_shells, n_atoms)
+        kdotr_batch = torch.matmul(params.xyz_template_points[start:end,:,:], params.parsed_model.atomic_coordinates_scaled) ## uniform (n_templates, n_inplanes, n_atoms) or nonuniform (n_templates, n_points, n_atoms)
+        kdotr_batch = kdotr_batch[:,None,:,:] * params.parsed_model.radius_shells[None,:,None,None] ## (n_templates, n_inplanes, n_shells, n_atoms)
         exponent = torch.complex(gaussKernelAtoms[None,:,None,:], kdotr_batch) ## (n_templates, n_inplanes, n_shells, n_atoms)
         exponent.exp_()
         templates_fourier_batch = torch.sum(exponent, dim = 3) - offset
-        templates_fourier[start:end,:,:] = templates_fourier_batch.cpu()
-    _iterate_kernel_with_memory_constraints(n_templates, kernel=_uniform_kernel, verbose=verbose)
-    return templates_fourier
-
-
-def _generate_templates_from_nonuniform_positions_gaussian(
-    atomic_model : AtomicModel,
-    viewing_angles: ViewingAngles,
-    polar_grid: PolarGrid,
-    box_size: FloatArrayType,
-    precision: Precision = Precision.DEFAULT,
-    use_cuda: bool = True,
-    verbose : bool = False
-) -> torch.Tensor:
-    raise NotImplementedError("kdtor is not set properly.")
-    device = check_cuda(use_cuda)
-    (torch_float_type, torch_complex_type, _) = set_precision(precision, default=Precision.SINGLE)
-    n_templates = viewing_angles.n_angles
-    parsed_model = _parse_atomic_model(
-        atomic_model,
-        polar_grid,
-        box_size,
-        float_type=torch_float_type,
-        device=device
-    )
-    log_norm = - 1.5 * np.log(2 * np.pi) - 3 * torch.log(parsed_model.atomic_radius_scaled) - np.log(atomic_model.n_atoms)
-    offset = _get_offset(polar_grid, float_type=torch_float_type, device=device)    
-    offset *=  torch.sum(torch.exp(log_norm))
-
-    # TODO: Check this signature, is it right?
-    templates_fourier = torch.zeros((n_templates, polar_grid.n_points), dtype = torch_complex_type, device = "cpu")
-    gaussKernelAtoms = parsed_model.radius_shells_sq[:,None] * parsed_model.pi_atomic_radius_sq_times_two[None,:] + log_norm[None,:]
-    radius_points = torch.from_numpy(polar_grid.radius_points).to(device)
-    kdotr = kdotr * radius_points[None,:,None]
-    offset = offset.unsqueeze(0)
-    def _nonuniform_kernel(start: int, end: int):
-        exponent = torch.complex(gaussKernelAtoms[None,:,:], kdotr[start:end,:,:]) ## (n_templates, n_points, n_atoms)
-        exponent.exp_()
-        templates_fourier_batch = torch.sum(exponent, dim = 2) - offset
-        templates_fourier[start:end,:] = templates_fourier_batch.cpu() ## (n_templates, n_points)
-    _iterate_kernel_with_memory_constraints(n_templates, _nonuniform_kernel, verbose=verbose)
-    return templates_fourier
+        params.templates_fourier[start:end,:,:] = templates_fourier_batch.to(params.output_device)
+    return _uniform_kernel
 
 
 def _iterate_kernel_with_memory_constraints(n_templates: int, kernel: Callable[[int, int], None], verbose: bool = False):
-    batch_size = 1#n_templates ## batch size = 1 is fine for now
-    exponent = None
+    batch_size = n_templates
     success = False
     while batch_size > 0:
         n_batches = ceil(n_templates / batch_size)
         try:
-            # TODO: Check if performance issue from exponent being in the kernel function scope now
-            exponent = None
             if verbose:
                 print(f"Batch size: {batch_size}")
                 from tqdm import trange
@@ -246,7 +220,6 @@ def _iterate_kernel_with_memory_constraints(n_templates: int, kernel: Callable[[
             success = True
             break
         except torch.cuda.OutOfMemoryError:
-            del exponent
             batch_size //= 2
             continue
     if not success:
@@ -254,7 +227,22 @@ def _iterate_kernel_with_memory_constraints(n_templates: int, kernel: Callable[[
 
 
 def _get_fourier_slices(polar_grid: PolarGrid, viewing_angles: ViewingAngles, float_type: torch.dtype, device: torch.device) -> torch.Tensor:
-    radius_shells = torch.tensor(polar_grid.radius_shells, dtype = float_type, device = device)
+    """Returns a tensor representing the Cartesian values, in space, of the points on the polar grid.
+
+    Outer index is the image, middle index is linearized point index, inner index is 3 (for x, y, z).
+    Linearized point index is (# of points per shell) x (# of shells)
+
+    Args:
+        polar_grid (PolarGrid): Grid to compute Fourier slices for
+        viewing_angles (ViewingAngles): Viewing angles used to compute slices
+        float_type (torch.dtype): dtype identifying level of precision to use for computation
+        device (torch.device): Device on which to carry out computatino
+
+    Returns:
+        torch.Tensor: Tensor of reals, of [img x point x [x/y/z]] such that result[0,5,:] is a
+            3-vector of the x,y,z coordinates of the 6th grid point of the 1st image in the stack.
+    """
+    radius_shells = torch.tensor(polar_grid.radius_shells, dtype=float_type, device=device)
     circles = _get_circles(viewing_angles, polar_grid, float_type=float_type, device=device)
     if not polar_grid.uniform:
         return circles * radius_shells[None,:,None]
@@ -263,11 +251,11 @@ def _get_fourier_slices(polar_grid: PolarGrid, viewing_angles: ViewingAngles, fl
     return fourier_slices
 
 
-def _test_callable(fn: Callable, precision: Precision, device: torch.device | None):
+def _test_callable(fn: Callable[[torch.Tensor], torch.Tensor], precision: Precision, device: torch.device):
     if not callable(fn):
         raise ValueError("Function must be callable.")
-    (float_type, complex_type, _) = set_precision(precision, Precision.DOUBLE)
-    test_input = torch.randn(1, 2, 3, dtype = float_type, device = device)
+    (float_type, complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
+    test_input = torch.randn(1, 2, 3, dtype=float_type, device=device)
     test_output: torch.Tensor = fn(test_input)
     if test_output.shape != test_input.shape[:-1]:
         raise ValueError("Function must be a callable that takes a tensor of shape (n_templates, n_pixels, 3) and returns a tensor of shape (n_templates, n_pixels).")
@@ -277,7 +265,7 @@ def _test_callable(fn: Callable, precision: Precision, device: torch.device | No
                              f"returns {test_output.dtype}. Please ensure your function returns the appropriate type.")
 
 
-class Templates:
+class Templates(Images):
     """Class representing a collection of (Cartesian-space and/or Fourier-space) templates, with methods for manipulating them.
     
     Attributes:
@@ -288,110 +276,24 @@ class Templates:
         templates_fourier (torch.Tensor | None): Fourier-space template images as complex-valued array of [template x radius x angle]
         n_templates (int): Count of templates in the collection
         ctf (CTF | None): Contrast transfer function to be applied to templates, if any
-        viewing_angles (ViewingAngles): Optimal viewing angles, if set
+        viewing_angles (ViewingAngles): Viewing angle which generated each template in the stack
         filename (str | None): If set, the name of the file from which the templates were loaded
     """
-    box_size: FloatArrayType
-    phys_grid: CartesianGrid2D
-    polar_grid: PolarGrid
-    templates_phys: torch.Tensor | None
-    templates_fourier: torch.Tensor | None
-    n_templates: int
-    ctf: CTF | None
     viewing_angles: ViewingAngles
-    filename: str | None
 
 
     def __init__(self, *,
-        phys_templates_data: Optional[PhysicalImages] = None,
-        fourier_templates_data: Optional[FourierImages] = None,
+        phys_data: Optional[PhysicalImages | CartesianGrid2D] = None,
+        fourier_data: Optional[FourierImages | PolarGrid] = None,
         box_size: Optional[float | FloatArrayType] = None,
-        polar_grid: Optional[PolarGrid] = None,
-        phys_grid: Optional[CartesianGrid2D] = None,
+        viewing_angles: ViewingAngles,
         ctf : Optional[CTF] = None,
-        viewing_angles: ViewingAngles
     ):
-        if (phys_templates_data is None and fourier_templates_data is None):
-            raise ValueError("Must pass at least one of Fourier and cartesian templates.")
-        
-        phys_grid_set = False
-        if phys_templates_data is not None:
-            if phys_templates_data.phys_grid is None:
-                raise ValueError("Can't happen: this should be fixed in the constructor.")
-            self.phys_grid = phys_templates_data.phys_grid
-            phys_grid_set = True
-            self.templates_phys = phys_templates_data.images_phys
-            self.n_templates = self.templates_phys.shape[0]
-        else:
-            self.templates_phys = None
-        if phys_grid is not None:
-            self.phys_grid = phys_grid
-            phys_grid_set = True
-            
-        if fourier_templates_data is not None:
-            if polar_grid is not None:
-                raise ValueError("Can't pass both polar_grid and fourier_templates_data.")
-            self.polar_grid = fourier_templates_data.polar_grid
-            self.templates_fourier = fourier_templates_data.images_fourier
-            self.n_templates = self.templates_fourier.shape[0]
-        else:
-            self.templates_fourier = None
-            if polar_grid is not None:
-                self.polar_grid = polar_grid
-            
-        if box_size is not None:
-            _box_size = cast(FloatArrayType, project_descriptor(box_size, "box_size", 2, TargetType.FLOAT))
-            self.box_size = _box_size
-        elif phys_grid_set == True:
-            self.box_size = self.phys_grid.box_size
-        else:
-            self.box_size = np.array([2., 2.])
-            
-        self._check_template_array()
-        self.viewing_angles = viewing_angles
-        if (self.viewing_angles.n_angles != self.n_templates):
-            raise ValueError(f"Number of viewing angles ({self.viewing_angles.n_angles}) must match number of templates ({self.n_templates}).")
-        self.ctf = ctf
+        super().__init__(phys_data, fourier_data, box_size, viewing_angles, ctf)
+        if (self.viewing_angles.n_angles != self.n_images):
+            raise ValueError(f"Number of viewing angles ({self.viewing_angles.n_angles}) must match number of templates ({self.n_images}).")
     
     
-    def _ensure_phys_templates(self):
-        if self.templates_phys is None:
-            raise ValueError("Physical templates not found.")
-        if self.phys_grid is None:
-            raise ValueError("No physical grid found.")
-        
-
-    def _ensure_fourier_templates(self):
-        if self.templates_fourier is None:
-            raise ValueError("Fourier templates not found.")
-        if self.polar_grid is None:
-            raise ValueError("No polar grid found.")
-
-    
-    def _check_template_array(self):
-        if self.templates_phys is not None:
-            if self.phys_grid is None:
-                # can't happen
-                raise ValueError("Physical grid is not defined for physical Templates")
-            if len(self.templates_phys.shape) == 2:
-                self.templates_phys = self.templates_phys[None,:,:]
-            if len(self.templates_phys.shape) != 3:
-                raise ValueError("Invalid shape for Templates.")
-            if (self.n_templates != self.templates_phys.shape[0]):
-                raise ValueError(f"Templates object lists templates count of {self.n_templates} but the physical Templates array has {self.templates_phys.shape[0]} entries.")
-            # TODO: There's probably another consistency check required with the phys grid.
-            if (self.phys_grid.n_pixels[0] != self.templates_phys.shape[1] or self.phys_grid.n_pixels[1] != self.templates_phys.shape[2]):
-                raise ValueError('Dimension mismatch: n_pixels {self.phys_grid.n_pixels[0]} x {self.phys_grid.n_pixels[1]} but shape is {self.templates_phys.shape}')
-            if not np.allclose(self.box_size, self.phys_grid.box_size):
-                print(f"WARNING: Templates box size {self.box_size} is outside tolerance of physical grid box size {self.phys_grid.box_size}")
-        if self.templates_fourier is not None:
-            if self.polar_grid is None:
-                # Can't happen
-                raise ValueError("Polar grid is not defined for Fourier Templates")
-            if self.n_templates != self.templates_fourier.shape[0]:
-                raise ValueError(f"Templates object lists templates count of {self.n_templates} but the fourier Templates array has {self.templates_fourier.shape[0]} entries.")
-
-
     @classmethod
     def generate_from_positions(
         cls,
@@ -399,244 +301,129 @@ class Templates:
         viewing_angles: ViewingAngles,
         polar_grid: PolarGrid,
         box_size: float | FloatArrayType,
+        device: str | torch.device | None = None,
+        output_device: str | torch.device | None = "cpu",
         atom_shape: AtomShape = AtomShape.DEFAULT,
         precision: Precision = Precision.DEFAULT,
-        use_cuda: bool = True,
         verbose : bool = False
     ):
-        if isinstance(box_size, float):
-            box_size = cast(FloatArrayType, project_descriptor(box_size, "box size", 2, TargetType.FLOAT))
-        assert isinstance(box_size, np.ndarray)
+        _device = get_device(device)
+        _output_device = get_device(output_device)
+        _box_size = cast(FloatArrayType, project_descriptor(box_size, "box size", 2, TargetType.FLOAT))
         if atom_shape == AtomShape.DEFAULT:
             atom_shape = AtomShape.HARD_SPHERE
             print("Atom shape not specified, using hard sphere.")
-        if atom_shape == AtomShape.GAUSSIAN:
-            if polar_grid.uniform:
-                templates_fourier = _generate_templates_from_uniform_positions_gaussian(
-                    atomic_model=atomic_model, viewing_angles=viewing_angles, polar_grid=polar_grid,
-                    box_size=box_size, precision=precision, use_cuda=use_cuda, verbose=verbose
-                )
-            else:
-                raise NotImplementedError("Non-uniform Fourier templates not implemented yet.")
-                # templates_fourier = _generate_templates_from_nonuniform_positions_gaussian(
-                #     atomic_model=atomic_model, viewing_angles=viewing_angles, polar_grid=polar_grid,
-                #     box_size=box_size, precision=precision, use_cuda=use_cuda, verbose=verbose
-                # )
-        elif atom_shape == AtomShape.HARD_SPHERE:
-            if polar_grid.uniform:
-                templates_fourier = _generate_templates_from_uniform_positions_hard_sphere(
-                    atomic_model=atomic_model, viewing_angles=viewing_angles, polar_grid=polar_grid,
-                    box_size=box_size, precision=precision, use_cuda=use_cuda, verbose=verbose
-                )
-            else:
-                raise NotImplementedError("Non-uniform Fourier templates not implemented yet.")
+
+        kernel_params = _get_shared_kernel_params(
+            atomic_model=atomic_model,
+            viewing_angles=viewing_angles,
+            polar_grid=polar_grid,
+            box_size=_box_size,
+            device=_device,
+            output_device=_output_device,
+            precision=precision
+        )
+        if not polar_grid.uniform:
+            raise NotImplementedError("Non-uniform Fourier templates not implemented yet.")
         else:
-            raise ValueError(f"Unknown atom shape {atom_shape.value}")
-        data = FourierImages(images_fourier=templates_fourier, polar_grid=polar_grid)
-        return cls(fourier_templates_data=data, viewing_angles=viewing_angles, box_size=box_size)
+            if atom_shape == AtomShape.GAUSSIAN:
+                kernel = _make_uniform_gaussian_kernel(kernel_params)
+            elif atom_shape == AtomShape.HARD_SPHERE:
+                kernel = _make_uniform_hard_sphere_kernel(kernel_params)
+            else:
+                raise ValueError(f"Unknown atom shape {atom_shape.value}")
+
+        _iterate_kernel_with_memory_constraints(kernel_params.n_templates, kernel=kernel, verbose=verbose)
+        data = FourierImages(images_fourier=kernel_params.templates_fourier, polar_grid=polar_grid)
+        return cls(fourier_data=data, viewing_angles=viewing_angles, box_size=box_size)
 
 
     @classmethod
     def generate_from_physical_volume(
         cls,
-        volume : Volume,
+        volume: Volume,
         polar_grid: PolarGrid,
         viewing_angles: ViewingAngles,
         precision: Precision = Precision.DEFAULT,
-        use_cuda: bool = True,
-        nufft_eps : float = 1.0e-12,
-        verbose : bool = False
+        device: torch.device | None = None,
+        output_device: str | torch.device | None = "cpu",
+        nufft_eps: float = 1.0e-12,
+        verbose: bool = False
     ):
         if volume.density_physical is None:
             raise ValueError("No physical volume found")
-        device = check_cuda(use_cuda)
-        (torch_float_type, _, _) = set_precision(precision, default=Precision.SINGLE)
+        _device = get_device(device)
+        _output_device = get_device(output_device)
+        (torch_float_type, _, _) = precision.get_dtypes(default=Precision.SINGLE)
         n_templates = viewing_angles.n_angles
 
-        volume.density_physical = volume.density_physical.to(device)
-        origin = torch.tensor([0.0, 0.0, 0.0], dtype = torch_float_type, device = device).unsqueeze(0)
-        fourier_slices = _get_fourier_slices(polar_grid, viewing_angles, float_type=torch_float_type, device=device)
+        volume.density_physical = volume.density_physical.to(_device)
+        fourier_slices = _get_fourier_slices(polar_grid, viewing_angles, float_type=torch_float_type, device=_device)
         templates_fourier = volume_phys_to_fourier_points(
             volume = volume,
             fourier_slices = fourier_slices,
             eps = nufft_eps,
             precision = Precision.SINGLE if precision == Precision.DEFAULT else precision,
-            use_cuda = True,
-            output_device = device,
+            input_device = _device,
+            output_device = _output_device,
             verbose = verbose
         )
 
-        offset = _get_offset(polar_grid=polar_grid, float_type=torch_float_type, device=device)
+        origin = torch.tensor([0.0, 0.0, 0.0], dtype = torch_float_type, device=_device).unsqueeze(0)
         centers = volume_phys_to_fourier_points(
             volume = volume,
             fourier_slices = origin,
             eps = nufft_eps,
             precision = Precision.SINGLE if precision == Precision.DEFAULT else precision,
-            use_cuda = True,
-            output_device = device,
+            input_device = _device,
+            output_device= _output_device,
             verbose = verbose
         )
+        offset = _get_offset(polar_grid=polar_grid, float_type=torch_float_type, device=_output_device)
+        print("device:", offset.device, centers.device)
         offset = offset[None,:] * centers
-
         templates_fourier -= offset
+
         if polar_grid.uniform:
             templates_fourier = templates_fourier.reshape(n_templates, polar_grid.n_shells, polar_grid.n_inplanes)
         data = FourierImages(images_fourier=templates_fourier, polar_grid=polar_grid)
-        return cls(fourier_templates_data=data, viewing_angles=viewing_angles)
+
+        return cls(fourier_data=data, viewing_angles=viewing_angles)
 
 
     @classmethod
     def generate_from_function(
         cls,
-        function: Callable,
+        function: Callable[[torch.Tensor], torch.Tensor],
         viewing_angles: ViewingAngles,
         polar_grid: PolarGrid,
-        precision: Precision = Precision.DEFAULT,
-        use_cuda: bool = True
+        device: str | torch.device | None = None,
+        output_device: str | torch.device | None = "cpu",
+        precision: Precision = Precision.DEFAULT
     ):
-        device = check_cuda(use_cuda)
-        _test_callable(fn=function, precision=precision, device=device)
-        (torch_float_type, _, _) = set_precision(precision, default=Precision.SINGLE)
-        n_templates = viewing_angles.n_angles
-
-        fourier_slices = _get_fourier_slices(polar_grid, viewing_angles, float_type=torch_float_type, device=device)
-        templates_fourier = function(fourier_slices)
-        assert isinstance(templates_fourier, torch.Tensor)
-
-        if polar_grid.uniform:
-            templates_fourier = templates_fourier.reshape(n_templates, polar_grid.n_shells, polar_grid.n_inplanes)
-        data =FourierImages(images_fourier=templates_fourier, polar_grid=polar_grid)
-        return cls(fourier_templates_data=data, viewing_angles=viewing_angles)
+        _device = get_device(device)
+        _output_device = get_device(output_device)
+        _test_callable(fn=function, precision=precision, device=_device)
+        (torch_float_type, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
+        fourier_slices = _get_fourier_slices(polar_grid, viewing_angles, float_type=torch_float_type, device=_device)
+        templates_fourier = function(fourier_slices).reshape(viewing_angles.n_angles, polar_grid.n_shells, polar_grid.n_inplanes).to(_output_device)
+        data = FourierImages(images_fourier=templates_fourier, polar_grid=polar_grid)
+        return cls(fourier_data=data, viewing_angles=viewing_angles)
 
 
-    def transform_to_spatial(
-        self,
-        phys_grid: Cartesian_grid_2d_descriptor | CartesianGrid2D | None = None,
-        nufft_eps: float = 1e-12,
-        n_templates_stop: int = -1,
-        precision: Precision = Precision.DEFAULT,
-        use_cuda: bool = True,
-        save_to_class: bool = True
-    ):
-        if self.templates_fourier is None:
-            raise ValueError("Fourier templates not generated.")
-        if self.polar_grid is None:
-            raise ValueError("No polar grid found")
-        if phys_grid is not None:
-            self.phys_grid = CartesianGrid2D.from_descriptor(phys_grid)
-        if self.phys_grid is None:
-            raise ValueError("No physical grid found")
-
-        if n_templates_stop == -1 or n_templates_stop == self.n_templates:
-            print("Transforming all Templates.")
-            n_templates_stop = self.n_templates
+    def to_images(self) -> Images:
+        if getattr(self, "phys_grid", None) is not None and self.has_physical_images():
+            phys_data = PhysicalImages(self.images_phys.clone(), pixel_size=self.phys_grid.pixel_size)
+        elif getattr(self, "phys_grid", None) is not None:
+            phys_data = self.phys_grid
         else:
-            print(f"Transforming only the first {n_templates_stop} Templates, probably for testing or plotting.")
+            phys_data = None
 
-        templates_fourier = self.templates_fourier[:n_templates_stop]
-        templates_fourier = templates_fourier.reshape(templates_fourier.shape[0], -1)
-        templates_phys = fourier_polar_to_cartesian_phys(
-            grid_fourier_polar = self.polar_grid,
-            grid_cartesian_phys = self.phys_grid,
-            image_polar = templates_fourier,
-            eps = nufft_eps,
-            precision = Precision.SINGLE if precision == Precision.DEFAULT else precision,
-            use_cuda = use_cuda
-        )
-        if save_to_class:
-            if n_templates_stop != self.n_templates:
-                print("Warning: Only the first {} templates are saved to the class. This can create issues.".format(n_templates_stop))
-            self.templates_phys = templates_phys
-        return templates_phys
-
-
-    def apply_ctf(self, ctf: CTF):
-        """Applies a contrast transfer function to the Fourier-space templates.
-
-        Args:
-            ctf (CTF): CTF to apply.
-
-        Raises:
-            NotImplementedError: If the Fourier-space templates are using a non-uniform
-                polar grid.
-
-        Returns:
-            torch.Tensor: The updated templates (which will also be persisted to the collection).
-        """
-        self._ensure_fourier_templates()
-        if not self.polar_grid.uniform:
-            raise NotImplementedError("Non-uniform Fourier templates not implemented yet.")
-        self.ctf = ctf
-        assert self.templates_fourier is not None  # TODO: Improve this assertion
-        self.templates_fourier = ctf.apply(self.templates_fourier)
-        return self.templates_fourier
-    
-    
-    def normalize_templates_phys(
-        self,
-        ord: int = 1,
-        use_max: bool = False
-    ):
-        """Normalize the Cartesian-space templates in the collection.
-
-        Args:
-            ord (int, optional): Degree of norm to apply. Defaults to 1.
-            use_max (bool, optional): Whether to use the max in place of an LP norm. Defaults to False.
-
-        Returns:
-            torch.Tensor: The norm applied to the templates (which are modified in-place).
-        """
-        self._ensure_phys_templates()
-        assert self.templates_phys is not None
-        if use_max:
-            maxval = get_imgs_max(self.templates_phys)
-            self.templates_phys /= maxval
-            return maxval
+        if getattr(self, "polar_grid", None) is not None and self.has_fourier_images():
+            fourier_data = FourierImages(self.images_fourier.clone(), self.polar_grid)
+        elif getattr(self, "polar_grid", None) is not None:
+            fourier_data = self.polar_grid
         else:
-            lpnorm = torch.norm(self.templates_phys, dim = (1,2), p = ord, keepdim = False)
-            self.templates_phys /= lpnorm[:,None,None]
-            return lpnorm
-    
+            fourier_data = None
 
-    def normalize_templates_fourier(
-        self,
-        ord: int = 1,
-        use_max: bool = False,
-    ):
-        """Normalize the Fourier-space templates in the collection.
-
-        Args:
-            ord (int, optional): Degree of norm to apply. Defaults to 1.
-            use_max (bool, optional): Whether to use the max in place of an LP norm. Defaults to False.
-
-        Returns:
-            torch.Tensor: The norm applied to the templates (which are modified in-place).
-        """
-        self._ensure_fourier_templates()
-        assert self.templates_fourier is not None
-        if use_max:
-            maxval = get_imgs_max(self.templates_fourier)
-            self.templates_fourier /= maxval
-            return maxval
-        else:
-            lpnorm = self.polar_grid.integrate(self.templates_fourier.abs().pow(ord)).pow(1.0 / ord)
-            for _ in range(len(self.templates_fourier.shape) - 1):
-                lpnorm = torch.unsqueeze(lpnorm, dim = -1)
-            self.templates_fourier /= lpnorm
-            return lpnorm
-        
-    
-    def get_power_spectrum(self):
-        """Gets the power spectrum of the (Fourier-space) images.
-
-        Raises:
-            ValueError: If no Fourier-space images exist in the collection.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: Tuple of power-spectrum values and the resolutions.
-        """
-        if self.templates_fourier is None:
-            raise ValueError("Fourier images not found. Please transform the images to Fourier domain before calculating the power spectrum.")
-        resolutions = np.amax(self.box_size) / (2.0 * self.polar_grid.radius_shells)
-        power_spectrum = torch.mean(torch.abs(self.templates_fourier) ** 2, dim = (0, 2))
-        return power_spectrum, resolutions
+        return Images(phys_data, fourier_data, self.box_size, self.viewing_angles)

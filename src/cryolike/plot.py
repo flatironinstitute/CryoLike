@@ -15,14 +15,16 @@ mpl.rcParams['lines.linewidth'] = 2
 mpl.rcParams['lines.markersize'] = 6
 cmap = plt.get_cmap("gray")
 
-from cryolike.stacks import Images, Templates
+from cryolike.stacks import Images
 from cryolike.grids import FourierImages, PolarGrid, CartesianGrid2D
 from cryolike.util import FloatArrayType
+
+N_PLOTS_DEFAULT = 16
 
 def plot_images(
     images: torch.Tensor | np.ndarray,
     grid: PolarGrid | CartesianGrid2D,
-    n_plots: int = 16,
+    n_plots: int = N_PLOTS_DEFAULT,
     filename: str = '',
     show: bool = False,
     with_ctf: bool = False,
@@ -32,17 +34,19 @@ def plot_images(
         raise NotImplementedError("Non-uniform fourier images not implemented yet.")
 
     if filename == '' and not show:
-        # raise ValueError("Provide either a filename or set show")
-        show = True     # TODO: This ok?
+        raise ValueError("Provide either a filename or set show")
     n_images = images.shape[0]
-    if n_images < n_plots:
-        # raise ValueError("Requested number of plots exceeds the number of images available.")
-        n_plots = n_images ## TODO: This ok?
+    if n_images == 0:
+        raise ValueError("No images to plot.")
+    if n_images < N_PLOTS_DEFAULT:
+        n_plots = n_images
+    else:
+        n_plots = N_PLOTS_DEFAULT
 
     use_polar = True if isinstance(grid, PolarGrid) else False
     axs = _setup_figure(n_plots, use_polar)
 
-    for im, ax in zip(images, axs.flatten()):
+    for im, ax in zip(images, axs):
         real_img = _extract_real_image_as_np(im)
         if isinstance(grid, PolarGrid):
             _plot_polar_image_uniform_grid(grid, ax, real_img)
@@ -51,16 +55,17 @@ def plot_images(
     _finalize_plot(filename, show)
 
 
-def _setup_figure(n_plots: int, use_polar: bool = False) -> Iterable[mpl_axes.Axes]:
+def _setup_figure(n_plots: int, use_polar: bool = False) -> Iterable[mpl_axes.Axes] | np.ndarray:
     n_axis_x = int(np.ceil(np.sqrt(n_plots)))
     n_axis_y = int(np.ceil(n_plots / n_axis_x))
     subplot_kw = {'projection': 'polar'} if use_polar else None
-    _, axs = plt.subplots(n_axis_x, n_axis_y, figsize = (12, 12), subplot_kw = subplot_kw)
+    figsize = (12, 12 * n_axis_y / n_axis_x)
+    _, axs = plt.subplots(n_axis_x, n_axis_y, figsize = figsize, subplot_kw = subplot_kw)
     if n_plots == 1:
         assert isinstance(axs, mpl_axes.Axes)
         return [axs]
     assert isinstance(axs, np.ndarray)
-    return axs
+    return axs.flatten()
 
 
 def _plot_polar_image_uniform_grid(polar_grid: PolarGrid, ax: mpl_axes.Axes, image: np.ndarray):
@@ -107,7 +112,7 @@ def _finalize_plot(filename: str, show: bool):
 
 PowerSpectrumTuple = tuple[torch.Tensor, PolarGrid, float | FloatArrayType | None]
 def plot_power_spectrum(
-    source: Images | Templates | PowerSpectrumTuple,
+    source: Images | PowerSpectrumTuple,
     filename_plot: str = '',
     show: bool = False
 ):
@@ -115,7 +120,7 @@ def plot_power_spectrum(
         print("Filename not provided and show is set to False. No plot will be generated.")
     if isinstance(source, tuple):
         (images_fourier, polar_grid, box_size) = source
-        source = Images(fourier_images_data=FourierImages(images_fourier, polar_grid), box_size=box_size)
+        source = Images(fourier_data=FourierImages(images_fourier, polar_grid), box_size=box_size)
     power_spectrum, resolutions = source.get_power_spectrum()
     if isinstance(power_spectrum, torch.Tensor):
         power_spectrum = power_spectrum.detach().cpu().numpy()

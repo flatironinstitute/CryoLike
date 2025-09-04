@@ -1,13 +1,12 @@
-import numpy as np
-from cryolike.convert_particle_stacks.particle_stacks_conversion import convert_particle_stacks_from_star_files
+from cryolike import convert_particle_stacks_from_paired_star_and_mrc_files
 
 pixel_size = 1.346
 dataset_name = "apoferritin"
 particle_file_list = ["./data/particles/particles.mrcs"]
 star_file = ["./data/particles/particle_data.star"]
 
-convert_particle_stacks_from_star_files(
-    params_input = "./output/templates/parameters.npz",
+convert_particle_stacks_from_paired_star_and_mrc_files(
+    params_input= "./output/templates/parameters.npz",
     folder_output = "./output/particles/",
     particle_file_list = particle_file_list,
     star_file_list = star_file,
