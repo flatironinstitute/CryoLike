@@ -12,10 +12,10 @@ class CartesianShell(NamedTuple):
     """Collection of Cartesian points for a sphere or spherical shell.
 
     Attributes:
-        x_points (FloatArrayType): x-positions of the points.
-        y_points (FloatArrayType): y-positions of the points.
-        z_points (FloatArrayType): z-positions of the points.
-        xyz_points (FloatArrayType): arrays of x, y, z positions for each point. TODO: CONFIRM
+        x_points (FloatArrayType): x-positions of the points
+        y_points (FloatArrayType): y-positions of the points
+        z_points (FloatArrayType): z-positions of the points
+        xyz_points (FloatArrayType): arrays of x, y, z positions for each point
     """
     x_points: FloatArrayType
     y_points: FloatArrayType
@@ -27,7 +27,7 @@ class SphereShell:
     """Class to sample points on a sphere shell of known radius r.
 
     Attributes:
-        radius (float): Radius of the sphere in TODO:UNITS. Positive finite.
+        radius (float): Radius of the sphere in Angstrom. Positive finite.
         dist_eq (float): Distance between points at the equator. Positive finite.
         azimuthal_sampling (SamplingStrategy): Whether the grid is uniform or adaptive.
         n_points (int): number of points
@@ -64,11 +64,11 @@ class SphereShell:
         """Class to sample points on a sphere shell of known radius r.
 
         Args:
-            radius (float, optional): Radius of the sphere in TODO:UNITS. Must be positive finite. Defaults to 1.0.
+            radius (float, optional): Radius of the sphere in Angstrom. Must be positive finite. Defaults to 1.0.
             dist_eq (float, optional): Distance between points at equator. Must be positive finite.
                 Defaults to 1.0/(2.0 * np.pi).
             azimuthal_sampling (SamplingStrategy, optional): Enum indicating whether to use uniform sampling
-                (the default) or adaptive sampling (TODO: ADAPTIVE HOW?).
+                (the default) or adaptive sampling.
             compute_cartesian (bool, optional): Whether to populate a cartesian grid for the sphere. If True,
                 the resulting shell will have a cartesian_points member set. Defaults to True.
         """
@@ -89,7 +89,6 @@ class SphereShell:
         self.weight_points = np.zeros(self.n_points, dtype = np.float64)
         radius_sq = self.radius ** 2
         i_point = 0
-        # TODO: Is there a more elegant way to do this without explicit loop
         for i, n_azimus in enumerate(self.n_azimus_each_circle):
             self._compute_circle_azimus(i, n_azimus, i_point, radius_sq)
             i_point += n_azimus
@@ -240,7 +239,7 @@ class SphereGrid:
         self.dist_type = dist_type
         self.azimuthal_sampling = azimuthal_sampling
         self._sample_radii()
-        self._init_grid()    # TODO: Can this just be skipped entirely?
+        self._init_grid()
         if equal_shell:
             self._build_grid_equal_shells()
         else:
@@ -265,9 +264,6 @@ class SphereGrid:
         self.cartesian_points = None
 
 
-    # TODO: This could be combined fairly straightforwardly with the _varied_shells
-    # version, by setting the appropriate values of radius_shells, dist_eq_shells.
-    # Maybe a couple other variables. That seems worth doing to simplify the code...
     def _build_grid_equal_shells(self):
         shell: SphereShell = SphereShell(radius = 1.0, dist_eq = self.dist_eq / self.radius_max,
             azimuthal_sampling = self.azimuthal_sampling)

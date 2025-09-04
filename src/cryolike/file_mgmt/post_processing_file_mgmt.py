@@ -137,8 +137,6 @@ class PostProcessFileManager():
         integ = r / 'integrated_fourier_log_likelihood_matrix.pt'
         cc    = r / 'cross_correlation_matrix.pt'
 
-        # TODO: check if these target files pre-exist?
-
         return PostProcessOutputTree(
             FourierMatrix= four,
             PhysMatrix = phys,

@@ -10,7 +10,6 @@ from cryolike.likelihoods.kernels.integrated_log_likelihood_kernel import ill_ke
 from cryolike.util import Precision, to_torch, fourier_bessel_transform
 
 
-# TODO: Consider locking for image/template displacement grid?
 def template_first_comparator(
     device: torch.device,
     images: Images,
@@ -50,9 +49,6 @@ def template_first_comparator(
             These are strongly typed in a NamedTuple for ease of use.
     """
     validate_operation(templates, images)
-    
-    # TODO: Something about automatically setting the batch sizes
-    # TODO: Handle case where precisions differ across tensors
     
     if precision == Precision.DEFAULT:
         precision = Precision.DOUBLE if templates.images_fourier.dtype == torch.complex128 else Precision.SINGLE
@@ -128,7 +124,6 @@ def template_first_comparator(
                 t_bessel_sdnq
             )
 
-            # TODO: Do we really need this check?
             cross_correlation_msdw = Ixy_msdw / torch.sqrt(Ixx_msdw * Iyy_msdw)
             if torch.isnan(cross_correlation_msdw).any():
                 raise ValueError("NaN detected in cross-correlation.")

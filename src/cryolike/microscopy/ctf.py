@@ -107,8 +107,6 @@ class CTF:
         
         assert polar_grid is not None
 
-        # TODO: There's code for handling the case where box_size is a
-        # numpy array, but it's not clear that that's used or allowed?
         if np.any(box_size < 0.0):
             raise ValueError('Box size must be positive')
         self.box_size = box_size

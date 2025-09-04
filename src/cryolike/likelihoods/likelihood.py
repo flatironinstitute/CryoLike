@@ -19,63 +19,6 @@ from cryolike.util import (
 
 
 
-## TODO: clean up this script
-
-@overload
-def likelihood_physical(
-    templates_phys: torch.Tensor,
-    images_phys: torch.Tensor,
-    return_cross_correlation: Literal[True]
-) -> tuple[torch.Tensor, torch.Tensor]:
-    ...
-@overload
-def likelihood_physical(
-    templates_phys: torch.Tensor,
-    images_phys: torch.Tensor,
-    return_cross_correlation: Literal[False]
-) -> tuple[torch.Tensor, None]:
-    ...
-def likelihood_physical(
-    templates_phys : torch.Tensor,
-    images_phys : torch.Tensor,
-    return_cross_correlation: bool = False,
-) -> tuple[torch.Tensor, torch.Tensor | None]:
-    
-    raise NotImplementedError("Physical likelihood is still under development and not yet available. Please use Fourier likelihood instead.")
-    
-    n_pixels = images_phys.shape[1] * images_phys.shape[2]
-
-    Co = torch.sum(images_phys, dim = (1,2))
-    Cc = torch.sum(templates_phys, dim = (1,2))
-    Coo = torch.sum(images_phys ** 2, dim = (1,2))
-    Ccc = torch.sum(templates_phys ** 2, dim = (1,2))
-    Coc = torch.sum(images_phys * templates_phys, dim = (1,2))
-    
-    
-    ## Version with saddle-point-approximated lambda
-    # first_term = n_pixels * (Ccc * Coo - Coc ** 2) + 2 * Co * Cc * Coc - Co ** 2 * Ccc - Coo * Cc ** 2
-    # second_term = (n_pixels * Ccc - Cc ** 2) * (n_pixels - 2)
-    
-    # first_term = (1.5 - n_pixels * 0.5) * torch.log(first_term)
-    # second_term = (n_pixels * 0.5 - 2) * torch.log(second_term)
-    # third_term = 0.5 * np.log(np.pi) + (1 - n_pixels * 0.5) * (np.log(2 * np.pi) + 1)
-    
-    # log_likelihood = first_term + second_term + third_term
-    # log_likelihood = log_likelihood.cpu()
-    
-    ## Version with integrating over lambda
-    a = (n_pixels * (Ccc * Coo - Coc ** 2) + 2 * Co * Cc * Coc - Co ** 2 * Ccc - Coo * Cc ** 2) / 2 / (n_pixels * Ccc - Cc ** 2)
-    p = (3.0 - n_pixels) * 0.5
-    log_likelihood: torch.Tensor = (1.0 - n_pixels * 0.5) * np.log(2 * np.pi) - 0.5 * torch.log(n_pixels * Ccc - Cc ** 2) - np.log(2) + lgamma(-p) + p * torch.log(a)
-    log_likelihood = log_likelihood.cpu()
-    
-    if return_cross_correlation:
-        cross_correlation = Coc / torch.sqrt(Ccc * Coo)
-        cross_correlation = cross_correlation.cpu()
-        return log_likelihood, cross_correlation
-    return log_likelihood
-
-
 @overload
 def likelihood_fourier(
     templates_fourier: torch.Tensor,
@@ -100,12 +43,7 @@ def likelihood_fourier(
     polar_grid: PolarGrid,
     n_pixels: int,
     return_cross_correlation: bool = False
-    # TODO: can we precompute the point/weight sets? At least s_points, x_points, y_points, Iss, Isy, Isx
-    # TODO: are there more native functions for some of these computations
 ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, None]:
-    # n_shells = polar_grid.n_shells
-    # n_inplanes = polar_grid.n_inplanes
-    # n_pixels = n_shells * n_inplanes
     float_type = torch.float32 if templates_fourier.dtype == torch.complex64 else torch.float64
     device = templates_fourier.device
     weights_base = torch.tensor(polar_grid.integration_weight_points, dtype = float_type, device = device)
@@ -202,30 +140,6 @@ def calc_likelihood_optimal_pose(
     cross_correlation = None
     if mode == "phys":
         raise NotImplementedError()
-        templates_optimal = templates_optimal.cpu().numpy()
-        templates_optimal_physical = fourier_polar_to_cartesian_phys(
-            grid_fourier_polar = template.polar_grid,
-            grid_cartesian_phys = image.phys_grid,
-            image_polar = templates_optimal.reshape(n_images, -1),
-            eps = 1e-12,
-            precision = precision,
-            use_cuda = use_cuda
-        ).real
-        images_phys = image.images_phys.real
-        templates_optimal_physical = to_torch(templates_optimal_physical, precision, device)
-        images_phys = to_torch(images_phys, precision, device)
-        if return_distance:
-            distances = torch.norm(templates_optimal_physical - images_phys, dim = (1, 2), p = 2).cpu()
-        if return_likelihood:
-            output_likelihood = likelihood_physical(
-                templates_phys = templates_optimal_physical,
-                images_phys = images_phys,
-                return_cross_correlation = return_cross_correlation
-            )
-            if return_cross_correlation:
-                log_likelihood, cross_correlation = output_likelihood
-            else:
-                log_likelihood = output_likelihood
     elif mode == "fourier":
         if not image.has_fourier_images():
             raise ValueError("Fourier images not found. Transform or Create Fourier images first before calculating the distance.")
@@ -263,86 +177,6 @@ def calc_likelihood_optimal_pose(
         return distances, cross_correlation
     if return_likelihood and return_distance and return_cross_correlation:
         return log_likelihood, distances, cross_correlation
-
-
-## TODO: optimize this function for computational efficiency
-## the convention here for 2D rotation and translation is that the image is translated first and then rotated
-## which sounds counter-intuitive but is consistent with the convention in cross_correlation_likelihood.py
-## CTF also have to be applied after translation and rotation as there may be anisotropy in the CTF
-def calc_physical_likelihood_images_given_optimal_pose(
-    images : Images,
-    model : Volume | AtomicModel,
-    atom_shape: Literal['hard-sphere'] | Literal['gaussian'] | AtomShape = AtomShape.GAUSSIAN,
-    viewing_angles : ViewingAngles | None = None,
-    search_displacements : bool = False,
-    x_displacements : torch.Tensor | FloatArrayType | None = None,
-    y_displacements : torch.Tensor | FloatArrayType | None = None,
-    ctf : CTF | None = None,
-    device : str | torch.device = 'cpu',
-    precision : Precision = Precision.SINGLE,
-    verbose : bool = False
-):
-    raise NotImplementedError
-    use_cuda = not device == 'cpu' and torch.cuda.is_available()
-    device = torch.device(device) if use_cuda else torch.device('cpu')
-    (torch_float_type, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
-    if viewing_angles is None:
-        print("viewing_angles is None. Not rotating the model.")
-        azimus = torch.tensor([0.0], dtype = torch_float_type)
-        polars = torch.tensor([0.0], dtype = torch_float_type)
-        gammas = torch.tensor([0.0], dtype = torch_float_type)
-        _viewing_angles = ViewingAngles(azimus = azimus, polars = polars, gammas = gammas)
-    else:
-        _viewing_angles = viewing_angles
-    atom_shape = AtomShape.from_str(atom_shape)
-    templates = _make_templates_from_model(model, images, _viewing_angles, precision, atom_shape, verbose)
-    templates.normalize_images_fourier(ord=2, use_max=False)
-    images.images_phys = images.images_phys.real.to(torch_float_type).to(device)
-    images.center_physical_image_signal()
-    if search_displacements:
-        x_disps, y_disps = _validate_displacements(x_displacements, y_displacements, search_displacements)
-        n_displacements = x_disps.shape[0]
-        n_imgs = images.n_images
-        templates_original = templates.images_fourier.clone().to(device)
-        likelihood = torch.zeros((n_imgs, n_displacements), dtype = torch_float_type, device = 'cpu')
-        cross_correlation = torch.zeros((n_imgs, n_displacements), dtype = torch_float_type, device = 'cpu')
-        for i in range(n_displacements):
-            templates.images_fourier = templates_original.clone()
-            x_disp = x_disps[i] * torch.ones(n_imgs, dtype = torch_float_type, device = device)
-            y_disp = y_disps[i] * torch.ones(n_imgs, dtype = torch_float_type, device = device)
-            templates.displace_fourier_images(x_disp, y_disp)
-            templates.rotate_images_fourier_discrete(_viewing_angles.gammas)
-            if ctf is not None:
-                templates.apply_ctf(ctf)
-            templates.images_phys = templates.transform_to_spatial(
-                grid=images.phys_grid,
-                precision=precision,
-                use_cuda=use_cuda
-            ).real.to(torch_float_type).to(device)
-            templates.center_physical_image_signal()
-            likelihood[:, i], cross_correlation[:, i] = likelihood_physical(
-                templates_phys = templates.images_phys,
-                images_phys = images.images_phys,
-                return_cross_correlation = True
-            )
-    else:
-        if x_displacements is not None and y_displacements is not None:
-            templates.displace_fourier_images(x_displacements, y_displacements)
-        templates.rotate_images_fourier_discrete(_viewing_angles.gammas)
-        if ctf is not None:
-            templates.apply_ctf(ctf)
-        templates.images_phys = templates.transform_to_spatial(
-            grid=images.phys_grid,
-            precision=precision,
-            use_cuda=use_cuda
-        ).real.to(torch_float_type).to(device)
-        templates.center_physical_image_signal()
-        likelihood, cross_correlation = likelihood_physical(
-            templates_phys = templates.images_phys,
-            images_phys = images.images_phys,
-            return_cross_correlation = True
-        )
-    return likelihood, cross_correlation
 
 
 def calc_fourier_likelihood_images_given_optimal_pose(

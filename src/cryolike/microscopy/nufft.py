@@ -65,13 +65,6 @@ def fourier_polar_to_cartesian_phys(
         for i_image in range(n_images):
             image_polar_gpu = image_polar[i_image].to(_device) * weight_points
             plan.execute(image_polar_gpu, image_phys_gpu)
-            # nufft2d1(
-            #     k1, k2, image_polar_gpu,
-            #     out = image_phys_gpu,
-            #     n_modes = n_modes,
-            #     eps = eps,
-            #     isign = isign,
-            # )
             image_phys_gpu *= rescale_factor
             image_phys[i_image,:,:] = image_phys_gpu.detach().cpu()
         return image_phys
@@ -196,7 +189,7 @@ def volume_phys_to_fourier_points(
     check_nufft_installed(_device)
     print("Using device:", _device, ", Precision", precision.name, "for NUFFT.")
     _output_device = _device if output_device is None else get_device(output_device)
-    (torch_float_type, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
+    (_, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
     eps = precision.set_epsilon(eps)
     if volume.voxel_grid is None:
         raise ValueError("Volume does not have a voxel grid")
@@ -240,7 +233,6 @@ def volume_phys_to_fourier_points(
             )
         except Exception as e:
             print("Error creating plan, possibly not enough GPU memory. Try using a downsampled volume")
-            ## TODO: implement memory management to avoid this error
             raise e
         density_gpu = density.to(_device)
         if verbose:
@@ -253,35 +245,6 @@ def volume_phys_to_fourier_points(
             plan.setpts(x_points[i], y_points[i], z_points[i])
             plan.execute(density_gpu, image_polar_gpu)
             image_polar[i] = image_polar_gpu.to(_output_device)
-        # n_batch_points = 1
-        # batch_size_points = n_points
-        # for i in tmp:
-        #     try:
-        #         for i_batch in range(n_batch_points):
-        #             batch_start = i_batch * batch_size_points
-        #             batch_end = min((i_batch + 1) * batch_size_points, n_points)
-        #             batch_size = batch_end - batch_start
-        #             if batch_size == 0:
-        #                 break
-        #             image_polar_gpu_batch = torch.zeros(batch_size, dtype = torch_complex_type, device = device)
-        #             # nufft3d2(
-        #             #     x = x_points[i][batch_start:batch_end],
-        #             #     y = y_points[i][batch_start:batch_end],
-        #             #     z = z_points[i][batch_start:batch_end],
-        #             #     data = density_gpu,
-        #             #     out = image_polar_gpu_batch,
-        #             #     eps = eps,
-        #             #     isign = isign)
-        #             plan.setpts(x_points[i][batch_start:batch_end], y_points[i][batch_start:batch_end], z_points[i][batch_start:batch_end])
-        #             plan.execute(density_gpu, image_polar_gpu_batch)
-        #             image_polar[i][batch_start:batch_end] = image_polar_gpu_batch.to(output_device)
-        #     except RuntimeError: ## RuntimeError: Error creating plan, possibly memory error (?) TODO: Check this
-        #         n_batch_points *= 2
-        #         batch_size_points = n_points // n_batch_points
-        #         if n_points % n_batch_points:
-        #             batch_size_points += 1
-        #         print("Error creating plan, retrying with batch size", batch_size_points)
-        #         torch.cuda.empty_cache()
         torch.cuda.empty_cache()
     else:
         from finufft import nufft3d2 as nufft3d2_cpu
@@ -291,7 +254,6 @@ def volume_phys_to_fourier_points(
         y_points = y_points.astype(numpy_float_type)
         z_points = z_points.astype(numpy_float_type)
         density = density.cpu().numpy().astype(numpy_complex_type)
-        # image_polar = np.zeros((n_images, n_points), dtype=numpy_complex_type)
         if verbose:
             from tqdm import trange
             tmp = trange(n_images)
@@ -307,5 +269,4 @@ def volume_phys_to_fourier_points(
                     isign = isign, eps = eps), 
                 precision=precision, device=_output_device
             )
-        # image_polar = torch.tensor(image_polar, dtype=torch_complex_type, device=_output_device)
-    return image_polar#.to(output_device)
+    return image_polar

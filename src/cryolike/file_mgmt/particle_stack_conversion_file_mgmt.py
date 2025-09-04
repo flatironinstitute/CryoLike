@@ -157,7 +157,6 @@ class CryosparcJobPath():
         
 
     def get_mrc_filename(self, i_file: int):
-        # TODO: Might want to look for them in both padded and unpadded versions
         mrc_path = self.mrc_folder / f"batch_{i_file:06}_{self.folder_type}.mrc"
         return mrc_path
 

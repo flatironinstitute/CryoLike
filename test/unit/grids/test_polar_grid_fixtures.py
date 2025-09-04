@@ -16,15 +16,13 @@ def make_grids() -> List[Tuple[int, float, PolarGrid, str, str]]:
     grids = []
     for n in ns:
         n_inplanes = n #* 2
-        # radius_max = n * np.pi / 2 / (2.0 * np.pi)
-        radius_max = n / 4. # just reducing the above
+        radius_max = n / 4.
         dist_inplane = dist_inplane_default
         for (n_inplanes, uniform) in [
             (n_inplanes, True),
             (None, True),
             (None, False)
         ]:
-            ## TODO: fix the negative weight issue for the shells for the beta 2 quadrature with arbitrary weights assignment
             for quadrature in [QuadratureType.GAUSS_LEGENDRE, QuadratureType.GAUSS_JACOBI_BETA_1]:#, QuadratureType.GAUSS_JACOBI_BETA_2]:
                 # if (n == 320 and quadrature == QuadratureType.GAUSS_JACOBI_BETA_2):
                 #     continue # this particular family of test cases produces a negative weight for the shells.

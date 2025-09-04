@@ -147,7 +147,6 @@ class Images:
             raise ValueError("Invalid shape for images.")
         if (self.n_images != self.images_phys.shape[0]):
             raise ValueError(f"Images object lists image count of {self.n_images} but the physical images array has {self.images_phys.shape[0]} entries.")
-        # TODO: There's probably another consistency check required with the phys grid.
         if (self.phys_grid.n_pixels[0] != self.images_phys.shape[1] or
             self.phys_grid.n_pixels[1] != self.images_phys.shape[2]):
             raise ValueError('Dimension mismatch: n_pixels {self.phys_grid.n_pixels[0]} x {self.phys_grid.n_pixels[1]} but shape is {self.images_phys.shape}')
@@ -170,7 +169,6 @@ class Images:
         self._check_fourier_imgs()
         # NOTE: Inconsistent image counts is not possible; we've already checked both values
         # against n_images, so if they don't match, one of those would have failed.
-        # TODO: Look for more consistency checks
 
 
     def has_physical_images(self):
@@ -313,7 +311,6 @@ class Images:
         if box_size is None and n_pixels is None:
             raise ValueError("Either n_pixels or box_size must be provided.")
         if not self.has_physical_images():
-            # TODO: Query: should this be an error, or can we just let it slide?
             raise ValueError('Attempt to change physical image size, but no physical images have been set.')
         if box_size is not None:
             _box_size = cast(FloatArrayType, project_descriptor(box_size, "box size", 2, TargetType.FLOAT))
@@ -370,7 +367,7 @@ class Images:
         )
         if self.polar_grid.uniform:
             self.images_fourier = self.images_fourier.reshape(self.n_images, self.polar_grid.n_shells, self.polar_grid.n_inplanes)
-        self.images_fourier.to(self.images_phys.device)     # TODO: make this user-configurable, they might not want same device
+        self.images_fourier.to(self.images_phys.device)
 
 
     def transform_to_spatial(
@@ -429,7 +426,7 @@ class Images:
             device = _device
         ).real
         if persist_transformed:
-            self.images_phys = images_phys.to(device)     # TODO: Make this configurable
+            self.images_phys = images_phys.to(device)
         return images_phys
 
     
@@ -767,16 +764,6 @@ class Images:
         return _rotations
 
 
-    # TODO: Need to change this to stay discretized the whole way through
-    # ALSO need to map up the discretized angles/indexes to the actual angle
-    # measures they correspond to, which we'll need to communicate to the user
-    # (somehow)
-    # Ultimately, needs to change (to a purely discretized version) in 3 places:
-    #  - here
-    #  - the cross-correlation-likelihood.py fn
-    #  - the optimized likelihood.py
-    # HERE, these should be discretized to begin with (& change fn name to add "_discretized")
-    # HOWEVER, we will likely also need a continuous version for dealing with data from external sources
     def rotate_images_fourier_discrete(
         self,
         inplane_rotations: np.ndarray | torch.Tensor | float
@@ -790,7 +777,7 @@ class Images:
 
         Args:
             inplane_rotations (np.ndarray | torch.Tensor | float): Rotation to apply,
-                in revolutions [RADIANS?] TODO. If an array or tensor, must be of length 1 (in which
+                in revolutions. If an array or tensor, must be of length 1 (in which
                 case it will be applied to all images) or a 1-d array of length equal
                 to the number of images (one rotation per image).
 
@@ -829,7 +816,6 @@ class Images:
         return not_padded
 
 
-    # TODO: Consider returning Tensor instead of ndarray? Or is this only used for plotting?
     def get_power_spectrum(self):
         """Gets the power spectrum of the (Fourier-space) images.
 

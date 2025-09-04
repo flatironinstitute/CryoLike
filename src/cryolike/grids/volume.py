@@ -128,7 +128,6 @@ class Volume:
         with mrcfile.open(filename) as mrc:
             assert isinstance(mrc.data, np.ndarray)
             density_phys = mrc.data.copy()
-            # TODO: Confirm--there's probably a more idiomatic way to do this
             if len(density_phys.shape) == 2:
                 density_phys = density_phys[None, :, :]
             if voxel_size is not None:

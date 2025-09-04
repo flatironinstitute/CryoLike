@@ -5,8 +5,6 @@ ComplexArrayType = npt.NDArray[np.complexfloating]
 FloatArrayType = npt.NDArray[np.floating]
 IntArrayType = npt.NDArray[np.integer]
 
-# TODO: These actually probably belong in the grids directory
-
 Pixels_count_type = int | list[int]   | IntArrayType
 Pixel_size_type = float | list[float] | FloatArrayType
 

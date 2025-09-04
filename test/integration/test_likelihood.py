@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from pathlib import Path
 from copy import deepcopy
-from torch.testing import assert_close
 import pytest
 
 from cryolike.grids import PolarGrid
@@ -26,7 +25,6 @@ from cryolike.util import (AtomShape, AtomicModel, Precision)
 from cryolike.likelihoods.likelihood import calc_likelihood_optimal_pose, calc_fourier_likelihood_images_given_optimal_pose#, calc_physical_likelihood_images_given_optimal_pose
 
 
-## TODO: optimize and clean up this test
 def test_likelihood():
 
     use_cuda = True

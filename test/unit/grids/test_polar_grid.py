@@ -23,15 +23,6 @@ def test_arbitrary_quadrature_consistency():
     with pytest.raises(ValueError, match="must match"):
         x = ArbitraryPolarQuadrature(radius_shells, weight_shells)
 
-## TODO: add test for negative weights in _weights_arbitrary_points
-
-## TODO: Test for manual quadrature points
-
-## TODO: Test for more cases of integrate() fn
-
-## TODO: Test resolution fn
-
-
 # Presumably one might want to test other properties, like that it
 # actually accomplishes a requested displacement, but this will do
 # for now

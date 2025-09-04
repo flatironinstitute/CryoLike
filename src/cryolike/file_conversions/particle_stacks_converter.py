@@ -64,7 +64,6 @@ DataSource = tuple[Literal["starfile"], StarfileInput] | \
              tuple[Literal["sequential_cryosparc"], SequentialCryosparc]
 
 
-# TODO: Verbosity flag
 class ParticleStackConverter():
     """Object that manages converting images in Starfile or Cryosparc format to
     the internal format used by this package.
@@ -183,7 +182,6 @@ class ParticleStackConverter():
         self.filemgr = ParticleConversionFileManager(folder_output)
 
         self.max_stacks = n_stacks_max
-        # TODO: standardize options for pixel size handling
         if np.isscalar(pixel_size):
             ps = float(pixel_size)          # type: ignore
             ensure_positive(ps, "pixel size")
@@ -219,7 +217,6 @@ class ParticleStackConverter():
         if self.lens_desc.ref_pixel_size is not None:
             if self.pixel_size is None:
                 self.pixel_size = self.lens_desc.ref_pixel_size
-                # TODO: cs_pixel_size will be ONE-D. Need to upscale.
             elif np.allclose(self.pixel_size, self.lens_desc.ref_pixel_size):
                 pass
             else: # a pixel size was manually set, and does not match the one in the file
@@ -453,8 +450,6 @@ class ParticleStackConverter():
 
 
     def _plot_imgs(self, phys_img: torch.Tensor, fourier_img: torch.Tensor):
-        # TODO: for full separation of filesystem access, the plot functions 
-        # need to not be self-saving.
         (fn_phys, fn_four, fn_power) = self.filemgr.get_plot_filenames(self.i_stacks)
 
         pol_grid = self.img_desc.polar_grid

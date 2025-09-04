@@ -468,7 +468,6 @@ def test_change_images_phys_size():
     sut = Images(phys_data=make_mock_data_obj(mock_pimg, mock_cgrid))
     sut.change_images_phys_size(box_size=15.)
     assert np.allclose(sut.box_size, np.array([15., 15.]))
-    # TODO: Should probably assert that the new grid has an n_pixels computed to fit new box size
 
     sut = Images(phys_data=make_mock_data_obj(mock_pimg, mock_cgrid))
     sut.change_images_phys_size(n_pixels=75)

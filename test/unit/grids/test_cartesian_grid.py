@@ -130,7 +130,6 @@ def test_cartesian_grid_3d():
     np.testing.assert_allclose(cg3d.radius, cg3d.box_size * 0.5)
     np.testing.assert_allclose(cg3d.x_axis, cg3d.y_axis)
     assert(cg3d.z_axis.shape == (n_voxels[2],))
-    # TODO: might be good to check the grids are correct
     assert cg3d.n_voxels_total == 10 * 10 * 20
     
     

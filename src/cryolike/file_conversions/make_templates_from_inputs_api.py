@@ -90,9 +90,7 @@ def _make_templates_from_memory_array(
 ) -> Templates:
     if isinstance(input, np.ndarray):
         input = torch.from_numpy(input)
-    # TODO NOTE: hard-coded to assume square pixels mapped into cubic voxels
     density_physical_data = PhysicalVolume(density_physical=input, voxel_size=descriptor.cartesian_grid.pixel_size[0])
-    # TODO: Might be easier to just take the first dimension of the box size
     volume = Volume(density_physical_data=density_physical_data, box_size=descriptor.get_3d_box_size())
     if (volume.density_physical is None):
         raise ValueError("Unreachable: creating a volume with explicit physical density did not preserve physical density.")
@@ -144,7 +142,6 @@ def _make_template_maker_fn(
     return maker
 
 
-# TODO: expose parameters for template normalization
 def make_templates_from_inputs(
     list_of_inputs: Sequence[str | np.ndarray | torch.Tensor],
     image_parameters_file: str,

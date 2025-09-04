@@ -5,7 +5,6 @@ from cryolike.stacks import Templates
 from cryolike.metadata import ViewingAngles
 from cryolike.util import Precision, AtomShape, AtomicModel
 
-# TODO: parametrize to test on cpu, cuda
 def test_displacement():
 
     precision = Precision.DOUBLE

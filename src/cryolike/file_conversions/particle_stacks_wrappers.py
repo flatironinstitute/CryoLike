@@ -4,7 +4,6 @@ from cryolike.util import FloatArrayType
 from cryolike.metadata import ImageDescriptor
 from .particle_stacks_converter import ParticleStackConverter
 
-# TODO QUERY: should we allow a pixel_size separate from the parameters file?
 def convert_particle_stacks_from_paired_star_and_mrc_files(
     params_input: str | ImageDescriptor,
     particle_file_list: list[str],
@@ -119,7 +118,6 @@ def convert_particle_stacks_from_indexed_star_file(
     converter.convert_stacks(batch_size=batch_size)
 
 
-# TODO QUERY: Do we need a separate pixel size from the one in the image descriptor
 def convert_particle_stacks_from_indexed_cryosparc_file(
     params_input: str | ImageDescriptor,
     file_cs: str,

@@ -231,7 +231,6 @@ def _displace_templates(
     # the major ones, i.e. [n_inplanes, [rotated x,y], n_viewing, n_displacement, n_source],
     # so permute it back out to [n_viewing, n_displacement, n_rotation, n_source, (x,y)]
     rotated = torch.tensordot(rotations, displaced, dims=([-1], [-1])).permute(2, 3, 0, 4, 1) # type: ignore
-    # TODO: Figure out a way to do this switching the two tensors so we don't have to permute so much.
     return rotated
 
 
@@ -251,10 +250,7 @@ def p_xx_p_kernel_multiwave(
     # pairwise differences to match between the displacements and
     # the angles.
     delta_t = _pairwise_difference(wavevectors_a, wavevectors_b, dim = -2)
-    # # raise ValueError(f"dt new method slice 1 2 12 200: {delta_t[1,2,12,200]}")
-    # # raise ValueError(f"delta t new method: {delta_t.shape}")
 
-    # phi_neg = _pairwise_difference(-1. * angles_a, -1. * angles_b)
     phi_neg: Tensor = torch.tensor(angle_b - angle_a)
     phi_pos: Tensor = torch.tensor(angle_b + angle_a)
     delta_t_norm: Tensor = torch.norm(delta_t, dim=-1)
@@ -344,17 +340,11 @@ def p_xx_p_multiwave_vectorized(
     # We want the pairwise differences to look like S,M,d,w,n_src,[x,y].
     # So expand realized_templates to S,:,d,w,n_src,2 and
     # images to :,M,:,:,n_src,2
-    # # realized_templates = realized_templates.unsqueeze(1)
-    # TODO: This matches the current implementation code, which has S and M indices swapped
     realized_templates = realized_templates.unsqueeze(0)
     i_shape = i_wv.shape
-    # TODO: Should be subtracting images from templates but it matches implementation code
     i_wv = i_wv.reshape(i_shape[0], 1, 1, 1, i_shape[1], i_shape[2])
 
-    # TODO: Implementation code has swapped image and template indices, swap back once fixed
-    # (raw_integral, d_t_norm) = p_xx_p_kernel_multiwave(realized_templates, i_wv, template_ctf_angles, image_ctf_angles, grid_max_radius_K)
     raw_integral = p_xx_p_kernel_multiwave(i_wv, realized_templates, image_ctf_angle, template_ctf_angle, grid_max_radius_K)
-    # TODO: denominator will also need to be swapped when implementation is fixed
     denominator = torch.sqrt(rt_norms.unsqueeze(0) * image_norms.reshape(i_shape[0], 1, 1, 1))
 
     return raw_integral / denominator

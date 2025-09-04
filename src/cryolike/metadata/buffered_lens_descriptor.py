@@ -56,7 +56,6 @@ class LensDescriptorBuffer(LensDescriptor):
     def update_parent(self, new_parent: LensDescriptor):
         if self.parent_descriptor == new_parent:
             return
-        # TODO: More generalized test for equivalence/compatibility?
         if self.stack_size > 0:
             raise ValueError("Cannot reset parent lens descriptor when the buffer is not empty.")
         self.parent_descriptor = new_parent
@@ -108,7 +107,6 @@ class LensDescriptorBuffer(LensDescriptor):
 
     def to_dict(self):
         base_dict = self.parent_descriptor.to_dict()
-        # TODO: Some kind of trimming for the non-buffered fields?
         base_dict.update(self._to_dict_internal())
 
         return base_dict

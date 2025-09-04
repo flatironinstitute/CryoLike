@@ -89,11 +89,6 @@ class parameters():
         )
 
 
-# TODO: Parameterize based on: max_displacement,
-    # this basically simulates the effect of a displaced atom
-    # So maybe also try -.8 to +.8
-    # try 3 to 5 possible values in that range? Further away = higher values = lower accuracy
-
 def make_cases() -> list[parameters]:
     cases = [parameters.default()]
     with_single_precision = [x.duplicate(precision=Precision.SINGLE) for x in cases]

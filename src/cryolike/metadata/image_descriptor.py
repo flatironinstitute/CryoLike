@@ -18,8 +18,6 @@ from cryolike.grids import CartesianGrid2D, PolarGrid
 from .viewing_angles import ViewingAngles
 
 
-# TODO: Support for non-uniform grids and viewing angle sets
-
 class SerializedImageDescriptor(BaseModel):
     n_pixels: IntArrayType | int
     pixel_size: FloatArrayType | float
@@ -34,11 +32,6 @@ class SerializedImageDescriptor(BaseModel):
     atom_shape: AtomShape
 
     model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)
-
-    # TODO: May need some custom code for handling
-    # enums to avoid needing use_pickle = True
-    # TODO: Serialization currently assumes regularity, i.e.
-    # uniform polar grids and square/cubic cartesian pixels/boxes.
 
 
 class ImageDescriptor():
@@ -108,8 +101,6 @@ class ImageDescriptor():
 
 
     def is_compatible_with(self, other: 'ImageDescriptor') -> bool:
-        # TODO: Expand on this
-        # Currently, compatibility is defined as "uses the same grids".
         if self.polar_grid is not None and other.polar_grid is not None:
             if (self.polar_grid.radius_max != other.polar_grid.radius_max
                 or self.polar_grid.dist_radii != other.polar_grid.dist_radii
@@ -177,8 +168,6 @@ class ImageDescriptor():
     def print(self):
         """Prints a set of parameters to the command line.
         """
-        # TODO: probably ought to implement this in terms of the serialized dict
-        # Or use Pydantic's features
         print("Parameters:")
         print("n_voxels:", self.cartesian_grid.n_pixels)
         print("voxel_size:", self.cartesian_grid.pixel_size)
@@ -239,9 +228,6 @@ class ImageDescriptor():
         _cartesian_grid = CartesianGrid2D(n_pixels, pixel_size)
 
         _n_inplanes = n_pixels * 2 if n_inplanes is None else n_inplanes
-        # this had been written as np.pi / 2.0 / (2.0 * np.pi)
-        # but that's equivalent to np.pi / (4. * np.pi), i.e. a constant 0.25.
-        # TODO: CHECK THIS
         radius_max = resolution_factor * n_pixels * 0.25
         _polar_grid = PolarGrid(
             radius_max=radius_max,
@@ -273,9 +259,8 @@ class ImageDescriptor():
             radius_max=_data.radius_max,
             dist_radii=_data.dist_radii,
             n_inplanes=_data.n_inplanes,
-            uniform=True # TODO: support non-uniform polar grids
+            uniform=True
         )
-        # TODO: Support non-uniform viewing angles
 
         try:
             precision = Precision.from_str(_data.precision)
@@ -302,7 +287,6 @@ class ImageDescriptor():
         )
     
 
-    # TODO: Eliminate this
     @classmethod
     def ensure(cls, input: 'str | ImageDescriptor') -> 'ImageDescriptor':
         if isinstance(input, ImageDescriptor):
@@ -310,7 +294,6 @@ class ImageDescriptor():
         return cls.from_dict(load_file(input))
 
 
-    # TODO: Query: is this actually sufficient?
     def update_pixel_size(self, pixel_size: float | FloatArrayType):
         self.cartesian_grid = CartesianGrid2D(self.cartesian_grid.n_pixels, pixel_size)
     

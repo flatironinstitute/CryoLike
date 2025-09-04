@@ -44,8 +44,6 @@ QuadratureAlias = Union[QuadratureType, ArbitraryPolarQuadrature]
 T = TypeVar("T", bound = FloatArrayType | ComplexArrayType | torch.Tensor)
 EmptyArray = np.array([])
 
-## TODO: Standardize all numpy arrays into torch tensors.
-
 class PolarGrid:
     """Class implementing polar-coordinate grid.
 
@@ -275,9 +273,6 @@ class PolarGrid:
         if n_inplanes is not None:
             self.n_inplane_shells = cast(IntArrayType, n_inplanes.astype(int))
         self._set_n_inplanes_nonuniform(n_inplanes=n_inplanes, dist_inplane=dist_inplane)
-        # TODO: nonuniform initialization is not fully implemented yet
-
-        # TODO QUERY: where does self.n_inplane_shells come from if n_inplanes is None?
         # int() is pleonastic but keeps pylance happy
         self.n_points = int(np.sum(self.n_inplane_shells))
         if len(self.weight_shells) == 0:
@@ -292,7 +287,6 @@ class PolarGrid:
             n_inplanes = self.n_inplane_shells[i_s]
             assert(n_inplanes is not None)
             radius_shell = self.radius_shells[i_s]
-            # TODO: Reinstate this; we need a definite value for n_inplanes
             if self.half_space:
                 theta_shell = np.linspace(0, np.pi, n_inplanes, endpoint = False)
             else:
@@ -314,8 +308,6 @@ class PolarGrid:
 
 
     def _nonuniform_inplane(self, dist_inplane: float = 1.0 / (2.0 * np.pi)):
-        ## TODO QUERY: This next line resets any setting of self.n_inplane_shells that happened previously
-        ## (in the branch where n_inplanes is not None in set_n_inplanes_nonuniform.)
         self.n_inplane_shells = cast(IntArrayType, np.zeros(self.n_shells, dtype = int))
         for i_r in range(self.n_shells):
             n_equator = 3 + np.round(2 * np.pi * self.radius_shells[i_r] / dist_inplane).astype(int)
@@ -354,7 +346,6 @@ class PolarGrid:
             if f.shape[0] != self.n_points: # type: ignore
                 raise ValueError('Invalid shape for f', f.shape)
         if isinstance(f, np.ndarray):
-            ## TODO: check dimensions on this
             weight_points_tmp = np.expand_dims(self.integration_weight_points.flatten(), axis = tuple(range(f.ndim - 1)))
             I = cast(T, np.sum(f * weight_points_tmp, axis = -1))
             if I.size == 1:
@@ -362,7 +353,6 @@ class PolarGrid:
             else:
                 return cast(T, I)
         elif isinstance(f, torch.Tensor):
-            ## TODO: check dimensions on this
             weight_points_torch = torch.tensor(self.integration_weight_points.flatten(), dtype = f.dtype, device = f.device)
             for i in range(f.dim() - 1):
                 weight_points_torch = weight_points_torch.unsqueeze(0)

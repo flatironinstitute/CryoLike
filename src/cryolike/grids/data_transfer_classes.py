@@ -8,8 +8,6 @@ from .polar_grid import PolarGrid
 from .sphere_grid import SphereGrid
 
 
-# TODO: Review the use of these--they may not actually be needed
-
 @dataclass
 class FourierImages:
     """Data class representing a set of Fourier images and the corresponding polar grid.

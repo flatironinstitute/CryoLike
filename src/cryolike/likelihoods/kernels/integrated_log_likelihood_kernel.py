@@ -43,7 +43,6 @@ def ill_kernel(
         torch.Tensor: The integrated log likelihood of each image-tensor pair, indexed
             as [image, tensor]
     """
-    # TODO: we probably need to do a fourier-bessel trick here too, don't we
     Isx_ms = torch.sum(sqrt_weighted_mask_points * CTF_sqrtweighted_fourier_templates_msnw, dim = (2,3))
     Isy_m = torch.sum(sqrt_weighted_mask_points * images_fourier_sqrtweighted_mnw, dim=(1,2))
 

@@ -298,7 +298,6 @@ class LensDescriptor():
 
     @classmethod
     def from_dict(cls, d: dict[str, Any], angles_in_degrees: bool = False):
-        # TODO: queries about voltage, amp cont, phase types.
         data = SerializedLensDescriptor.model_validate(d)
         return cls(
             defocusU=data.defocusU,
@@ -381,7 +380,6 @@ class LensDescriptor():
         )
         return descriptor
 
-    # TODO: Rewrite following the model of indexed_starfile
     @classmethod
     def from_starfile(cls, star_file: str, defocus_is_degree: bool = True, phase_shift_is_degree: bool = True):
         """Read a Starfile and generate a LensDescriptor object
@@ -459,12 +457,6 @@ class LensDescriptor():
 
         files_list: list[str] = []
         indices_list: list[int] = []
-        # Note: arbitrary splitting of potentially-irregular-length strings
-        # on an arbitrary-positioned character is unlikely to benefit too
-        # much from vectorized operations.
-        # BUT if we can be certain that the int component is always a particular
-        # length, we could maybe do this much faster. TODO
-        # (Though I have doubts about whether the brittleness would be worth it)
         for fn in dataBlock['ImageName']:
             assert isinstance(fn, str)
             (idx, pathstr) = fn.split('@')

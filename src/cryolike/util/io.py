@@ -11,7 +11,6 @@ def load_file(file: str | Path) -> dict:
     if ext != '.npz':
         raise ValueError("Can only load from .npz files.")
     
-    # TODO: figure out a way to avoid allowing pickling
     data: dict[str, Any] = np.load(file, allow_pickle=True)
 
     out_dict = {}

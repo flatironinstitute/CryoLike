@@ -68,12 +68,10 @@ class AtomicModel:
         if box_size is None:
             print("Box size not specified. Using default box_size = 2.0.")
             box_size = 2.0
-        # if not np.isscalar(box_size):
-        #     ## not supported yet
-        #     box_size = box_size[0] ## TODO: replace with proper handling
-        self.box_size = float(box_size)
+        if not np.isscalar(box_size):
+            raise NotImplementedError()
+        self.box_size = float(box_size) # type: ignore
         if atomic_coordinates is None:
-            # raise ValueError("Atomic coordinates or pdb_file must be specified.")
             print("Atomic coordinates or pdb_file not specified. Using default random set of coordinates.")
             atomic_coordinates = _random_coordinates(radius = self.box_size / 4)
         self.atomic_coordinates = atomic_coordinates
@@ -105,9 +103,6 @@ class AtomicModel:
         if self.atomic_coordinates.shape[1] != 3:
             raise ValueError("atomic_coordinates.shape[1] != 3")
         self.n_atoms = self.atomic_coordinates.shape[0]
-        ### Add check if atomic coordinates are within the box_size
-        ### ...
-        ###
         if self.atom_radii is None:
             # NOTE: This is different from the default in the constructor
             print("Atomic radii not specified. Using default radii = 3.0.")

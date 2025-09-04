@@ -14,8 +14,6 @@ from cryolike.likelihoods import (
 from cryolike.metadata import ImageDescriptor
 from cryolike.util import  OutputConfiguration, Precision
 
-## TODO: implement functionality: optimized_inplane_rotation, optimized_displacement, optimized_viewing_angle
-
 
 def configure_likelihood_files(
     folder_templates: str,
@@ -249,9 +247,6 @@ def run_likelihood_full_cross_correlation(
     displacer(tp)
     file_config.save_displacements(tp.displacement_grid_angstrom)
 
-    ### TODO: For the many-image-stacks case, add another iterator
-    ### that handles loading multiple image stacks as part of its
-    ### iteration.
     for i_stack in range(n_stacks):
         if skip_exist and file_config.outputs_exist(i_stack, outputs):
             # NOTE: this is not a foolproof way to check if the files exist, as the files could be corrupted

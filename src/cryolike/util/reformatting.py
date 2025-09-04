@@ -106,7 +106,6 @@ def project_descriptor(descriptor: descriptor_types, label: str, dims: int, targ
         else:
             raise ValueError("Unreachable: test val was neither float nor int")
 
-    # TODO: Typing contravariant stuff.
     if np.isscalar(descriptor):
         result = project_scalar(descriptor, dims) # type: ignore
     else:

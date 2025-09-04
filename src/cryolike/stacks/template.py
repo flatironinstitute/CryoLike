@@ -96,8 +96,7 @@ class _ParsedAtomicModel(NamedTuple):
 
 def _parse_atomic_model(atomic_model: AtomicModel, polar_grid: PolarGrid, box_size: FloatArrayType, float_type: torch.dtype, device: torch.device) -> _ParsedAtomicModel:
     atomic_coordinates = torch.tensor(atomic_model.atomic_coordinates, dtype=float_type, device=device)
-    box_max = np.amax(box_size)
-    ## TODO: handle anisotropic box sizes
+    box_max = np.amax(box_size).item()
     atomic_coordinates_scaled = atomic_coordinates.T / box_max * 2.0 * (- 2.0 * np.pi)
 
     atomic_radii = torch.tensor(atomic_model.atom_radii, dtype=float_type, device=device)
@@ -108,11 +107,10 @@ def _parse_atomic_model(atomic_model: AtomicModel, polar_grid: PolarGrid, box_si
     return _ParsedAtomicModel(atomic_radius_scaled, radius_shells, radius_shells_sq, pi_atomic_radius_sq_times_two, atomic_coordinates_scaled)
 
 
-# TODO: Consider whether DataClass is better for this application
 class _CommonKernelParams(NamedTuple):
     xyz_template_points: torch.Tensor
     parsed_model: _ParsedAtomicModel
-    templates_fourier: torch.Tensor  # TODO: Ensure this is a pointer
+    templates_fourier: torch.Tensor
     polar_grid: PolarGrid
     n_atoms: int
     n_templates: int
@@ -201,40 +199,12 @@ def _make_uniform_gaussian_kernel(
     return _uniform_kernel
 
 
-# TODO: On the pattern of the others, this should just return the kernel
-# def _generate_templates_from_nonuniform_positions_gaussian(
-#     kernel_params: _CommonKernelParams,
-#     verbose : bool = False
-# ) -> torch.Tensor:
-#     raise NotImplementedError("kdtor is not set properly.")
-#     parsed_model = kernel_params.parsed_model
-#     polar_grid = kernel_params.polar_grid
-#     log_norm = - 1.5 * np.log(2 * np.pi) - 3 * torch.log(parsed_model.atomic_radius_scaled) - np.log(kernel_params.n_atoms)
-#     offset = _get_offset(polar_grid, float_type=kernel_params.torch_float_type, device=kernel_params.device)
-#     offset *=  torch.sum(torch.exp(log_norm))
-
-#     # TODO: Check this signature, is it right?
-#     templates_fourier = torch.zeros((kernel_params.n_templates, polar_grid.n_points), dtype = kernel_params.torch_complex_type, device = "cpu")
-#     gaussKernelAtoms = parsed_model.radius_shells_sq[:,None] * parsed_model.pi_atomic_radius_sq_times_two[None,:] + log_norm[None,:]
-#     radius_points = torch.from_numpy(polar_grid.radius_points).to(kernel_params.device)
-#     kdotr = kdotr * radius_points[None,:,None]
-#     offset = offset.unsqueeze(0)
-#     def _nonuniform_kernel(start: int, end: int):
-#         exponent = torch.complex(gaussKernelAtoms[None,:,:], kdotr[start:end,:,:]) ## (n_templates, n_points, n_atoms)
-#         exponent.exp_()
-#         templates_fourier_batch = torch.sum(exponent, dim = 2) - offset
-#         templates_fourier[start:end,:] = templates_fourier_batch.cpu() ## (n_templates, n_points)
-#     _iterate_kernel_with_memory_constraints(kernel_params.n_templates, _nonuniform_kernel, verbose=verbose)
-#     return templates_fourier
-
-
 def _iterate_kernel_with_memory_constraints(n_templates: int, kernel: Callable[[int, int], None], verbose: bool = False):
     batch_size = n_templates
     success = False
     while batch_size > 0:
         n_batches = ceil(n_templates / batch_size)
         try:
-            # TODO: Check if performance issue from exponent being in the kernel function scope now
             if verbose:
                 print(f"Batch size: {batch_size}")
                 from tqdm import trange
@@ -436,7 +406,6 @@ class Templates(Images):
         _test_callable(fn=function, precision=precision, device=_device)
         (torch_float_type, torch_complex_type, _) = precision.get_dtypes(default=Precision.SINGLE)
         fourier_slices = _get_fourier_slices(polar_grid, viewing_angles, float_type=torch_float_type, device=_device)
-        ## TODO: batch template generation for memory management
         templates_fourier = function(fourier_slices).reshape(viewing_angles.n_angles, polar_grid.n_shells, polar_grid.n_inplanes).to(_output_device)
         data = FourierImages(images_fourier=templates_fourier, polar_grid=polar_grid)
         return cls(fourier_data=data, viewing_angles=viewing_angles)

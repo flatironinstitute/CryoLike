@@ -17,8 +17,6 @@ from cryolike.grids import FourierImages, PhysicalImages
 from cryolike.util import OutputConfiguration, Precision
 from cryolike.metadata import ImageDescriptor, load_combined_params
 
-## TODO: The output configuration stuff needs to go away...
-
 class LikelihoodOutputFiles(NamedTuple):
     # cross correlation pose
     cross_corr_pose_file: Path | None
@@ -55,7 +53,6 @@ class LikelihoodFileManager():
     _output_optimal_pose: Path
     _displacements_saved: bool
 
-    # TODO: Way to customize naming scheme?
     def __init__(self,
         folder_output: str,
         folder_templates: str,
@@ -161,7 +158,6 @@ class LikelihoodFileManager():
             phys_data = image_desc.cartesian_grid,
             viewing_angles = image_desc.viewing_angles
         )
-        # del templates_fourier  ## TODO: test -- does this leak, and does it delete what you have
         return (tp, image_desc, torch_float_type)
 
 
@@ -179,12 +175,10 @@ class LikelihoodFileManager():
         ctf = CTF(
             ctf_descriptor=stack_lens_desc,
             polar_grid = stack_img_desc.polar_grid,
-            box_size = stack_img_desc.cartesian_grid.box_size[0], ## TODO: check this hard-coded index
+            box_size = stack_img_desc.cartesian_grid.box_size[0],
             anisotropy = True
         )
 
-        # del fourier_images    # TODO: test
-        # del images_fourier    # TODO: test
         return (im, ctf)
 
     
@@ -231,7 +225,6 @@ class LikelihoodFileManager():
         out_data: LikelihoodOutputDataSources
     ):
         out_fns = self._get_output_filenames(i_stack, outs)
-        # TODO: complain if requested output but no data, or data for unrequested output?
         if (outs.cross_correlation_pose):
             assert out_fns.cross_corr_pose_file is not None
             assert out_data.full_pose is not None

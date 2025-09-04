@@ -34,7 +34,6 @@ def stitch_log_likelihood_matrices(
     if not (phys or opt or integrated or cc):
         raise ValueError("At least one output type must be selected.")
     if n_cpus == 1:
-        # TODO: Does this really need to be a fatal error, or should we just proceed?
         raise RuntimeError("This function is not useful for single core machines")
 
     file_mgr = PostProcessFileManager(output_directory, batch_directory, template_directory)
