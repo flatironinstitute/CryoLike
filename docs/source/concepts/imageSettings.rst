@@ -6,8 +6,8 @@ to interpret a set of 2D images (Images stack or Templates). An
 ``ImageDescriptor`` is a required input to the functions for making
 Templates or converting experimentally-captured Images.
 
-For full details, see **LINK TO API DOCUMENTATION ONCE
-WE HAVE THE DEV VERSION MERGED IN.**
+For full details, see
+:py:class:`cryolike.metadata.image_descriptor.ImageDescriptor`
 
 Available fields
 ============================
@@ -143,8 +143,9 @@ Interface
 The main way for a user to create an ``ImageDescriptor`` instance
 is by the ``ImageDescriptor.from_individual_values()`` function.
 
-See also the API documentation at **TODO: PROVIDE CROSS-REFERENCE**
-**THIS DEPENDS ON MERGES IN THE CODE SIDE**
+See also the API documentation at
+:doc:`/pythonapi/cryolike.metadata` and
+:py:class:`cryolike.metadata.ImageDescriptor`
 
 The following parameters are accepted:
 

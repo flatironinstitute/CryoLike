@@ -13,7 +13,7 @@ Typical CryoLike usage requires four steps:
 
 - Set CryoLike parameters
 - Create known-pose templates from input model files (in
-  ``mrc``/``mrcs``/``maps`` or ``pdb`` format)
+  ``mrc``, ``mrcs``, ``maps``, or ``pdb`` format)
 - Create images from cryo-EM particle files (in
   ``CryoSparc`` or ``Starfile`` format)
 - Run the likelihood computation using the Templates and Images

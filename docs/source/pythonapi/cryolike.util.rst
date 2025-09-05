@@ -8,10 +8,24 @@ cryolike.util.atomic\_model
    :members:
    :show-inheritance:
 
+cryolike.util.device\_handling
+----------------------------------
+
+.. automodule:: cryolike.util.device_handling
+   :members:
+   :show-inheritance:
+
 cryolike.util.enums
 --------------------------
 
 .. automodule:: cryolike.util.enums
+   :members:
+   :show-inheritance:
+
+cryolike.util.post\_process\_output
+------------------------------------
+
+.. automodule:: cryolike.util.post_process_output
    :members:
    :show-inheritance:
 

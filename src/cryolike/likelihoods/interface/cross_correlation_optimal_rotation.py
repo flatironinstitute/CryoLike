@@ -43,7 +43,7 @@ def compute_optimal_rotation(
     images: Images,
     precision: Precision,
     include_integrated_log_likelihood: bool,
-):
+) -> OptimalRotationReturn | tuple[OptimalRotationReturn, torch.Tensor]:
     """Compute cross-correlation between templates and images, returning score
     and optimal rotation achieving that score for each image-template pair,
     and (optionally) the integrated log likelihood for each image.

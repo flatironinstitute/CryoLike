@@ -45,7 +45,8 @@ this is the "image descriptor," which includes the  discretization and
 scaling grids used to interpret the tensor representations of the
 images. For more detail on this, see the
 :doc:`image settings documentation</concepts/imageSettings>`
-and the :py:mod:`cryolike.microscopy.parameters` documentation.
+and the :py:class:`cryolike.metadata.image_descriptor.ImageDescriptor`
+documentation.
 
 In addition, image conversion needs data describing the image capture
 apparatus--most notably defocus and phase shift information. This
@@ -59,8 +60,8 @@ Interfaces
 
 File conversion is managed by the ``ParticleStackConverter`` class.
 While it is possible to interface with this class directly
-(see :py:mod:`particle stack conversion
-<cryolike.convert_particle_stacks.particle_stacks_conversion>`),
+(see
+:py:class:`ParticleStackConverter <cryolike.file_conversions.particle_stacks_converter.ParticleStackConverter>`),
 we also offer wrapper functions for
 the four use cases (i.e. converting from individual Star files, converting
 from indexed Star or CryoSparc files, and converting
@@ -80,8 +81,7 @@ Wrapper functions
 
 We will discuss the four wrapper functions available for the
 four cases listed above. These wrapper functions can be accessed
-at :py:mod:`CryoLike.convert_particle_stacks
-<cryolike.convert_particle_stacks.particle_stacks_conversion>`.
+at :py:mod:`the wrappers module <cryolike.file_conversions.particle_stacks_wrappers>`.
 
 .. _image-file-conversion-common-parameters:
 
@@ -103,7 +103,7 @@ Common Parameters
    In Angstroms. (``pixel_size``)
  - Whether to output plots (``flag_plots``). Default (``True``)
    causes plots to be output.
-   **[PC: QUESTIONS should we take these two out? I've never
+   **[PC: TODO QUESTIONS should we take these two out? I've never
    used the downsampling how does this interact with the
    resolution factor?]**
 
@@ -142,8 +142,8 @@ potentially combine
 images from several input MRC files into a single stack.
 
 The exception is the
-:py:func:`convert_particle_stacks_from_star_files()
-<cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_star_files>`
+:py:func:`convert_particle_stacks_from_paired_star_and_mrc_files()
+<cryolike.file_conversions.particle_stacks_wrappers.convert_particle_stacks_from_paired_star_and_mrc_files>`
 wrapper. This function
 is intended to process pairs of Star files and MRC files, so it
 is assumed that the Star files
@@ -174,7 +174,8 @@ input; please see the documentation linked above.
   - ``output/`` and ``..._000001.npz`` (containing metadata
     for the above stacks)
 
-  The ``convert_particle_stacks_from_star_files()`` wrapper function would produce:
+  The ``convert_particle_stacks_from_paired_star_and_mrc_files()``
+  wrapper function would produce:
 
   - ``output/fft/particles_fourier_stack_000000.pt`` (with only the 7 images from ``A.mrc``)
   - ``..._000001.pt`` (with only the 2 images from ``B.mrc``)
@@ -193,11 +194,11 @@ input; please see the documentation linked above.
 
 .. _star-file-general-info:
 
-Lists of Star files: ``convert_particle_stacks_from_star_files()``
+Lists of Star files: ``convert_particle_stacks_from_paired_star_and_mrc_files()``
 ********************************************************************************************
 
-:py:func:`convert_particle_stacks_from_star_files()
-<cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_star_files>`
+:py:func:`convert_particle_stacks_from_paired_star_and_mrc_files()
+<cryolike.file_conversions.particle_stacks_wrappers.convert_particle_stacks_from_paired_star_and_mrc_files>`
 
 This function is designed to convert images stored in a
 series of MRC files, described by a corresponding series
@@ -220,11 +221,11 @@ As described above, this wrapper function follows a different
 batching logic than the other two: it never makes output stacks
 that combine images from multiple MRC files.
 
-Indexed Star file: ``convert_particle_stacks_from_indexed_star_files()``
+Indexed Star file: ``convert_particle_stacks_from_indexed_star_file()``
 ************************************************************************
 
-:py:func:`convert_particle_stacks_from_indexed_star_files()
-<cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_indexed_star_files>`
+:py:func:`convert_particle_stacks_from_indexed_star_file()
+<cryolike.file_conversions.particle_stacks_wrappers.convert_particle_stacks_from_indexed_star_file>`
 
 This function is designed to convert images stored in a series
 of MRC files, described by a single Star file that refers to
@@ -246,11 +247,11 @@ then the system will use the paths in the Star file. Those
 paths will be assumed to be relative to the current directory.
 
 
-Indexed CryoSparc files: ``convert_particle_stacks_from_cryosparc()``
-*********************************************************************
+Indexed CryoSparc files: ``convert_particle_stacks_from_indexed_cryosparc_file()``
+***********************************************************************************
 
-:py:func:`convert_particle_stacks_from_cryosparc()
-<cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_cryosparc>`
+:py:func:`convert_particle_stacks_from_indexed_cryosparc_file()
+<cryolike.file_conversions.particle_stacks_wrappers.convert_particle_stacks_from_indexed_cryosparc_file>`
 
 This function is designed to convert images stored in a series of
 MRC files, described
@@ -275,11 +276,11 @@ those filenames within the ``folder_cryosparc`` directory.
 
 .. _cryosparc-job-folder-full-description:
 
-CryoSparc job folder: ``convert_particle_stacks_from_cryosparc_restack()``
-**************************************************************************
+CryoSparc job folder: ``convert_particle_stacks_from_cryosparc_job_directory()``
+********************************************************************************
 
-:py:func:`convert_particle_stacks_from_cryosparc_restack()
-<cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_cryosparc_restack>`
+:py:func:`convert_particle_stacks_from_cryosparc_job_directory()
+<cryolike.file_conversions.particle_stacks_wrappers.convert_particle_stacks_from_cryosparc_job_directory>`
 
 This function is designed to convert images stored in a CryoSparc
 job folder, described by a single unified CryoSparc file. It expects

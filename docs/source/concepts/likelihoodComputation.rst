@@ -26,7 +26,8 @@ can be returned with several different means of aggregation.
     The Templates and Images stacks are unlikely to fit fully in GPU
     memory all at once, so CryoLike batches the comparison over several sets.
     To reduce memory transfer overhead, we preference Templates as the outer
-    set of images to loop over.
+    set of objects to loop over. We may provide more customization options
+    for this in the future.
 
 Main outputs
 ************
@@ -39,23 +40,27 @@ respect to each 3D structure.
 Interface
 ==============
 
-The ``run_likelihood`` wrapper function exposes an interface to the underlying
-``CrossCorrelationLikelihood`` object that incorporates convenience features
-for file management and optionally attempts to find the best batch sizes for
-available GPU hardware (if any).
+The ``run_likelihood`` module provides two wrapper functions that
+serve as a convenient interface to
+the underlying *iterator* and *aggregator* functions found in
+:py:mod:`cryolike.likelihoods`. One wrapper returns the optimal pose
+for each image
+(:py:func:`cryolike.run_likelihood.run_likelihood_optimal_pose`),
+and the other returns the full unaggregated cross correlation likelihood,
+indexed by image, template, displacement, and inplane rotation
+(:py:func:`cryolike.run_likelihood.run_likelihood_full_cross_correlation`).
 
-For a worked example of this wrapper function, see the
+For a worked example of this wrapper function in action, see the
 :doc:`run likelihood example</examples/run_likelihood>`.
 
+Both wrapper functions take the following parameters:
 
-The ``run_likelihood`` function takes the following parameters:
-
+ - A configured file manager that handles fetching input files and writing
+   output files to standard locations on the file system
  - A set of :doc:`image descriptor parameters</concepts/imageSettings>`, in
    on-disk or in-memory form (``params_input``)
- - The path to the directory where templates are stored (``folder_templates``)
- - The path to the directory where image stacks are stored
-   (``folder_particles``)
- - The root of the output directory (``folder_output``)
+ - A callback function that applies the appropriate displacement-search grid
+   to every batch of templates
  - The index of the template file to process (``i_template``)
  - The number of image stacks to process (``n_stacks``)
  - Whether to skip processing when the output files appear to exist
@@ -63,20 +68,15 @@ The ``run_likelihood`` function takes the following parameters:
  - Number of templates and images to use per batch, and whether to
    attempt to determine
    those values automatically (``n_templates_per_batch``,
-   ``n_images_per_batch``, ``search_batch_size``)
- - The largest-size displacement to consider, and the number of
-   displacements to consider in both directions
-   (``max_displacement_pixels``, ``n_displacements_x``,
-   ``n_displacements_y``)
- - Flags to configure which output files are written. Note that
-   the integrated log likelihood is optional, but some form of
-   cross-correlation likelihood will always be returned.
+   ``n_images_per_batch``, ``estimate_batch_size``)
 
-   - ``return_likelihood_integrated_pose_fourier``
-   - ``return_optimal_pose``
-   - ``optimized_inplane_rotation``
-   - ``optimized_displacement``
-   - ``optimized_viewing_angle``
+The file manager is provided by the
+:py:func:`cryolike.run_likelihood.configure_likelihood_files` function, and
+the displacer is provided by the
+:py:func:`cryolike.run_likelihood.configure_displacement` function. See the
+:doc:`run likelihood example</examples/run_likelihood>` for example uses, and
+the :doc:`/concepts/file_structure` documentation for more details about
+expected file locations.
 
 
 Input system
@@ -85,7 +85,8 @@ Input system
 We compute likelihood by matching images against templates.
 We expect the templates to be located under the directory
 specified by ``folder_templates`` and the images to be located
-under the directory specified by ``folder_particles``. Specifically:
+under the directory specified by ``folder_particles`` as passed to the
+``configure_likelihood_files()`` function. Specifically:
 
  - There must be a "template file list"
    ``folder_templates/template_file_list.npy`` in the
@@ -113,7 +114,10 @@ Displacement handling
 
 The user specifies the displacement values to check using the
 ``n_displacements_x``, ``n_displacements_y``, and
-``max_displacement_pixels`` parameters.
+``max_displacement_pixels`` parameters to the
+:py:func:`cryolike.run_likelihood.configure_displacement` function,
+which provides a callback that should be passed to the ``run_likelihood``
+wrapper.
 
 To compute the available displacements, the
 ``max_displacement_pixels`` is first
@@ -121,7 +125,8 @@ converted to Angstrom using the pixel size associated with
 the image/template grids. The
 resulting ``max_displacement`` is treated as a potential
 displacement in either direction,
-creating a total displacement length of ``2 * max_displacement``.
+creating a total displacement length of ``2 * max_displacement`` in
+both dimensions.
 This distance is then
 divided linearly into ``n_displacements_x`` and ``n_displacements_y``
 steps, resulting in
@@ -134,41 +139,20 @@ The set of displacements tested will be preserved in
 Possible outputs
 =========================
 
-CryoLike can return the following aggregation levels of the computations.
-
-Note that these correspond to the ``NamedTuple`` return-type classes defined in
-``cross_correlation_likelihood.py``. For more detail, see
-:py:mod:`cryolike.cross_correlation_likelihood`.
-
-Output type selection
-*************************
-
-The ``run_likelihood()`` function exposes the following flags to control
-which of the above return types will be returned, as well as which
-additional likelihood reports will be written.
-
-   - ``return_likelihood_integrated_pose_fourier``
-
-If ``True``, we will additionally write a Tensor with the integrated
-log likelihood of the Fourier-space cross-correlation (see the
-:doc:`Mathematical Framework </about>` and
-:ref:`the Integrated likelihood section <integrated_likelihood>`).
-
-   - ``return_optimal_pose``
-
-If true, we will output the Tensors described under
-:ref:`the Optimal Pose section<optimal_pose>` below.
-If this is set to true, the remaining  options will be ignored.
-
-The remaining three options can be set individually, but the output will
-depend on the chosen combination.
+CryoLike can return the computed values at the following levels of
+aggregation. Note that the ``run_likelihood`` wrappers currently
+only support computing optimal pose or providing the fully
+unaggregated data, but other aggregation types are available in the
+``cryolike.likelihoods.interface`` module (just swap out the
+``compute_optimal_pose`` call for one of the other functions).
 
 
 Output paths
 **************
 
-The wrapper function writes computed likelihoods to disk for
-later review. The exact files written depend on the requested outputs.
+The wrapper functions write computed likelihoods to disk for
+later review. The exact files written depend on which wrapper function
+is called.
 
 The root output directory is specified by the ``folder_output`` parameter.
 Within that directory, the following paths will be used. Note that the
@@ -189,7 +173,7 @@ processed.
     - The actual set of displacement values used will be written to
       ``OUT/displacements_set.pt``
 
- - ``return_optimal_pose``: Will write the 5 Tensors
+ - ``run_likelihood_optimal_pose()``: Will write the 5 Tensors
    :ref:`discussed above<optimal_pose>` to individual files:
 
      - ``OUT/templateN/cross_correlation/cross_correlation_stack_STACK.pt``
@@ -197,6 +181,10 @@ processed.
      - ``OUT/templateN/optimal_pose/optimal_displacement_x_stack_STACK.pt``
      - ``OUT/templateN/optimal_pose/optimal_displacement_y_stack_STACK.pt``
      - ``OUT/templateN/optimal_pose/optimal_inplane_rotation_stack_STACK.pt``
+
+ - ``run_likelihood_full_cross_correlation()`` will, by contrast,
+   write only a single file per image stack, to
+   ``OUT/templateN/cross_correlation/cross_correlation_pose_msdw_stack_STACK.pt``
 
 
 .. _integrated_likelihood:
@@ -223,30 +211,30 @@ Optimal pose outputs
 This will return 5 1-dimensional Tensors, indexed by the image sequence index:
 
  - Best cross-correlation value for each image
-   (``cross_correlation_S``). **TODO: CHECK S there may be an indexing issue**
+   (``cross_correlation_M``).
    As described in the :doc:`Mathematical Framework</about>`,
    CryoLike calculates the cross-correlation between each image
    and each template. This tensor reports the numeric value of the
    best match achieved.
  - The template (by sequence number) of the best match
-   (``optimal_template_S``), i.e. the template that produced
-   the number in the corresponding index of ``cross_correlation_S``
+   (``optimal_template_M``), i.e. the template that produced
+   the number in the corresponding index of ``cross_correlation_M``
  - The optimal x-displacement matching this image with the best-fitting
-   template (``optimal_displacement_x_S``)
+   template (``optimal_displacement_x_M``)
  - The optimal y-displacement matching this image with the best-fitting
-   template (``optimal_displacement_y_S``)
+   template (``optimal_displacement_y_M``)
  - The optimal inplane rotation matching this image with the best-fitting
-   template (``optimal_inplane_rotation_S``)
+   template (``optimal_inplane_rotation_M``)
 
 .. admonition:: Example:
 
     So consider the values at index ``i``, which correspond to the image at index ``i`` in the
     input Images stack. Then:
 
-    - ``cross_correlation_S[i]`` is the best alignment likelihood
-    - ``optimal_template_S[i]`` is the index of the template that got the score above
-    - ``optimal_displacement_x_S[i]`` and ``..._y_S[i]`` are the displacements resulting in that alignment score
-    - ``optimal_inplane_rotation_S[i]`` is the rotation resulting in that alignment score
+    - ``cross_correlation_M[i]`` is the best alignment likelihood
+    - ``optimal_template_M[i]`` is the index of the template that got the score above
+    - ``optimal_displacement_x_M[i]`` and ``..._y_M[i]`` are the displacements resulting in that alignment score
+    - ``optimal_inplane_rotation_M[i]`` is the rotation resulting in that alignment score
 
 
 .. .. _optimal_displacement_rotations:
@@ -360,9 +348,5 @@ Base Comparator
 ================
 
 The underlying code that computes likelihood is found in the
-``CrossCorrelationLikelihood`` object. It contains many methods
-for computing probability arrays, including ones which are not
-yet supported by the wrapper, but are currently available.
-
-For further information, see
-:py:mod:`cryolike.cross_correlation_likelihood`.
+``compute_cross_correlation`` function. For further information, see
+:py:mod:`cryolike.likelihoods.kernels`.

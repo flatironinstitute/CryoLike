@@ -295,18 +295,26 @@ class ParticleStackConverter():
     def prepare_sequential_cryosparc(self, folder_cryosparc: str, job_number: int = 0):
         """Preprocesses a set of sequential files with a Cryosparc descriptor. The expected
         directory structure is as follows. Assume:
+
             - the parent folder is FOLDER
             - the job number is 15
+        
         Then we expect the following directories to exist:
+        
             - FOLDER/J15/J15_passthrough_particles.cs
             - An MRC file folder. This should be one of:
+
                 - FOLDER/J15/restack
                 - FOLDER/J15/downsample
+
               If both exist, the `restack` folder will be used.
             - MRC files in this folder should follow the naming convention:
+
                 - batch_0_restacked.mrc, batch_1_restacked.mrc, ... for `restack` or
                 - batch_000000_downsample.mrc, batch_000001_downsample.mrc, ... for `downsample`
+                
         MRC files will be processed sequentially until the first missing number in the sequence.
+
 
         Args:
             folder_cryosparc (str): Path to directory on the filesystem where files

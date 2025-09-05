@@ -54,7 +54,7 @@ def compute_optimal_pose(
     images: Images,
     precision: Precision,
     include_integrated_log_likelihood: bool
-):
+) -> OptimalPoseReturn | tuple[OptimalPoseReturn, torch.Tensor]:
     """Compute cross-correlation between templates and images, returning a
     tensor identifying the best cross-correlation for each image-template pair,
     as well as tensors identifying the identity of the optimal matching template

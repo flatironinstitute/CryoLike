@@ -1,8 +1,6 @@
 Converting particles from STAR file formats
 ========================================================
 
-**TODO: CHANGE NAME BASED ON UPDATED API NAME**
-
 This tutorial shows how to import cryo-EM image data into CryoLike from
 MRC files described by STAR-formatted files.
 
@@ -32,8 +30,7 @@ Parallel lists
 ****************
 
 We use the term "parallel lists" to refer to the
-**TODO FIX REF**
-:py:func:`cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_star_files`
+:py:func:`cryolike.file_conversions.particle_stacks_wrappers.convert_particle_stacks_from_paired_star_and_mrc_files`
 conversion function, whose inputs include two separate lists:
 one list of STAR files, and one list of MRC files.
 
@@ -107,7 +104,7 @@ stack with 5 images in the ``OUTDIR`` directory:
 
 .. code-block:: python
 
-    convert_particle_stacks_from_star_files(
+    convert_particle_stacks_from_paired_star_and_mrc_files(
         params_input="my_params_file.npz",
         particle_file_list=["images.mrc", "images2.mrc"],
         star_file_list=["MyFile.star", "File2.star"],

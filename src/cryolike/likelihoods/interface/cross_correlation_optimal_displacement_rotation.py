@@ -51,7 +51,7 @@ def compute_optimal_displacement_and_rotation(
     images: Images,
     precision: Precision,
     include_integrated_log_likelihood: bool
-):
+) -> OptimalDisplacementAndRotationReturn | tuple[OptimalDisplacementAndRotationReturn, torch.Tensor]:
     """Compute cross-correlation between templates and images, returning a
     tensor identifying the best cross-correlation for each image-template pair,
     as well as tensors identifying the the x- and y-displacements and rotation
@@ -73,7 +73,7 @@ def compute_optimal_displacement_and_rotation(
             in the return
 
     Returns:
-        OptimizedDisplacementAndRotationReturn | tuple(OptimizedDisplacementAndRotationReturn,
+        OptimalDisplacementAndRotationReturn | tuple(OptimalDisplacementAndRotationReturn,
             torch.Tensor): The score for each image against each template,
             as well as the optimal displacements and rotation producing this score
             (if no ILL requested); or a tuple of (same, ILL).

@@ -6,9 +6,9 @@ cryo-EM density maps or atomic models with CryoLike.
 
 The wrapper function for making templates is
 :py:func:`make_templates_from_inputs
-<cryolike.stacks.make_templates_from_inputs_api.make_templates_from_inputs>`
-in the :py:mod:`cryolike.stacks
-<cryolike.stacks.make_templates_from_inputs_api>` module.
+<cryolike.file_conversions.make_templates_from_inputs_api.make_templates_from_inputs>`
+in the :py:mod:`cryolike.file_conversions
+<cryolike.file_conversions.make_templates_from_inputs_api>` module.
 The function takes a list of inputs for the cryo-EM
 density map or atomic model, the imaging parameters perviously set
 (see :doc:`/examples/set_image_parameters`), and

@@ -98,7 +98,7 @@ parse the remaining rows, we simply treat the rows as a list of metadata
 values to be applied in sequence to images from an MRC file.
 
 This is the format expected in the
-``convert_particle_stacks_from_star_files()``
+``convert_particle_stacks_from_paired_star_and_mrc_files()``
 wrapper
 (see :doc:`the image conversion documentation</concepts/imageConversion>`).
 
@@ -155,5 +155,5 @@ If the internal index fields are not present, we assume that the
 records are correctly-ordered descriptors of the images in the
 MRC files in the job directory. See the
 :doc:`image conversion documentation</concepts/imageConversion>`
-for more details (``convert_particle_stacks_from_cryosparc_restack()``).
+for more details (``convert_particle_stacks_from_cryosparc_job_directory()``).
 

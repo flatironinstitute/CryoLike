@@ -50,8 +50,7 @@ For a basic example of generating ``Templates`` from PDB files, see the
 
 For complete documentation of the API, see the
 :doc:`API documentation </pythonapi/modules>`, in particular the
-:func:`make_templates_from_inputs() function
-<cryolike.stacks.make_templates_from_inputs_api.make_templates_from_inputs>`
+:func:`make_templates_from_inputs() function <>`
 and the :class:`Templates class <cryolike.stacks.template.Templates>`.
 
 

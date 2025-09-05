@@ -6,7 +6,8 @@ template creation, and likelihood computation. This example
 demontrates how to set these parameters using a script, which
 will write the collection of parameters to the file system for
 reuse in other functions. The parameters are collected and held
-in an **TODO:ADD METADATA PY LINK** ``ImageDescriptor`` object.
+in an :py:class:`cryolike.metadata.image_descriptor.ImageDescriptor`
+object.
 
 The imaging parameters include the number of voxels and voxel size
 in the template model, the precision for computations, a

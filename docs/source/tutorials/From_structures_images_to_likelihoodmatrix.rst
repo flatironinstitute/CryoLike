@@ -33,7 +33,7 @@ parameters and search ranges:
 See :doc:`/concepts/imageSettings` for details about the parameters,
 and :doc:`/examples/set_image_parameters` for the example code.
 The full set of parameters are discussed further in
-**TODO: LINK API DOC**
+the :doc:`/pythonapi/cryolike.metadata` doc.
 
 The optimal choice of parameters depends on the specific system
 being studied and is often selected empirically, based on an

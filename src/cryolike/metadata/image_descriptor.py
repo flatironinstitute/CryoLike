@@ -35,6 +35,39 @@ class SerializedImageDescriptor(BaseModel):
 
 
 class ImageDescriptor():
+    """Class recording the information necessary to interpret an image,
+    whether experimentally captured (Images) or constructed from a model
+    (Templates).
+
+    Attributes:
+        precision:
+            The precision (single or double) of the image representation
+        cartesian_grid:
+            The two-dimensional Cartesian grid that describes the images
+        polar_grid:
+            The PolarGrid object that can be used to interpret the Fourier representation
+            of the image
+        viewing_angles:
+            A ViewingAngles object describing the different orientations that
+            make up the generated template stack
+        viewing_distance:
+            A viewing distance (separation on the surface of a sphere) that allows
+            regenerating the viewing angles. Only relevant for templates with
+            regularly spaced viewing angles.
+        atom_radii:
+            Only relevant for template creation from PDB files. If set, describes
+            the radius of the atoms (as a single value for all atoms) in the model.
+        atom_selection:
+            Only relevant for template creation from PDB files. If set, describes
+            which atoms should be taken from the model.
+        use_protein_residue_model:
+            Only relevant for template creation from PDB files. Indicates whether
+            to use standard sizes for molecules mentioned in the PDB file.
+        atom_shape:
+            An enumeration value describing how to interpret atoms in a model.
+            Typical values are AtomShape.HARD_SPHERE and AtomShape.GAUSSIAN.
+            Only relevant for templates constructed from atomic models.
+    """
     precision: Precision
     cartesian_grid: CartesianGrid2D
     polar_grid: PolarGrid
@@ -203,6 +236,7 @@ class ImageDescriptor():
         set to defaults if not provided.
         As a reminder, values other than the grids have no effect on Images,
         and only impact Templates during the template-creation process.
+
         Args:
             n_pixels (int): Number of pixels per side of the grid
             pixel_size (float): Size of each pixel in Angstrom
@@ -222,6 +256,7 @@ class ImageDescriptor():
                 sizes for proteins in PDB. Defaults to True.
             atom_shape (AtomShape | str, optional): Whether to treat atoms as hard
                 spheres or Gaussian clouds. Defaults to AtomShape.GAUSSIAN.
+        
         Returns:
             ImageDescriptor: A fully-populated ImageDescriptor object.
         """

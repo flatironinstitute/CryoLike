@@ -1,8 +1,6 @@
 Converting particles from CryoSPARC file formats
 ========================================================
 
-**TODO: CHANGE NAME BASED ON UPDATED API NAME**
-
 This tutorial shows how to import cryo-EM data into CryoLike from
 CryoSPARC files.
 
@@ -43,10 +41,9 @@ is not specified, we assume that the CryoSPARC file contains
 a valid path (either absolute, or relative to the directory
 where CryoLike is being run) to the location of each MRC file.
 
-**TODO: DOUBLE CHECK AFTER RENAMING**
 The function that processes images indexed by a CryoSPARC
 file is
-:py:func:`cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_cryosparc`
+:py:func:`cryolike.file_conversions.particle_stacks_wrappers.convert_particle_stacks_from_indexed_cryosparc_file`.
 
 
 Job directories
@@ -62,9 +59,8 @@ This version makes particular strong assumptions about the layout of
 the job directory. The expected layout is discussed in detail in the
 :ref:`image conversion <cryosparc-job-folder-full-description>` documentation.
 
-**TODO: UPDATE NAME AFTER RENAMING**
 The function that processes images from a CryoSPARC job directory is
-:py:func:`cryolike.convert_particle_stacks.particle_stacks_conversion.convert_particle_stacks_from_cryosparc_restack`
+:py:func:`cryolike.file_conversions.particle_stacks_wrappers.convert_particle_stacks_from_cryosparc_job_directory`.
 
 
 Common parameters
@@ -113,7 +109,7 @@ a single output file in ``OUTDIR``:
 
 .. code-block:: python
 
-    convert_particle_stacks_from_cryosparc(
+    convert_particle_stacks_from_indexed_cryosparc(
         params_input="my_params_file.npz",
         file_cs="MyFile.cs",
         folder_output='OUTDIR',
@@ -128,7 +124,7 @@ directory, then this call would achieve the same result:
 
 .. code-block:: python
 
-    convert_particle_stacks_from_cryosparc(
+    convert_particle_stacks_from_indexed_cryosparc(
         params_input="my_params_file.npz",
         file_cs="MyFile.cs",
         folder_cryosparc='~/my_research/my_mrc_files/',
@@ -143,7 +139,7 @@ the remaining 2 images:
 
 .. code-block:: python
 
-    convert_particle_stacks_from_cryosparc(
+    convert_particle_stacks_from_indexed_cryosparc(
         params_input="my_params_file.npz",
         file_cs="MyFile.cs",
         batch_size=3
@@ -179,7 +175,7 @@ directory:
 
 .. code-block:: python
 
-    convert_particle_stacks_from_cryosparc_restack(
+    convert_particle_stacks_from_cryosparc_job_directory(
         params_input="my_params.npz",
         folder_cryosparc= 'cryosparc',
         job_number=4,
@@ -198,7 +194,7 @@ stacks of 4 images each:
 
 .. code-block:: python
 
-    convert_particle_stacks_from_cryosparc_restack(
+    convert_particle_stacks_from_cryosparc_job_directory(
         params_input="my_params.npz",
         folder_cryosparc= 'cryosparc',
         job_number=4,
@@ -213,7 +209,7 @@ range:
 
 .. code-block:: python
 
-    convert_particle_stacks_from_cryosparc_restack(
+    convert_particle_stacks_from_cryosparc_job_directory(
         params_input="my_params.npz",
         folder_cryosparc= 'cryosparc',
         job_number=4,
