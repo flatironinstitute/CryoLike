@@ -246,7 +246,7 @@ def test_get_output_filenames(tmp_path):
     i_stack = 15
     expected_suffix = f"stack_{i_stack:06}.pt"
     expecteds = {
-        "cross_corr_pose_file": sut._output_cross_correlation / f"cross_correlation_pose_smdw_{expected_suffix}",
+        "cross_corr_pose_file": sut._output_cross_correlation / f"cross_correlation_pose_msdw_{expected_suffix}",
         "integrated_pose_file": sut._output_log_likelihood / f"log_likelihood_integrated_fourier_{expected_suffix}",
         "optimal_fourier_pose_likelihood_file": sut._output_log_likelihood / f"log_likelihood_optimal_fourier_{expected_suffix}",
         "optimal_phys_pose_likelihood_file": sut._output_log_likelihood / f"log_likelihood_optimal_physical_{expected_suffix}",

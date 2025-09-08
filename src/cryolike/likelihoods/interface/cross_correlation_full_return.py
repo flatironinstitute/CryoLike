@@ -48,23 +48,25 @@ def compute_cross_correlation_complete(
     likelihood of each image.
 
     Args:
-        comparator (GeneratorType): A generator which returns one batch of cross-correlation
-            likelihood computation per call
-        templates (Templates): A stack of Templates, with the displacements-to-search
-            already configured
-        images (Images): A stack of Images
-        ctf (CTF): Contrast transfer function, either singleton (applied to
-            every image) or a tensor of per-point values (one grid per image)
-        precision (Precision): The precision at which to return results (note that
-            this is separate from the precision used for computing the cross-correlation
-            likelihood)
-        include_integrated_likelihood (bool): Whether to include integrated log likelihood
-            in the return
+        comparator (GeneratorType):
+            A generator which returns one batch of cross-correlation likelihood computation
+            per call
+        templates (Templates):
+            A stack of Templates, with the displacements-to-search already configured
+        images (Images):
+            A stack of Images
+        ctf (CTF):
+            Contrast transfer function, either singleton (applied to every image) or a
+            tensor of per-point values (one grid per image)
+        precision (Precision):
+            The precision at which to return results (note that this is separate from the
+            precision used for computing the cross-correlation likelihood)
+        include_integrated_likelihood (bool):
+            Whether to include integrated log likelihood in the return
 
     Returns:
-        CrossCorrelationReturn | tuple(CrossCorrelationReturn, torch.Tensor): The
-            full cross correlation matrix for each image (if no ILL requested) or a tuple of (same, ILL).
-            ILL is represented as a single score per image.
+        The full cross correlation matrix for each image (if no ILL requested) or a tuple of
+        (same, ILL). ILL is represented as a single score per image.
     """
     (torch_float_type, _, _) = Precision.get_dtypes(precision, default=Precision.DOUBLE)
     n_disp = templates.n_displacements

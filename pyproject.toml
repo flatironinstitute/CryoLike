@@ -45,3 +45,6 @@ addopts = "--ignore=test/integration/backup --ignore=test/unit/backup --cov --co
 norecursedirs = "test/helpers"
 pythonpath = ["test/helpers"]
 tmp_path_retention_policy = "none"
+
+[tool.doc8]
+max-line-length = 120

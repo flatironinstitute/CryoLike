@@ -23,6 +23,23 @@ def configure_likelihood_files(
     i_template: int = 0,
     return_likelihood_optimal_pose_physical : bool = False,
 ) -> LikelihoodFileManager:
+    """Sets up an object that is responsible for ensuring name consistency
+    for files input to or output by the run_likelihood wrappers.
+
+    Args:
+        folder_templates (str): Root of the folder where template files can be found
+        folder_particles (str): Root of the folder where image stack files can be found
+        folder_output (str, optional): Root of the folder to use for output. Defaults to ''.
+        n_stacks (int, optional): Maximum number of image stacks to process. Defaults to 1.
+        i_template (int, optional): Index of the template file within the templates directory. Defaults to 0.
+        return_likelihood_optimal_pose_physical (bool, optional): Whether to additionally
+            compute the likelihood of the optimal pose in physical-space representation.
+            Not currently implemented. Defaults to False.
+
+    Returns:
+        LikelihoodFileManager:
+            An object that provides consistent file name handling. 
+    """
     if return_likelihood_optimal_pose_physical:
         raise NotImplementedError("Physical likelihood is still under development and not yet available. Please use Fourier likelihood instead.")
 
@@ -42,6 +59,22 @@ def configure_displacement(
     n_displacements_x: int = -1,
     n_displacements_y: int = -1,
 ) -> displacement_configurator_T:
+    """Sets up an object (callback) that sets the grid of displacements to search
+    for each template file before processing.
+
+    Args:
+        max_displacement_pixels (float, optional): Maximum number of pixels to
+            displace in either x or y dimension for search. Defaults to 8.0.
+            Note that the full range will be from -(this value) to +(this value).
+        n_displacements_x (int, optional): Number of displacements to search in the
+            x-direction. Defaults to -1.
+        n_displacements_y (int, optional): Number of displacements to search in the
+            y-direction. Defaults to -1.
+
+    Returns:
+        displacement_configurator_T: A callback that ensures the displacement search
+            grid is correctly set.
+    """
     def template_grid_setter(tp: Templates):
         tp.set_displacement_grid(
             max_displacement_pixels,

@@ -119,7 +119,7 @@ class LikelihoodFileManager():
         opt_f_pose_ll = self._output_log_likelihood / f"log_likelihood_optimal_fourier_{i_ext}"
         opt_p_pose_ll = self._output_log_likelihood / f"log_likelihood_optimal_physical_{i_ext}"
         xcorr = self._output_cross_correlation / f"cross_correlation_{i_ext}"
-        xcorr_pose = self._output_cross_correlation / f"cross_correlation_pose_smdw_{i_ext}"
+        xcorr_pose = self._output_cross_correlation / f"cross_correlation_pose_msdw_{i_ext}"
         template_indices = self._output_optimal_pose / f"optimal_template_{i_ext}"
         disp_x = self._output_optimal_pose / f"optimal_displacement_x_{i_ext}"
         disp_y = self._output_optimal_pose / f"optimal_displacement_y_{i_ext}"

@@ -48,7 +48,7 @@ def compute_optimal_displacement(
     images: Images,
     precision: Precision,
     include_integrated_log_likelihood: bool,
-):
+) -> OptimalDisplacementReturn | tuple[OptimalDisplacementReturn, torch.Tensor]:
     """Compute cross-correlation between templates and images, returning optimal
     displacement, and (optionally) the integrated log likelihood for
     each template-image pair.
@@ -68,7 +68,7 @@ def compute_optimal_displacement(
             in the return
 
     Returns:
-        OptimizedDisplacementReturn | tuple(OptimizedDisplacementReturn, torch.Tensor): The
+        OptimalDisplacementReturn | tuple(OptimalDisplacementReturn, torch.Tensor): The
             optimal displacement for each image (if no ILL requested) or a tuple of (same, ILL). ILL is
             represented as a matrix of scores indexed as [image, template].
     """
