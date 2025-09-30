@@ -1,5 +1,14 @@
 # Configuration file for the Sphinx documentation builder.
 
+## NOTE: This is a workaround because autodoc needs to be able
+# to import the package, but it can't download the package from
+# pip before we publish it. When we're ready to publish, remove these
+# lines and update requirements.txt in the docs directory.
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path('..', '..', 'src').resolve()))
+
 # -- Project information
 
 project = 'CryoLike'
