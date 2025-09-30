@@ -16,6 +16,7 @@ autodoc_mock_imports = [
     'tqdm',
     'mrcfile',
     'starfile',
+    'pydantic'
 ]
 # -- Project information
 
