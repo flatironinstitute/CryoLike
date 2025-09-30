@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path('..', '..', 'src').resolve()))
 autodoc_mock_imports = [
     'numpy',
     'scipy',
-    'torch',
     'mdtraj',
     'matplotlib',
     'finufft',
