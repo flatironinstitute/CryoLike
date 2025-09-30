@@ -10,16 +10,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path('..', '..', 'src').resolve()))
 
 autodoc_mock_imports = [
-    'numpy',
-    'scipy',
     'mdtraj',
-    'matplotlib',
     'finufft',
     'cufinufft',
     'tqdm',
     'mrcfile',
     'starfile',
-    'pandas'
 ]
 # -- Project information
 
