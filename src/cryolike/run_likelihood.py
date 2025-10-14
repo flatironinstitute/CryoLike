@@ -182,7 +182,7 @@ def run_likelihood_optimal_pose(
             ctf=ctf,
             n_images_per_batch=n_images_per_batch,
             n_templates_per_batch=n_templates_per_batch,
-            return_integrated_likelihood=False,
+            return_integrated_likelihood=return_likelihood_integrated_pose_fourier,
             precision=Precision.DEFAULT
         )
 
@@ -377,7 +377,7 @@ def _compute_batch_sizes(
 
 
 T_OptPosePartial = Callable[[Images, CTF, OptimalPoseReturn, Literal['phys'] | Literal['fourier']], Tensor]
-def _get_optimal_pose_log_likelihood_partial(tp: Templates, precision: Precision):
+def _get_optimal_pose_log_likelihood_partial(tp: Templates, precision: Precision) -> T_OptPosePartial:
     def _inner(
         im: Images,
         ctf: CTF,
