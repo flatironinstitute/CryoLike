@@ -31,6 +31,8 @@ def aggregate_ill(
     n_inplanes = templates.polar_grid.n_inplanes
     
     log_viewing_weights = to_torch(templates.viewing_angles.weights_viewing, precision, "cpu")
+    log_viewing_weights /= log_viewing_weights.sum()
+    log_viewing_weights = torch.log(log_viewing_weights).unsqueeze(0)
 
     # assumption: log_viewing_weights should be tensor of n-templates size, so should broadcast
     # over the 2nd dimension of log_likelihood_MS
