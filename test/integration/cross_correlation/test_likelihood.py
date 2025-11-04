@@ -181,20 +181,6 @@ def test_likelihood_PxxP_from_a_k_p(params: parameters):
         i_bessel_mnq,
         t_bessel_sdnq
     )
-
-    # (_, log_likelihood_SMDW) = cc._compute_cross_correlation_likelihood(
-    #     device=_device,
-    #     images_fourier=images.images_fourier,
-    #     ctf=ctf_tensor,
-    #     n_pixels_phys=params.n_pixels * params.n_pixels,
-    #     n_templates_per_batch=viewing_angles.n_angles,
-    #     n_images_per_batch=viewing_angles.n_angles,
-    #     return_type=CrossCorrelationReturnType.FULL_TENSOR,
-    #     return_integrated_likelihood=True,
-    #     log_likelihood_keep_displacement_and_rotation=True
-    # )
-    # # print("log_likelihood_SMDW", log_likelihood_SMDW[:,:,0,0])
-
     log_likelihood_msdw = ill_kernel(
         Iss,
         n_pixels_total,

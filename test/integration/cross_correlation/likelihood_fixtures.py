@@ -209,53 +209,21 @@ class LogLikelihoodPlanarCTFPlanewaves():
         self.I_T_E_form = self.I_E_T_form.transpose(0, 1)
         self.I_M_E_form = self.I_E_M_form.transpose(0, 1)
 
-        # self.I_E_E_form = torch.clamp(self.I_E_E_form, min=1e-12)
-
-        ## print the shape of things
-        print(f'I_T_T_form shape: {self.I_T_T_form.shape}, type: {self.I_T_T_form.dtype}, max: {self.I_T_T_form.max()}, min: {self.I_T_T_form.min()}, absmin: {self.I_T_T_form.abs().min()}')
-        print(f'I_M_M_form shape: {self.I_M_M_form.shape}, type: {self.I_M_M_form.dtype}, max: {self.I_M_M_form.max()}, min: {self.I_M_M_form.min()}, absmin: {self.I_M_M_form.abs().min()}')
-        print(f'I_E_E_form shape: {self.I_E_E_form.shape}, type: {self.I_E_E_form.dtype}, max: {self.I_E_E_form.max()}, min: {self.I_E_E_form.min()}, absmin: {self.I_E_E_form.abs().min()}')
-        print(f'I_T_M_form shape: {self.I_T_M_form.shape}, type: {self.I_T_M_form.dtype}, max: {self.I_T_M_form.max()}, min: {self.I_T_M_form.min()}, absmin: {self.I_T_M_form.abs().min()}')
-        print(f'I_T_E_form shape: {self.I_T_E_form.shape}, type: {self.I_T_E_form.dtype}, max: {self.I_T_E_form.max()}, min: {self.I_T_E_form.min()}, absmin: {self.I_T_E_form.abs().min()}')
-        print(f'I_M_E_form shape: {self.I_M_E_form.shape}, type: {self.I_M_E_form.dtype}, max: {self.I_M_E_form.max()}, min: {self.I_M_E_form.min()}, absmin: {self.I_M_E_form.abs().min()}')
-        print(f'I_M_T_form shape: {self.I_M_T_form.shape}, type: {self.I_M_T_form.dtype}, max: {self.I_M_T_form.max()}, min: {self.I_M_T_form.min()}, absmin: {self.I_M_T_form.abs().min()}')
-        print(f'I_E_T_form shape: {self.I_E_T_form.shape}, type: {self.I_E_T_form.dtype}, max: {self.I_E_T_form.max()}, min: {self.I_E_T_form.min()}, absmin: {self.I_E_T_form.abs().min()}')
-        print(f'I_E_M_form shape: {self.I_E_M_form.shape}, type: {self.I_E_M_form.dtype}, max: {self.I_E_M_form.max()}, min: {self.I_E_M_form.min()}, absmin: {self.I_E_M_form.abs().min()}')
-        # exit()
-
         self.I_Tcen_Tcen_form = self.I_T_T_form
         self.I_Mcen_Mcen_form = self.I_M_M_form
         self.I_Tcen_Mcen_form = self.I_T_M_form
         self.I_Mcen_Tcen_form = self.I_M_T_form
-
-        # self.I_Tcen_Tcen_form = self.I_T_T_form - (self.I_T_E_form[:,0,:,:] ** 2) / self.I_E_E_form[:,0,:,:]
-        # self.I_Mcen_Mcen_form = self.I_M_M_form - (self.I_M_E_form[:,0,:,:] ** 2) / self.I_E_E_form[:,0,:,:]
-        # self.I_Tcen_Mcen_form = self.I_T_M_form - (self.I_T_E_form[:,0,:,:].unsqueeze(1) * self.I_M_E_form[:,0,:,:].unsqueeze(0)) / self.I_E_E_form
-        # self.I_Mcen_Tcen_form = self.I_M_T_form - (self.I_M_E_form[:,0,:,:].unsqueeze(1) * self.I_T_E_form[:,0,:,:].unsqueeze(0)) / self.I_E_E_form
-        
-        print(f'I_Tcen_Tcen_form shape: {self.I_Tcen_Tcen_form.shape}, type: {self.I_Tcen_Tcen_form.dtype}, max: {self.I_Tcen_Tcen_form.max()}, min: {self.I_Tcen_Tcen_form.min()}, absmin: {self.I_Tcen_Tcen_form.abs().min()}')
-        print(f'I_Mcen_Mcen_form shape: {self.I_Mcen_Mcen_form.shape}, type: {self.I_Mcen_Mcen_form.dtype}, max: {self.I_Mcen_Mcen_form.max()}, min: {self.I_Mcen_Mcen_form.min()}, absmin: {self.I_Mcen_Mcen_form.abs().min()}')
-        print(f'I_Tcen_Mcen_form shape: {self.I_Tcen_Mcen_form.shape}, type: {self.I_Tcen_Mcen_form.dtype}, max: {self.I_Tcen_Mcen_form.max()}, min: {self.I_Tcen_Mcen_form.min()}, absmin: {self.I_Tcen_Mcen_form.abs().min()}')
-        print(f'I_Mcen_Tcen_form shape: {self.I_Mcen_Tcen_form.shape}, type: {self.I_Mcen_Tcen_form.dtype}, max: {self.I_Mcen_Tcen_form.max()}, min: {self.I_Mcen_Tcen_form.min()}, absmin: {self.I_Mcen_Tcen_form.abs().min()}')
 
         # self.I_Tnrm_Tnrm_form = self.I_Tcen_Tcen_form / torch.clamp(torch.sqrt(self.I_Tcen_Tcen_form * self.I_Tcen_Tcen_form), min=1e-12)
         self.I_Tnrm_Mnrm_form = self.I_Tcen_Mcen_form / torch.sqrt(self.I_Tcen_Tcen_form.unsqueeze(0) * self.I_Mcen_Mcen_form.unsqueeze(1))
         self.I_Mnrm_Tnrm_form = self.I_Mcen_Tcen_form / torch.sqrt(self.I_Mcen_Mcen_form.unsqueeze(1) * self.I_Tcen_Tcen_form.unsqueeze(0))
         # self.I_Mnrm_Mnrm_form = self.I_Mcen_Mcen_form / torch.clamp(torch.sqrt(self.I_Mcen_Mcen_form * self.I_Mcen_Mcen_form), min=1e-12)
 
-        # print(f'I_Tnrm_Tnrm_form shape: {self.I_Tnrm_Tnrm_form.shape}, type: {self.I_Tnrm_Tnrm_form.dtype}')
-        print(f'I_Tnrm_Mnrm_form shape: {self.I_Tnrm_Mnrm_form.shape}, type: {self.I_Tnrm_Mnrm_form.dtype}, max: {self.I_Tnrm_Mnrm_form.max()}, min: {self.I_Tnrm_Mnrm_form.min()}, absmin: {self.I_Tnrm_Mnrm_form.abs().min()}')
-        print(f'I_Mnrm_Tnrm_form shape: {self.I_Mnrm_Tnrm_form.shape}, type: {self.I_Mnrm_Tnrm_form.dtype}, max: {self.I_Mnrm_Tnrm_form.max()}, min: {self.I_Mnrm_Tnrm_form.min()}, absmin: {self.I_Mnrm_Tnrm_form.abs().min()}')
-        # print(f'I_Mnrm_Mnrm_form shape: {self.I_Mnrm_Mnrm_form.shape}, type: {self.I_Mnrm_Mnrm_form.dtype}')
-
         # self.I_costheta = 0.5 * (self.I_Mnrm_Tnrm_form + self.I_Tnrm_Mnrm_form.transpose(0,1))  # similarity measure.
         self.I_costheta = self.I_Mnrm_Tnrm_form
         self.I_sinthetasquared = 1 - self.I_costheta ** 2  # dis-similarity measure.
 
-        print(f'I_costheta shape: {self.I_costheta.shape}, type: {self.I_costheta.dtype}, max: {self.I_costheta.max()}, min: {self.I_costheta.min()}')
-        print(f'I_sinthetasquared shape: {self.I_sinthetasquared.shape}, type: {self.I_sinthetasquared.dtype}, max: {self.I_sinthetasquared.max()}, min: {self.I_sinthetasquared.min()}, absmin: {self.I_sinthetasquared.abs().min()}')
 
-    
     def _ssnll_function(self):
         return 0.5 * self.I_Tcen_Tcen_form.unsqueeze(0) * self.I_sinthetasquared
 
