@@ -59,5 +59,5 @@ def ill_kernel(
                 + lgamma(n_pixels_phys / 2.0 - 2.0) \
                 + p * np.log(2 * Iss)
     log_likelihood_msdw = -p * torch.log(D) - 0.5 * torch.log(A) + constant
-    log_likelihood_ms = torch.logsumexp(log_likelihood_msdw, dim = (2, 3))
-    return log_likelihood_ms
+    # log_likelihood_ms = torch.logsumexp(log_likelihood_msdw, dim = (2, 3))
+    return log_likelihood_msdw
