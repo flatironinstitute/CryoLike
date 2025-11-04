@@ -114,5 +114,4 @@ the modeled and observed image:
 
 where :math:`\Omega` is the image space.
 
-.. math::
-    missing
+..     missing math section?

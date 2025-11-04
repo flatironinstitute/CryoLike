@@ -64,7 +64,7 @@ The resulting Templates objects are saved in the ``output/templates``
 folder.
 
 See :doc:`/examples/make_templates` for more information about
-this example, and :doc:`</concepts/templateCreation>`
+this example, and :doc:`/concepts/templateCreation`
 for details about the template creation functions.
 
 

@@ -124,7 +124,12 @@ def fourier_bessel_transform(image_fourier_: torch.Tensor, axis = -1, norm = "or
     return image_fourier_bessel_
 
 
-def inverse_fourier_bessel_transform(fourier_bessel: torch.Tensor, n_inplanes: int, axis: int = -1, norm="forward"):
+def inverse_fourier_bessel_transform(
+    fourier_bessel: torch.Tensor,
+    n_inplanes: int,
+    axis: int = -1,
+    norm="forward"
+) -> torch.Tensor:
     if axis > fourier_bessel.ndim - 1:
         raise ValueError("Axis out of range")
     img_fourier = torch.fft.irfft(
