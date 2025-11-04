@@ -126,7 +126,6 @@ def make_polar_grid(n_pixels: int) -> PolarGrid:
         dist_radii = dist_radii,
         n_inplanes = n_inplanes,
         uniform = True,
-        return_cartesian = True
     )
     return polar_grid
 
