@@ -25,6 +25,6 @@ for i_template in range(2):
         skip_exist = False,
         n_templates_per_batch = 16,
         n_images_per_batch = 64,
-        estimate_batch_size = False,
+        discover_batch_size = False,
         return_likelihood_integrated_pose_fourier = True
     )
