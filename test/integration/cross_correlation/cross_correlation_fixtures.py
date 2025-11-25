@@ -1,7 +1,10 @@
 from scipy.special import jv
 from torch import Tensor
 import torch
+import numpy as np
 from numpy import pi
+from numpy import conj
+from scipy.special import loggamma as lgamma
 
 from cryolike.grids import PolarGrid
 from cryolike.stacks import Templates
@@ -10,8 +13,108 @@ from cryolike.microscopy import CTF
 
 from cryolike.util import (
     Precision,
-    to_torch
+    to_torch,
+    absq
 )
+
+
+class parameters():
+    device: str
+    n_pixels: int
+    precision: Precision
+    wavevector: torch.Tensor
+    max_displacement: float  # this is max per axis; real max will be this * root 2
+    abs_tolerance_cross_correlation: float
+    rel_tolerance_cross_correlation: float
+
+    def __init__(
+        self,
+        device: str,
+        n_pixels: int,
+        precision: Precision,
+        wavevector: torch.Tensor,
+        max_displacement: float,
+        abs_tolerance_cross_correlation: float,
+        rel_tolerance_cross_correlation: float,
+        abs_tolerance_log_likelihood: float,
+        rel_tolerance_log_likelihood: float,
+    ):
+        self.device = device
+        self.n_pixels = n_pixels
+        self.precision = precision
+        self.wavevector = wavevector
+        self.max_displacement = max_displacement
+        self.abs_tolerance_cross_correlation = abs_tolerance_cross_correlation
+        self.rel_tolerance_cross_correlation = rel_tolerance_cross_correlation
+        self.abs_tolerance_log_likelihood = abs_tolerance_log_likelihood
+        self.rel_tolerance_log_likelihood = rel_tolerance_log_likelihood
+
+
+    def duplicate(self, *,
+        device: str | None = None,
+        n_pixels: int | None = None,
+        precision: Precision | None = None,
+        wavevector: torch.Tensor | None = None,
+        max_displacement: float | None = None,
+        abs_tolerance_cross_correlation: float | None = None,
+        rel_tolerance_cross_correlation: float | None = None,
+        abs_tolerance_log_likelihood: float | None = None,
+        rel_tolerance_log_likelihood: float | None = None,
+    ):
+        (float_type, _, _) = self.precision.get_dtypes(default=Precision.DOUBLE)
+        if precision is not None:
+            (float_type, _, _) = precision.get_dtypes(default=Precision.DOUBLE)
+        wv = wavevector if wavevector is not None else self.wavevector
+        return parameters(
+            device=device if device is not None else self.device,
+            n_pixels=n_pixels if n_pixels is not None else self.n_pixels,
+            precision=precision if precision is not None else self.precision,
+            wavevector=wv.to(float_type),
+            max_displacement=max_displacement if max_displacement is not None else self.max_displacement,
+            abs_tolerance_cross_correlation=abs_tolerance_cross_correlation if abs_tolerance_cross_correlation is not None else self.abs_tolerance_cross_correlation,
+            rel_tolerance_cross_correlation=rel_tolerance_cross_correlation if rel_tolerance_cross_correlation is not None else self.rel_tolerance_cross_correlation,
+            abs_tolerance_log_likelihood=abs_tolerance_log_likelihood if abs_tolerance_log_likelihood is not None else self.abs_tolerance_log_likelihood,
+            rel_tolerance_log_likelihood=rel_tolerance_log_likelihood if rel_tolerance_log_likelihood is not None else self.rel_tolerance_log_likelihood,
+        )
+
+
+    @staticmethod
+    def default():
+        (default_float, _, _) = Precision.DOUBLE.get_dtypes(default=Precision.DOUBLE)
+        return parameters(
+            device='cpu',
+            n_pixels=128,
+            precision=Precision.DOUBLE,
+            wavevector=torch.tensor([-0.17, -0.03, 0.07], dtype=default_float),
+            max_displacement=0.08,
+            abs_tolerance_cross_correlation=1e-6,
+            rel_tolerance_cross_correlation=1e-6,
+            abs_tolerance_log_likelihood=1e-3,
+            rel_tolerance_log_likelihood=1e-3,
+        )
+    
+
+# TODO: Parameterize based on: wavevector_planewave, max_displacement,
+    # this basically simulates the effect of a displaced atom
+    # So maybe also try -.8 to +.8
+    # try 3 to 5 possible values in that range? Further away = higher values = lower accuracy
+
+def make_cases() -> list[parameters]:
+    cases = [parameters.default()]
+    with_single_precision = [x.duplicate(
+        precision=Precision.SINGLE, 
+        abs_tolerance_cross_correlation=1e-5, rel_tolerance_cross_correlation=1e-3, 
+        abs_tolerance_log_likelihood=1e-3, rel_tolerance_log_likelihood=1e-3
+    ) for x in cases]
+    cases.extend(with_single_precision)
+    with_cuda = [x.duplicate(device='cuda') for x in cases]
+    cases.extend(with_cuda)
+    low_pixel = [x.duplicate(n_pixels=64) for x in cases]
+    high_pixel = [x.duplicate(n_pixels=256) for x in cases]
+    cases.extend(low_pixel)
+    cases.extend(high_pixel)
+
+    return cases
 
 
 def make_polar_grid(n_pixels: int) -> PolarGrid:
@@ -22,7 +125,7 @@ def make_polar_grid(n_pixels: int) -> PolarGrid:
         radius_max = radius_max,
         dist_radii = dist_radii,
         n_inplanes = n_inplanes,
-        uniform = True
+        uniform = True,
     )
     return polar_grid
 
@@ -32,29 +135,20 @@ def make_planewave_templates(
     viewing_angles: ViewingAngles,
     polar_grid: PolarGrid,
     precision: Precision,
-    device: str = "cpu"
+    device: torch.device = torch.device("cpu"),
 ) -> Templates:
     (_, complex_type, _) = precision.get_dtypes(default=Precision.DOUBLE)
     def wavevector_function(fourier_slice: Tensor) -> Tensor:
         fs = fourier_slice.to(wavevector_planewave.dtype)
-        # There is surely a better way to do this
-        # but for now we're just going to iterate over the wave vectors
-        res = torch.zeros(fourier_slice.shape[0:-1], dtype=complex_type, device=device)
-        for i in range(wavevector_planewave.shape[0]):
-            res += torch.exp(2 * pi * 1j * torch.matmul(fs, wavevector_planewave[i]))
-        return res
+        return torch.exp(2 * pi * 1j * torch.matmul(fs, wavevector_planewave)).to(complex_type)
     templates = Templates.generate_from_function(
-                    wavevector_function,
-                    viewing_angles,
-                    polar_grid, 
-                    device = device,
-                    output_device = "cpu",
-                    precision = precision
-                )
+            wavevector_function, viewing_angles, polar_grid,
+            device=device, output_device="cpu", precision=precision
+        )
     return templates
 
 
-def make_viewing_angles(device: str, dtype: torch.dtype):
+def make_viewing_angles(device: torch.device, dtype: torch.dtype):
     polars = 1 * pi * torch.tensor([ 0.28, 0.09, 0.72, 0.00 ], dtype=dtype).to(device)
     azimus = 2 * pi * torch.tensor([ 0.10, 0.32, 0.85, 0.00 ], dtype=dtype).to(device)
     gammas = 2 * pi * torch.tensor([ 0.71, 0.14, 0.48, 0.00 ], dtype=dtype).to(device)
@@ -159,21 +253,16 @@ def viewing_angles_to_cartesian_displacements(
     Rz_azi = _rotate_about_plus_z_axis(-1. * viewing_angles.azimus)
 
     rotation = torch.matmul(Rz_gam, torch.matmul(Ry, Rz_azi)) # n_angles x 3 x 3
+    print(f'rotation {rotation.shape}')
     # below: n x 2
-    rotated_wavevector: torch.Tensor = \
-        torch.tensordot(rotation,
-                        wave_vector_delta_a.to(device),
-                        dims=([2], [-1]) # type: ignore
-                       ).permute(0,2,1)[..., 0:2]
+    rotated_wavevector: torch.Tensor = torch.tensordot(rotation, wave_vector_delta_a.to(device), dims=([2], [0]))[:, 0:2] # type: ignore
     return rotated_wavevector
 
 
-def get_planar_ctf(grid: PolarGrid, phi_ctf: float, box_size: float, precision: Precision, device: str) -> CTF:
-    r_pts = to_torch(grid.radius_points, precision=precision, device=device)
-    thetas = to_torch(grid.theta_points, precision=precision, device=device)
-    ctf = (2.0 * r_pts * torch.cos(thetas - phi_ctf)) \
-        .reshape(1, grid.n_shells, grid.n_inplanes)
-
+def get_planar_ctf(grid: PolarGrid, phi_S: float, box_size: float, precision: Precision, device: torch.device) -> CTF:
+    ctf = (2.0 * to_torch(grid.radius_points, precision=precision, device=device) \
+            * torch.cos(to_torch(grid.theta_points, precision=precision, device=device) - phi_S)) \
+          .reshape(1, grid.n_shells, grid.n_inplanes)
     return CTF(
         polar_grid=grid,
         box_size = box_size,
@@ -181,309 +270,87 @@ def get_planar_ctf(grid: PolarGrid, phi_ctf: float, box_size: float, precision: 
         ctf_descriptor = ctf
     )
 
+def get_difference_wavevector_images_templates(
+    wavevector_planewave_templates: Tensor,
+    wavevector_planewave_images: Tensor,
+    grid_inplanes: Tensor,
+    searched_displacements: Tensor,
+) -> tuple[Tensor, Tensor, Tensor]:
 
-def _pairwise_difference(a: Tensor, b: Tensor, dim: int = -1):
-    a_cnt = a.shape[dim]
-    b_cnt = b.shape[dim]
-    a_expanded_shape = [1] * len(a.shape)
-    a_expanded_shape[dim] *= b_cnt
+    sin_gamma = torch.sin(grid_inplanes) # (n_inplanes)
+    cos_gamma = torch.cos(grid_inplanes) # (n_inplanes)
+    gamma_z_rotation = torch.stack((torch.stack((cos_gamma, - sin_gamma)),
+                                    torch.stack((sin_gamma,   cos_gamma)))).permute(2,0,1)  # n_inplanes * 2 * 2
+    _wavevector_planewave_templates = wavevector_planewave_templates.to(searched_displacements.device)
+    _wavevector_planewave_images = wavevector_planewave_images.to(searched_displacements.device)
 
-    delta = a.repeat(a_expanded_shape) - b.repeat_interleave(a_cnt, dim = dim)
-    return delta
-
-
-def _rotation_matrix(gamma_rotations: Tensor):
-    sin_gamma = torch.sin(gamma_rotations)
-    cos_gamma = torch.cos(gamma_rotations)
-    rotations = torch.stack((torch.stack((cos_gamma, -sin_gamma)),
-                             torch.stack((sin_gamma,  cos_gamma)))
-                           ).permute(2, 0, 1)
-    return rotations
-
-
-def _displace_templates(
-    templates: Tensor,
-    displacements: Tensor,
-    rotations: Tensor
-):
-    """Apply displacements and rotations to template wavevectors, resulting in
-    a tensor of [n_viewings, n_displacements, n_inplanes, n_sources, [x,y]].
-
-    Args:
-        templates (Tensor): A 3D template of [n_viewings x n_sources_per_template x [x,y]]
-        displacements (Tensor): Displacement grid of [n_displacements x [x,y]]
-        rotations (Tensor): Inplane rotation matrix of [n_inplanes x 2 x 2, where the 
-            2x2 dimensions constitute a rotation matrix per inplane
-
-    Returns:
-        Tensor: Fully realized set of template planewave sources, indexed as
-            [n_viewing, n_displacement, n_inplane, n_source, [x,y]] ([x,y] being a
-            plane wave source location)
-    """
-    # to displace the templates, apply each displacement to a copy of each template, adding a dimension.
-    # so expand [T x s x 2] -> [T, :, source, 2]
-    #  and from [D x 2]     -> [:, D,   :,    2]
-    displaced = templates.unsqueeze(1) - displacements.unsqueeze(1).unsqueeze(0)
-    # Yields [T x D x source x 2]. Now apply rotation tensor ([n_inplanes x 2 x2]) to each source.
-    # (for each n_inplane of the rot, we have a 2x2 matrix, and we want to multiply that
-    # against the 2-vector in the last place of the template tensor to yield a rotated 2-vector.)
-    # Since we're left-multiplying by the rotations, tensordot will give us that tensor's indices as
-    # the major ones, i.e. [n_inplanes, [rotated x,y], n_viewing, n_displacement, n_source],
-    # so permute it back out to [n_viewing, n_displacement, n_rotation, n_source, (x,y)]
-    rotated = torch.tensordot(rotations, displaced, dims=([-1], [-1])).permute(2, 3, 0, 4, 1) # type: ignore
-    return rotated
-
-
-def p_xx_p_kernel_multiwave(
-    wavevectors_a: Tensor,
-    wavevectors_b: Tensor,
-    angle_a: float,
-    angle_b: float,
-    max_radius_K: float
-):
-    bessel_coeff = 2 * pi * max_radius_K
-    return_coeff = pi * max_radius_K ** 4
-
-    # recall delta is m - s, phi is s - m
-    # _pairwise_difference must assume that the vectors might have
-    # different wave counts, and anyway we need the order of the
-    # pairwise differences to match between the displacements and
-    # the angles.
-    delta_t = _pairwise_difference(wavevectors_a, wavevectors_b, dim = -2)
-
-    phi_neg: Tensor = torch.tensor(angle_b - angle_a)
-    phi_pos: Tensor = torch.tensor(angle_b + angle_a)
-    delta_t_norm: Tensor = torch.norm(delta_t, dim=-1)
-    omega_t = torch.atan2(delta_t[...,1], delta_t[...,0])
+    searched_displacements_plus_wavevector_planewave = _wavevector_planewave_templates.unsqueeze(1) - searched_displacements.unsqueeze(0) # (viewing_angles * n_displacements * 2)
+    searched_displacements_plus_wavevector_planewave_templates_rotated = torch.tensordot(gamma_z_rotation, searched_displacements_plus_wavevector_planewave, dims=([2], [2])).permute(2,3,0,1) # type: ignore # viewing_angles * n_displacements * n_inplanes * 2
+    searched_displacements_plus_wavevector_planewave_templates_rotated = searched_displacements_plus_wavevector_planewave_templates_rotated.unsqueeze(0) # unsqueeze for images dimension
     
-    x = (bessel_coeff * delta_t_norm).cpu().numpy()
-    bessel_0: Tensor = torch.tensor(jv(0, x), device=wavevectors_a.device)
-    bessel_2: Tensor = torch.tensor(jv(2, x), device=wavevectors_a.device)
-    bessel_4: Tensor = torch.tensor(jv(4, x), device=wavevectors_a.device)
-
-    mode_0: Tensor = torch.cos(phi_neg) * (3. * bessel_0 + 2. * bessel_2 - bessel_4) / 12.
-    mode_2: Tensor = torch.cos(phi_pos - 2. * omega_t) * (bessel_2 + bessel_4) / 6.
-
-    return 4 * return_coeff * torch.sum((mode_0 - mode_2), dim=-1)
+    offset_delta_T = _wavevector_planewave_images.unsqueeze(1).unsqueeze(2).unsqueeze(3) - searched_displacements_plus_wavevector_planewave_templates_rotated
+    offset_radius = torch.norm(offset_delta_T, dim=-1, p="fro")
+    offset_angle_omega_t = torch.atan2(offset_delta_T[:,:,:,:,1], offset_delta_T[:,:,:,:,0])
+    
+    return offset_delta_T, offset_radius, offset_angle_omega_t
 
 
-def p_xx_p_multiwave_vectorized(
-    t_wv: Tensor,
-    i_wv: Tensor,
-    template_ctf_angle: float,
-    image_ctf_angle: float,
-    gamma_rotations: Tensor,
-    displacement_grid: Tensor,
+def planewave_planar_planewave_planar(
+    wavevector_planewave_templates: Tensor,
+    wavevector_planewave_images: Tensor,
+    grid_inplanes: Tensor,
+    searched_displacements: Tensor,
+    angle_planar_ctf_template: Tensor,
+    angle_planar_ctf_image: Tensor,
     grid_max_radius_K: float
-):
-    """Analytical computation of normalized cross-correlation between all (displaced
-    and rotated) templates and all images, using vector operations.
+) -> Tensor:
+    """Analytic solution for integral of plane wave x planar fn x plane wave x planar fn,
+    returning a vector of [image_count] dimension.
+
+    This corresponds to equation 0.6 in the explanatory note.
 
     Args:
-        t_wv (Tensor): Template wavevectors. A set of planewave templates, with
-            each template defined as a stack of 2-d displacements defining a plane
-            wave whose wavelength is the displacement between the origin and
-            the displacement. We assume that the templates are all different
-            projections of a common parent planewave, viewed from different
-            viewing angles (computed elsewhere).
-            Vector should be indexed as [n_template, n_wave_vectors, [x, y]].
-        i_wv (Tensor): Image wavevectors. As with the template wave vectors, but
-            there is no expectation of any relationship to viewing angles.
-            Vector should be indexed as [n_img, n_wave_vectors, [x, y]].
-        template_ctf_angles (Tensor): A stack of stacks of angles defining the
-            planar ctf function applied to each plane wave of the templates.
-            Every plane wave displacement has a single ctf angle, i.e. the
-            n_wave_vector dimension must match the one in template_wavevectors.
-            Indexed as [n_template x n_wave_vector].
-        image_ctf_angles (Tensor): A stack of stacks of angles defining the
-            planar ctf function applied to each plane wave of the images.
-            Indexed as [n_image x n_wave_vector].
-        gamma_rotations (Tensor): Vector of inplane rotations from the
-            viewing angles via the cross-correlation-likelihood object.
-            Used to apply rotations to the templates.
-        displacement_grid (Tensor): Grid of x- and y-displacements to apply to
-            each template before comparing to the images
-        grid_max_radius_K (float): Maximum radius of the polar quadrature grid
+        wavevector_planewave_templates (Tensor): Tensor representation of the planewave
+            Templates (in Fourier space)
+        wavevector_planewave_images (Tensor): Tensor representation of the planewave
+            Images (in Fourier space)
+        grid_inplanes (Tensor): The inplane rotational angles of the quadrature points.
+            Corresponds to gamma.
+        searched_displacements (Tensor): The set of displacements (in Cartesian space)
+            which will be used for matching
+        angle_planar_ctf_template (Tensor): Angle by which the template CTF's planar
+            function has been rotated about the +Z axis
+        angle_planar_ctf_image (Tensor): Angle by which the image CTF's planar
+            function has been rotated about the +Z axis
+        grid_max_radius_K (float): Upper bound for the integration
 
     Returns:
-        Tensor: A tensor of normalized cross-correlation likelihoods for each
-            base template-image pair, times all possible displacements, and
-            all possible inplane rotations. Should match the output of the
-            cross-correlation likelihood calculation's FULL_TENSOR return.
-            Indexed as [n_template, n_image, n_displacement, n_inplane].
+        Tensor: A tensor directly comparable with the non-aggregated cross-correlation
+            likelihood result returned from
+            CrossCorrelationLikelihood._compute_cross_correlation_likelihood()
     """
-    if len(t_wv.shape) < 3:
-        t_wv = t_wv.unsqueeze(1)
-    if len(i_wv.shape) < 3:
-        i_wv = i_wv.unsqueeze(1)
-    rotations = _rotation_matrix(gamma_rotations)
-    # realized_templates are now [S, d, w, n_sources, [x,y]]
-    realized_templates = _displace_templates(t_wv, displacement_grid, rotations)
 
-    rt_norms = p_xx_p_kernel_multiwave(
-        realized_templates,
-        realized_templates,
-        template_ctf_angle,
-        template_ctf_angle,
-        grid_max_radius_K
+    two_pi_K = grid_max_radius_K * 2 * pi
+    _device = wavevector_planewave_templates.device
+    
+    offset_delta_T, offset_radius, offset_angle_omega_t = get_difference_wavevector_images_templates(
+        wavevector_planewave_templates,
+        wavevector_planewave_images,
+        grid_inplanes,
+        searched_displacements
     )
-    image_norms = p_xx_p_kernel_multiwave(
-        i_wv,
-        i_wv,
-        image_ctf_angle,
-        image_ctf_angle,
-        grid_max_radius_K
-    )
+    offset_angle_omega_t = offset_angle_omega_t.to(_device)
+    two_pi_K_delta_T = (offset_radius * two_pi_K).cpu()
 
-    # realized_templates should now be S,d,w,n_sources,[x,y].
-    # image_wavevectors remain M,n_sources,[x,y].
-    # We want the pairwise differences to look like S,M,d,w,n_src,[x,y].
-    # So expand realized_templates to S,:,d,w,n_src,2 and
-    # images to :,M,:,:,n_src,2
-    realized_templates = realized_templates.unsqueeze(0)
-    i_shape = i_wv.shape
-    i_wv = i_wv.reshape(i_shape[0], 1, 1, 1, i_shape[1], i_shape[2])
+    bessel_0 = jv(0, two_pi_K_delta_T).to(_device)
+    bessel_2 = jv(2, two_pi_K_delta_T).to(_device)
+    bessel_4 = jv(4, two_pi_K_delta_T).to(_device)
 
-    raw_integral = p_xx_p_kernel_multiwave(i_wv, realized_templates, image_ctf_angle, template_ctf_angle, grid_max_radius_K)
-    denominator = torch.sqrt(rt_norms.unsqueeze(0) * image_norms.reshape(i_shape[0], 1, 1, 1))
+    phi_pos = angle_planar_ctf_template + angle_planar_ctf_image ## scalar
+    phi_neg = angle_planar_ctf_template - angle_planar_ctf_image ## scalar
 
-    return raw_integral / denominator
+    mode_0: Tensor = torch.cos(phi_neg) * (3. * bessel_0 + 2. * bessel_2 - bessel_4) / 12.0
+    mode_2: Tensor = torch.cos(phi_pos - 2. * offset_angle_omega_t) * (bessel_2 + bessel_4) / 6.0
+    result = 4 * (mode_0 - mode_2) # * pi * grid_max_radius_K ** 4
 
-
-# # ## NOTE: The following two functions are only a check that the vectorized
-# # ## multi-wave-vector analytic formula was implemented correctly.
-# # ## We should keep them for future reference but we are not actually
-# # ## testing anything with them in an automated sense.
-
-# # def _p_xx_p_minikernel(
-# #     delta_t_norm: Tensor,
-# #     phi_pos: Tensor,
-# #     phi_neg: Tensor,
-# #     omega_t: Tensor,
-# #     bessel_coeff: float,
-# #     return_coeff: float
-# # ):
-# #     x = (bessel_coeff * delta_t_norm).cpu().numpy()
-# #     bessel_0: Tensor = torch.tensor(jv(0, x), device=delta_t_norm.device)
-# #     bessel_2: Tensor = torch.tensor(jv(2, x), device=delta_t_norm.device)
-# #     bessel_4: Tensor = torch.tensor(jv(4, x), device=delta_t_norm.device)
-
-# #     mode_0: Tensor = torch.cos(phi_neg) * (3. * bessel_0 + 2. * bessel_2 - bessel_4) / 12
-# #     mode_2: Tensor = torch.cos(phi_pos - 2. * omega_t) * (bessel_2 + bessel_4) / 6.
-
-# #     return 4 * return_coeff * (mode_0 - mode_2)
-
-
-# # def p_xx_p_multiwave_iterative(
-# #     t_wv: Tensor,
-# #     i_wv: Tensor,
-# #     template_ctf_angle: float,
-# #     image_ctf_angle: float,
-# #     gamma_rotations: Tensor,
-# #     displacement_grid: Tensor,
-# #     grid_max_radius_K: float
-# # ):
-# #     # 0: Constants
-# #     bessel_coeff = 2 * pi * grid_max_radius_K
-# #     return_coeff = pi * grid_max_radius_K ** 4
-
-# #     # 1: Compute image norms.
-# #     img_count = i_wv.shape[0]
-# #     i_src_count = i_wv.shape[1]
-# #     _img_norm_phi_pos = torch.tensor(2 * image_ctf_angle)
-# #     _img_norm_phi_neg = torch.tensor(0)
-# #     i_norms = []
-# #     for img in range(img_count):
-# #         i_norm = 0
-# #         for i in range(i_src_count):
-# #             m_src = i_wv[img, i]
-# #             for j in range(i_src_count):
-# #                 s_src = i_wv[img, j]
-# #                 delta_t = m_src - s_src
-# #                 delta_t_norm = torch.norm(delta_t)
-# #                 omega_t = torch.arctan2(delta_t[1], delta_t[0])
-# #                 i_norm += _p_xx_p_minikernel(delta_t_norm, _img_norm_phi_pos, _img_norm_phi_neg, omega_t, bessel_coeff, return_coeff)
-# #         i_norms.append(i_norm)
-# #     i_norms = torch.stack(i_norms, dim=0)
-
-# #     # 2: Rotate and displace templates.
-# #     rotations = _rotation_matrix(gamma_rotations)
-# #     realized_templates = _displace_templates(t_wv, displacement_grid, rotations)
-
-# #     # 3: Compute fully-realized-template norms.
-# #     # Realized_templates s.b. [Template, displacement, rotation, wave-vector]
-# #     assert len(realized_templates.shape) == 5
-# #     t_count = realized_templates.shape[0]
-# #     d_count = realized_templates.shape[1]
-# #     w_count = realized_templates.shape[2]
-# #     t_src_cnt = realized_templates.shape[3]
-
-# #     _tp_norm_phi_pos = torch.tensor(2 * template_ctf_angle)
-# #     _tp_norm_phi_neg = torch.tensor(0)
-# #     t_norms = []
-# #     for t in range(t_count):
-# #         td_norms_buffer = []
-# #         for d in range(d_count):
-# #             tdw_norms_buffer = []
-# #             for w in range(w_count):
-# #                 t_norm = 0
-# #                 for i in range(t_src_cnt):
-# #                     m_src = realized_templates[t,d,w,i]
-# #                     assert len(m_src.shape) == 1
-# #                     assert m_src.shape[0] == 2
-# #                     for j in range(t_src_cnt):
-# #                         s_src = realized_templates[t,d,w,j]
-# #                         assert len(s_src.shape) == 1
-# #                         assert s_src.shape[0] == 2
-# #                         delta_t = m_src - s_src
-# #                         delta_t_norm = torch.norm(delta_t)
-# #                         omega_t = torch.arctan2(delta_t[1], delta_t[0])
-# #                         t_norm += _p_xx_p_minikernel(delta_t_norm, _tp_norm_phi_pos, _tp_norm_phi_neg, omega_t, bessel_coeff, return_coeff)
-# #                 tdw_norms_buffer.append(t_norm)
-# #             tdw_norms = torch.stack(tdw_norms_buffer, dim=0)
-# #             td_norms_buffer.append(tdw_norms)
-# #         td_norms = torch.stack(td_norms_buffer, dim=0)
-# #         t_norms.append(td_norms)
-# #     t_norms = torch.stack(t_norms, dim=0)
-
-
-# #     # 4: Get individual x-corrs, file appropriately
-# #     phi_pos = torch.tensor(image_ctf_angle + template_ctf_angle)
-# #     phi_neg = torch.tensor(template_ctf_angle - image_ctf_angle)  # needs to be opposite of wv subtraction
-
-# #     raw_xcorr = []
-# #     norm_xcorr = []
-# #     for i in range(img_count):
-# #         it_buffer = []
-# #         it_buffer_raw = []
-# #         for t in range(t_count):
-# #             itd_buffer = []
-# #             itd_buffer_raw = []
-# #             for d in range(d_count):
-# #                 itdw_buffer = []
-# #                 itdw_buffer_raw = []
-# #                 for w in range(w_count):
-# #                     integral = 0
-# #                     for i_src in range(i_src_count):
-# #                         m_src = i_wv[i, i_src]
-# #                         for t_src in range(t_src_cnt):
-# #                             s_src = realized_templates[t, d, w, t_src]
-# #                             delta_t = m_src - s_src
-# #                             assert len(delta_t.shape) == 1
-# #                             assert delta_t.shape[0] == 2
-# #                             dt_norm = torch.norm(delta_t)
-# #                             omega_t = torch.arctan2(delta_t[1], delta_t[0])
-# #                             integral += _p_xx_p_minikernel(dt_norm, phi_pos, phi_neg, omega_t, bessel_coeff, return_coeff)
-# #                     itdw_buffer_raw.append(integral)
-# #                     normed = integral / torch.sqrt(t_norms[t, d, w] * i_norms[i]).item()
-# #                     itdw_buffer.append(normed)
-# #                 itd_buffer.append(torch.stack(itdw_buffer, dim=0))
-# #                 itd_buffer_raw.append(torch.stack(itdw_buffer_raw, dim=0))
-# #             it_buffer.append(torch.stack(itd_buffer, dim=0))
-# #             it_buffer_raw.append(torch.stack(itd_buffer_raw, dim=0))
-# #         raw_xcorr.append(torch.stack(it_buffer_raw, dim=0))
-# #         norm_xcorr.append(torch.stack(it_buffer, dim=0))
-# #     raw_xcorr = torch.stack(raw_xcorr, dim=0)
-# #     norm_xcorr = torch.stack(norm_xcorr, dim=0)
-
-# #     return norm_xcorr
+    return result

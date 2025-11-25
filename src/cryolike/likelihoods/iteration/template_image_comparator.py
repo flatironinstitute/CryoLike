@@ -65,8 +65,6 @@ def template_first_comparator(
         )
     ).unsqueeze(0)  # natively nw, this makes it snw
 
-    n_pixels_phys = images.phys_grid.n_pixels_total
-
     Iss = None
     sqrt_mask_points = None
     if return_integrated_likelihood:
@@ -132,9 +130,9 @@ def template_first_comparator(
             if return_integrated_likelihood:
                 assert Iss is not None
                 assert sqrt_mask_points is not None
-                log_likelihood_ms = ill_kernel(
+                log_likelihood_msdw = ill_kernel(
                     Iss,
-                    n_pixels_phys,
+                    images.phys_grid.n_pixels_total,
                     sqrt_mask_points,
                     t_snw * ctf_batch.unsqueeze(1),
                     i_mnw,
@@ -142,6 +140,7 @@ def template_first_comparator(
                     Iyy_msdw,
                     Ixy_msdw
                 )
+                log_likelihood_ms = torch.logsumexp(log_likelihood_msdw, dim = (2, 3))
 
             res = CrossCorrelationYieldType(
                 t_start, t_end, i_start, i_end, cross_correlation_msdw, log_likelihood_ms
