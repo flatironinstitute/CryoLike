@@ -68,7 +68,7 @@ Both wrapper functions take the following parameters:
  - Number of templates and images to use per batch, and whether to
    attempt to determine
    those values automatically (``n_templates_per_batch``,
-   ``n_images_per_batch``, ``estimate_batch_size``)
+   ``n_images_per_batch``, ``discover_batch_size``)
 
 The file manager is provided by the
 :py:func:`cryolike.run_likelihood.configure_likelihood_files` function, and
