@@ -1,13 +1,14 @@
-from cryolike.run_likelihood import run_likelihood
+from cryolike.run_likelihood import run_likelihood_batch
     
 for i_template in range(2):
-    run_likelihood(
+    for i_stack in range(2):
+    run_likelihood_batch(
         params_input = "./output/templates/parameters.npz",
         folder_templates = "./output/templates/",
         folder_particles = "./output/particles/",
         folder_output = "./output/likelihood/",
         i_template = i_template,
-        n_stacks = 1,
+        i_stack = i_stack,
         skip_exist = False,
         n_templates_per_batch = 16,
         n_images_per_batch = 128,

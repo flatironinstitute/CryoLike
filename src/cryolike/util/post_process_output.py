@@ -16,18 +16,26 @@ def _concatenate_image_batches(file_list, num_workers):
     return concatenated_tensor
 
 
-def stitch_log_likelihood_matrices(n_templates: int = 0, n_image_stacks: int = 0, output_directory: str = '',phys=False,opt=False,integrated=False, cc=False):
+def stitch_log_likelihood_matrices(
+                        output_directory,
+                        templates_directory, 
+                        particles_directory,
+                        phys=False,
+                        opt=False,
+                        integrated=False, 
+                        cc=False):
     if phys == False and opt == False and integrated == False and cc == False:
        raise ValueError('at least one of physical, integrated or optimal log likelihoods must be post processed.') 
     n_cpus = cpu_count()
     if n_cpus == 1:
         raise RuntimeError("This function is not useful for single core machines")
 
-    if n_templates <= 0:
-        n_templates = len(np.load(os.path.join(output_directory,'templates/template_file_list.npy')))
-    if n_image_stacks <= 0:
-        n_image_stacks = len(glob.glob(os.path.join(output_directory, 'images', 'phys/*')))
 
+    n_templates = len(np.load(os.path.join(templates_directory,'template_file_list.npy')))
+    print(os.path.abspath(os.path.join(particles_directory)))
+    n_image_stacks = len(glob.glob(os.path.join(particles_directory, 'phys/*')))
+    if n_image_stacks == 0:
+        raise ValueError ('no image stacks detected')
     n_jobs = n_templates * n_image_stacks
     num_workers = min(n_cpus, n_jobs)
 
@@ -36,8 +44,8 @@ def stitch_log_likelihood_matrices(n_templates: int = 0, n_image_stacks: int = 0
     int_fourier_list = []
     cc_list = []
     for i_template in range(n_templates):
-        folder_log_likelihood = os.path.join(output_directory, 'likelihood', 'template%d'%i_template, 'log_likelihood')
-        folder_cc = os.path.join(output_directory, 'likelihood', 'template%d'%i_template, 'cross_correlation')
+        folder_log_likelihood = os.path.join(output_directory, 'template%d'%i_template, 'log_likelihood')
+        folder_cc = os.path.join(output_directory, 'template%d'%i_template, 'cross_correlation')
         for i_stack in range(n_image_stacks):
             if opt == True:
                 opt_fourier_list.append(os.path.join(folder_log_likelihood, f'log_likelihood_fourier_S_stack_{i_stack:06}.pt'))
