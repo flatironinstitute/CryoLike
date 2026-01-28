@@ -10,7 +10,7 @@ if verbose:
 n_voxels = 132
 voxel_size = 1.346
 precision = 'single' # 'single' or 'double'
-viewing_distance = 8.0 / (4.0 * pi)
+viewing_distance = 1 / (4.0 * pi)
 n_inplanes = 256
 # atom_radii = 3.0
 atom_selection = "name CA"
@@ -21,7 +21,7 @@ image_parameters_filename = os.path.join(folder_output, "parameters.npz")
 image_parameters = ImageDescriptor.from_individual_values(
     n_pixels = n_voxels,
     pixel_size = voxel_size,
-    resolution_factor = 1.0,
+    resolution_factor = 0.5,
     precision = precision,
     viewing_distance = viewing_distance,
     n_inplanes = n_inplanes,

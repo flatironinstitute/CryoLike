@@ -13,6 +13,4 @@ convert_particle_stacks_from_star_files(
     pixel_size = pixel_size,
     defocus_angle_is_degree = True,
     phase_shift_is_degree = True,
-    skip_exist = False,
-    flag_plots = True
 )
