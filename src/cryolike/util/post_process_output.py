@@ -30,9 +30,10 @@ def stitch_log_likelihood_matrices(
     if n_cpus == 1:
         raise RuntimeError("This function is not useful for single core machines")
 
+
     n_templates = len(np.load(os.path.join(templates_directory,'template_file_list.npy')))
-    print (glob.glob(os.path.join(particles_directory, 'particles', 'phys/*')))
-    n_image_stacks = len(glob.glob(os.path.join(particles_directory, 'particles', 'phys/*')))
+    print(os.path.abspath(os.path.join(particles_directory)))
+    n_image_stacks = len(glob.glob(os.path.join(particles_directory, 'phys/*')))
     if n_image_stacks == 0:
         raise ValueError ('no image stacks detected')
     n_jobs = n_templates * n_image_stacks

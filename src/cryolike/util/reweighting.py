@@ -87,6 +87,7 @@ def grad_log_prob(
     num_images, num_structures = log_likelihood.shape
 
     log_weights = torch.log(weights)
+    print(log_weights.dtype)
     log_density_at_weights = torch.logsumexp(log_likelihood + log_weights, axis=1)
 
     aux = log_likelihood - log_density_at_weights.reshape(num_images, 1)
@@ -98,7 +99,7 @@ def multiplicative_gradient(
     log_likelihood,
     tol: Optional[float]=10**-4,
     max_iterations: Optional[int]=20000,
-    stats_frequency: Optional[int]=100
+    stats_frequency: Optional[int]=1
 )->float:
     
     """
@@ -138,7 +139,7 @@ def multiplicative_gradient(
     num_images, num_structures = log_likelihood.shape
 
     # Initialize Weights
-    weights = (1/num_structures)*torch.ones(num_structures)
+    weights = (1/num_structures)*torch.ones(num_structures,dtype=torch.float64)
     
     stats_tracking = {}
     stats_tracking["losses"] = []
@@ -179,17 +180,27 @@ def multiplicative_gradient(
 
 def reweighting_wrapper (
     likelihoods_matrix,
-    cross_validate_sets=5,
-    random_seed=42
+    cross_validation_sets=5,
+    random_seed=42,
+    shuffle=False
     ):
 
     np.random.seed(random_seed)
+    print(likelihoods_matrix.dtype)
 
-    np.random.shuffle(likelihoods_matrix)
-    particle_sets = np.array_split(likelihoods_matrix,cross_validate_sets)
-    weights_array = torch.zeros([cross_validate_sets,likelihoods_matrix.shape[1]])
+    if likelihoods_matrix.dtype == torch.float32:
+        likelihoods_matrix = likelihoods_matrix.to(torch.float64)
+        print('here')
 
-    for i  in range(cross_validate_sets):
+    print(likelihoods_matrix.dtype)
+    
+
+    if shuffle == True:
+        np.random.shuffle(likelihoods_matrix)
+    particle_sets = np.array_split(likelihoods_matrix,cross_validation_sets)
+    weights_array = torch.zeros([cross_validation_sets,likelihoods_matrix.shape[1]])
+
+    for i  in range(cross_validation_sets):
         weights_array[i], __ =  multiplicative_gradient (particle_sets[i])
 
          
@@ -202,14 +213,18 @@ def reweighting (
     likelihoods_directory,
     opt=False,
     phys=False,
-    integrated=False
+    integrated=False,
+    cross_validation_sets=5,
+    random_seed=42,
+    ignore_particles=None,
+    ignore_templates=None
     ):
 
     matrices_directory = os.path.join(likelihoods_directory, 'concatenated_matrices')
 
     if opt == True:
-        opt_likelihoods = -torch.load(os.path.join(matrices_directory, 'optimal_fourier_log_likelihood_matrix.pt'), weights_only=False).T
-        weights_array = reweighting_wrapper (opt_likelihoods) 
+        opt_likelihoods = torch.load(os.path.join(matrices_directory, 'optimal_fourier_log_likelihood_matrix.pt'), weights_only=False).T
+        weights_array = reweighting_wrapper (opt_likelihoods,cross_validation_sets=cross_validation_sets,random_seed=random_seed) 
 
         print("Using the optimal calculated posse and displacement, the relative weights between templates are.")
         print(torch.exp(weights_array))
@@ -217,8 +232,12 @@ def reweighting (
         torch.save(weights_array,os.path.join(likelihoods_directory,'opt_weights.pt'))
 
     if integrated == True:
-        integrated_likelihoods = -torch.load(os.path.join(matrices_directory, 'integrated_fourier_log_likelihood_matrix.pt'), weights_only=False).T
-        weights_array = reweighting_wrapper (integrated_likelihoods) 
+        integrated_likelihoods_filename = os.path.join(matrices_directory, 'integrated_fourier_log_likelihood_matrix.pt')
+        print(integrated_likelihoods_filename)
+        integrated_likelihoods = torch.load(integrated_likelihoods_filename,weights_only=False).T
+
+        print(integrated_likelihoods.shape)
+        weights_array = reweighting_wrapper (integrated_likelihoods,cross_validation_sets=cross_validation_sets,random_seed=random_seed) 
 
         print("Using the marginalised likelihoods, the relative weights between templates are.")
         print(torch.exp(weights_array))
